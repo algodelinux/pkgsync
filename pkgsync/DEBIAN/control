@@ -1,0 +1,17 @@
+Package: pkgsync
+Version: 1.24-2
+Architecture: all
+Maintainer: Steinar H. Gunderson <sesse@debian.org>
+Installed-Size: 64
+Depends: aptitude (>= 0.6.1.4-1)
+Suggests: puppet | cfengine2 | cfengine | rdist, tagcoll
+Section: admin
+Priority: optional
+Description: automated package list synchronization
+ pkgsync is a tool for keeping multiple machines reasonably similar and
+ clean. Packages can either be in a `must be installed', `may be
+ installed' or `must not be installed' list (which is presumed to be
+ distributed separately using a tool such as rdist or cfengine). pkgsync
+ will take care of meeting the demands put down in the lists, and then
+ removing everything that is not in the `must' or `may' list and is not
+ necessary for their operations (as determined by aptitude).

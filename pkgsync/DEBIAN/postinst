@@ -1,0 +1,7 @@
+#! /bin/sh -e
+
+if [ -f /etc/cron.d/pkgsync ]; then
+	rm -f /etc/cron.d/pkgsync
+fi
+
+

@@ -1,0 +1,21 @@
+#
+# Sample /etc/pkgsync/musthave file for a rather bare-bones system.
+# Adjust to your own taste :-)
+#
+aptitude
+cfengine2
+console-tools
+grub
+nfs-common
+locales
+pkgsync
+sysklogd
+
+# Misc.
+sudo
+zsh
+
+# X stuff
+x-window-system
+gnome
+wmaker
