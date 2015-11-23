@@ -1,9 +1,9 @@
-a2c1247e448694fbf51b35451ef3ccda  usr/local/sbin/pkgsync
-cfe23b9c8902675bcbfc4d942bda7a83  usr/share/doc/pkgsync/changelog
+04084cd17db844c8c3a5331cbca5ca1e  usr/local/sbin/pkgsync
+43bb55dba9cc6cd2047d4f94b339c837  usr/share/doc/pkgsync/changelog
 1d59cfe57bf2436c052f6d9af746194d  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-c7df93c568d8c8c982658fbed6e5a81f  usr/share/doc/pkgsync/NEWS.Debian.gz
+28932945b674955a447674af02cfc880  usr/share/doc/pkgsync/NEWS.Debian.gz
 d78afac6b66bd1127a0f524af754a4e5  usr/share/doc/pkgsync/README.Debian
 f5d048920ce72b0d08249fdc5c657499  usr/share/man/man8/pkgsync.8.gz
