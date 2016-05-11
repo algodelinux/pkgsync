@@ -2,7 +2,7 @@ pkgsync (1.26-2) unstable; urgency=low
 
  * Pequeños detalles, para mejorar la estética y explicación:
 
-   /usr/loca/sbin/pkgsync
+   /usr/local/sbin/pkgsync
 
    # Comprobamos que está activada
    ENABLE=yes
