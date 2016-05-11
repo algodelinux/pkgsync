@@ -4,6 +4,7 @@
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
 # Modificado: 11/12/2013 Esteban M. Navas Martín <algodelinux@gmail.com>
 # Modificado: 19/11/2015 Esteban M. Navas Martín <algodelinux@gmail.com>
+# Modificado: 09/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 # Permite fusionar los archivos musthave, maynothave y mayhave gestionados
 # por la sección de administración de sistemas con los archivos
@@ -37,23 +38,41 @@
 #
 # pkgsync -t
 #
-# Por último, también he añadido una mejora que considero importante: Se dará prioridad
+# También he añadido una mejora que considero importante: Se dará prioridad
 # a los ficheros maynothave, de tal manera que, cuando el administrador especifique 
 # un nombre de paquete en un fichero maynothave, si el nombre del fichero se encuentra 
 # añadido a cualquiera de los ficheros musthave, pkgsync lo ignorará para que aptitude
 # no trate de instalarlo.
 # 
+# Por último, incorporamos la posibilidad de desactivar pkgsync con tan sólo definir  
+# el valor de la variable ENABLE="no" en el fichero de configuración /etc/default/pkgsync
+#
+# ENABLE="no"
+#
+# La opción por defecto es ENABLE="yes", de manera que tan sólo es necesario definir
+# el parámetro si se desea desactivarlo.
+# Aportación de Antonio Abasolo
+# Esta  novedad es muy interesante porque nos permite, por ejemplo, desactivar pkgsync
+# en portátiles, donde resulta conveniente hacerlo.
+#
 # Licensed under the GNU GPL version 2, as publicshed by the FSF;
 # see /usr/share/common-licenses/GPL-2 on Debian systems or visit
 # www.fsf.org.
 #
 
-. /etc/default/pkgsync
-
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.25-2
+export VERSION=1.26
+
+# Comprobamos que está activada
+ENABLE=yes
+[ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
+if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
+  echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
+  echo "           Para activarla poner el valor ENABLE=yes."
+  exit 0
+fi
 
 if [ ! -r /etc/pkgsync/musthave -o \
      ! -r /etc/pkgsync/mayhave -o \

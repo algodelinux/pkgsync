@@ -1,3 +1,40 @@
+pkgsync (1.26-2) unstable; urgency=low
+
+ * Pequeños detalles, para mejorar la estética y explicación:
+
+   /usr/loca/sbin/pkgsync
+
+   # Comprobamos que está activada
+   ENABLE=yes
+   [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
+   if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
+     echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
+     echo "           Para activarla poner el valor ENABLE=yes."
+     exit 0
+   fi
+
+   /etc/default/pkgsync
+
+   # Activar o desactivar pkgsync:
+   #  ENABLE="yes": activa pkgsync (opción por defecto)
+   #  ENABLE="no" : desactiva pkgsync
+   #  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'no'.
+   ENABLE="yes"
+
+    (proposed by Antonio Abasolo)
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  10 May 2016 17:52:00 +0100
+
+pkgsync (1.26) unstable; urgency=low
+
+  * Added option ENABLE to /etc/default/pkgsync to let disable pkgsync changing
+       ENABLE="yes" (default option)
+
+       by:
+
+       ENABLE="no"
+    (proposed by Antonio Abasolo)
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  09 May 2016 18:10:00 +0100
+
 pkgsync (1.25-2) unstable; urgency=low
 
   * Create directories musthave.d, mayhave.d and maynothave.d for a best organization.
