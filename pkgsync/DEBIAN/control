@@ -1,7 +1,7 @@
 Package: pkgsync
-Version: 1.27
+Version: 1.24-2
 Architecture: all
-Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
+Maintainer: Steinar H. Gunderson <sesse@debian.org>
 Installed-Size: 64
 Depends: aptitude (>= 0.6.1.4-1)
 Suggests: puppet | cfengine2 | cfengine | rdist, tagcoll

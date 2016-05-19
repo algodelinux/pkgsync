@@ -11,6 +11,6 @@ IGNORE_MAYNOTHAVE="no"
 # Activar o desactivar pkgsync:
 #  ENABLE="yes": activa pkgsync (opción por defecto)
 #  ENABLE="no" : desactiva pkgsync
-#  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'no'.
+#  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'yes'.
 ENABLE="yes"
 

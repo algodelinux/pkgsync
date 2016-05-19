@@ -54,32 +54,21 @@ you can safely have a package in both musthave and mayhave, though.
 Sysadmin can ignore files musthave, mayhave and maynothave, changing values in 
 /etc/default/pkgsync:
 # 
-       IGNORE_MUSTHAVE="no"
-       IGNORE_MAYHAVE="no"
-       IGNORE_MAYNOTHAVE="no" 
+# IGNORE_MUSTHAVE="no"
+# IGNORE_MAYHAVE="no"
+# IGNORE_MAYNOTHAVE="no" 
 
 by:
 
-       IGNORE_MUSTHAVE="yes"
-       IGNORE_MAYHAVE="yes"
-       IGNORE_MAYNOTHAVE="yes"
+# IGNORE_MUSTHAVE="yes"
+# IGNORE_MAYHAVE="yes"
+# IGNORE_MAYNOTHAVE="yes"
 
 It's important when package management is shared and the files specified in the musthave, 
 mayhave and maynothave are incompatible with musthave.ies, mayhave.ies and maynothave.ies
 
-Sysadmin can disable pkgsync changing value in /etc/default/pkgsync:
-
-       ENABLE="yes" (default option)
-
-       by:
-
-       ENABLE="no"
-
 I added an upgrade which I consider important: To give priority to the file maynothave. In
 this way, when a package is in maynothave files, It will be ignored at the musthave files.
-
-On the other hand, I have included a new option: -f or --force, which it lets to force the manual
-execution although the variable ENABLE="no"
 
 See sections 2.1 and 2.2 for information on special pattern types.
 

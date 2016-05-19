@@ -1,46 +1,4 @@
-pkgsync (1.27) unstable; urgency=low
-
-  * Added option -f, --force which allows force pkgsync execution
- -- Esteban M. Navas Martín <algodelinux@gmail.com>  19 May 2016 12:02:00 +0100
-
-pkgsync (1.26-2) unstable; urgency=low
-
- * Pequeños detalles, para mejorar la estética y explicación:
-
-   /usr/local/sbin/pkgsync
-
-   # Comprobamos que está activada
-   ENABLE=yes
-   [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
-   if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
-     echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
-     echo "           Para activarla poner el valor ENABLE=yes."
-     exit 0
-   fi
-
-   /etc/default/pkgsync
-
-   # Activar o desactivar pkgsync:
-   #  ENABLE="yes": activa pkgsync (opción por defecto)
-   #  ENABLE="no" : desactiva pkgsync
-   #  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'no'.
-   ENABLE="yes"
-
-    (proposed by Antonio Abasolo)
- -- Esteban M. Navas Martín <algodelinux@gmail.com>  10 May 2016 17:52:00 +0100
-
-pkgsync (1.26) unstable; urgency=low
-
-  * Added option ENABLE to /etc/default/pkgsync to let disable pkgsync changing
-       ENABLE="yes" (default option)
-
-       by:
-
-       ENABLE="no"
-    (proposed by Antonio Abasolo)
- -- Esteban M. Navas Martín <algodelinux@gmail.com>  09 May 2016 18:10:00 +0100
-
-pkgsync (1.25-2) unstable; urgency=low
+pkgsync (1.24-2) unstable; urgency=low
 
   * Create directories musthave.d, mayhave.d and maynothave.d for a best organization.
   * Add /etc/default/pkgsync configuration file to let ignore musthave, mayhave and/or
@@ -54,29 +12,13 @@ pkgsync (1.25-2) unstable; urgency=low
  
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  19 Nov 2015 13:00:05 +0100
 
-pkgsync (1.25) unstable; urgency=medium
-
-  * When listing installed packages, filter out everything after the colon,
-    so that we do not get commandlines that try to (e.g.) install libfoo and
-    set libfoo:amd64 to manually installed at the same time, causing
-    flip-flopping between runs.
-
- -- Steinar H. Gunderson <sesse@debian.org>  Sat, 18 Jul 2015 12:32:23 +0200
- 
-pkgsync (1.24-2) unstable; urgency=low
+pkgsync (1.23-2) unstable; urgency=low
 
   * Add shared management for two sysadmin, merging two different lists:
     * musthave, mayhave, maynothave.
     * musthave.ies, mayhave.ies, maynothave.ies.
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  11 Dec 2013 12:00:33 +0100
-
-pkgsync (1.24) unstable; urgency=medium
-
-  * Remove trailing whitespace from packages, fixing warnings like
-    “Couldn't find package ""” from aptitude.
-
- -- Steinar H. Gunderson <sesse@debian.org>  Sun, 07 Jun 2015 21:56:09 +0200
 
 pkgsync (1.23) unstable; urgency=low
 
