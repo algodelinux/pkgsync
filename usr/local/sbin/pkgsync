@@ -6,7 +6,6 @@
 # Modificado: 19/11/2015 Esteban M. Navas Martín <algodelinux@gmail.com>
 # Modificado: 09/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
 # Modificado: 19/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
-# Modificado: 24/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 # Permite fusionar los archivos musthave, maynothave y mayhave gestionados
 # por la sección de administración de sistemas con los archivos
@@ -249,7 +248,7 @@ parse_options "$@"
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
 
 # Esperamos mientras se esté realizando una actualización de índices
-while [ $(lsof /var/lib/apt/lists/lock | awk '{print $1}' | tail -1) ]; do
+while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
    sleep 1
 done
 
@@ -303,7 +302,7 @@ mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayh
 rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 
 # Esperamos mientras se esté realizando una actualización de paquetes
-while [ $(lsof /var/lib/dpkg/lock | awk '{print $1}' | tail -1) ]; do
+while [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
    sleep 1
 done
 
