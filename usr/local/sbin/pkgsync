@@ -68,7 +68,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.27
+export VERSION=1.28
 
 
 print_help () {
@@ -247,6 +247,11 @@ parse_options "$@"
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
 
+# Esperamos mientras se esté realizando una actualización de índices
+while [ $(lsof /var/lib/apt/lists/lock | awk '{print $1}' | tail -1) ]; do
+   sleep 1
+done
+
 # Update the package lists
 aptitude update
 run_debtags update
@@ -295,6 +300,11 @@ maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/
 mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
 rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+
+# Esperamos mientras se esté realizando una actualización de paquetes
+while [ $(lsof /var/lib/dpkg/lock | awk '{print $1}' | tail -1) ]; do
+   sleep 1
+done
 
 run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 run_aptitude autoclean
