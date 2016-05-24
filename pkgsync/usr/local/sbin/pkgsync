@@ -4,6 +4,8 @@
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
 # Modificado: 11/12/2013 Esteban M. Navas Martín <algodelinux@gmail.com>
 # Modificado: 19/11/2015 Esteban M. Navas Martín <algodelinux@gmail.com>
+# Modificado: 09/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
+# Modificado: 19/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 # Permite fusionar los archivos musthave, maynothave y mayhave gestionados
 # por la sección de administración de sistemas con los archivos
@@ -37,34 +39,37 @@
 #
 # pkgsync -t
 #
-# Por último, también he añadido una mejora que considero importante: Se dará prioridad
+# También he añadido una mejora que considero importante: Se dará prioridad
 # a los ficheros maynothave, de tal manera que, cuando el administrador especifique 
 # un nombre de paquete en un fichero maynothave, si el nombre del fichero se encuentra 
 # añadido a cualquiera de los ficheros musthave, pkgsync lo ignorará para que aptitude
 # no trate de instalarlo.
 # 
+# Incorporamos la posibilidad de desactivar pkgsync con tan sólo definir  
+# el valor de la variable ENABLE="no" en el fichero de configuración /etc/default/pkgsync
+#
+# ENABLE="no"
+#
+# La opción por defecto es ENABLE="yes", de manera que tan sólo es necesario definir
+# el parámetro si se desea desactivarlo.
+# Aportación de Antonio Abasolo
+# Esta  novedad es muy interesante porque nos permite, por ejemplo, desactivar pkgsync
+# en portátiles, donde resulta conveniente hacerlo.
+#
+# Por último he añadido una nueva opción -f o --force para permitir forzar la ejecución
+# manual de pkgsync cuando ha sido desactivado por el usuario mediante la variable
+# ENABLE="no".
+#
 # Licensed under the GNU GPL version 2, as publicshed by the FSF;
 # see /usr/share/common-licenses/GPL-2 on Debian systems or visit
 # www.fsf.org.
 #
 
-. /etc/default/pkgsync
-
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.21
+export VERSION=1.27
 
-if [ ! -r /etc/pkgsync/musthave -o \
-     ! -r /etc/pkgsync/mayhave -o \
-     ! -r /etc/pkgsync/maynothave ]; then
-	echo Error: Missing files in /etc/pkgsync. Aborting.
-	echo
-	echo Please see /usr/share/doc/pkgsync/README.Debian for information on 
-	echo configuring pkgsync.
-
-	exit 1
-fi
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -78,6 +83,7 @@ print_help () {
 	echo "  -d, --dpkg-glob      use dpkg's globbing (deprecated)"
 	echo "  -a, --aptitude-glob  use aptitude's globbing (default, recommended)"
         echo "  -t, --test-files     test pkgsync files"
+        echo "  -f, --force          force pkgsync"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -100,7 +106,7 @@ test_files () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o htksad --long help,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hftksad --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -124,14 +130,17 @@ parse_options () {
 				GLOB_STYLE="aptitude"
 				shift
 				;;
+			-f|--force)
+				shift
+				;;
                         -t|--test-files)
                                 test_files
                                 exit 0
                                 ;;
-			-h|--help)
-				print_help
-				exit 0
-				;;
+			# -h|--help)
+			#	print_help
+			#	exit 0
+			#	;;
 			--)
 				shift
 				break
@@ -144,7 +153,7 @@ parse_options () {
 	done
 }
 readpkgs () {
-	grep -vE '^#' "$1" | grep -vE '^\s*$' || true
+	grep -vE '^#' "$1" | grep -vE '^\s*$' | tr -d " \t"
 }
 getpkgs () {
 	IFS="
@@ -205,6 +214,34 @@ filter () {
 	echo "$@" | tr " " "\n" | sort | uniq -c | grep "     2" | cut -c9-
 }
 
+# Mostrar ayuda
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then 
+   print_help
+   exit 0
+fi
+
+# Controlamos la ejecución manual o automática de pkgsync
+ENABLE=yes
+[ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
+if [ "$1" == "-f" ] || [ "$1" == "--force" ]; then ENABLE=yes; fi
+if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
+  echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
+  echo "           Para activarla poner el valor ENABLE=yes."
+  exit 0
+fi
+
+# No ejecutar pkgsync cuando falta alguno de los ficheros musthave, mayhave o maynothave
+if [ ! -r /etc/pkgsync/musthave -o \
+     ! -r /etc/pkgsync/mayhave -o \
+     ! -r /etc/pkgsync/maynothave ]; then
+	echo Error: Missing files in /etc/pkgsync. Aborting.
+	echo
+	echo Please see /usr/share/doc/pkgsync/README.Debian for information on 
+	echo configuring pkgsync.
+
+	exit 1
+fi
+
 parse_options "$@"
 
 # Check if we've got debtags installed
@@ -261,4 +298,3 @@ rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 
 run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 run_aptitude autoclean
-
