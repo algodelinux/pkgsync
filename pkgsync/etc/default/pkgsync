@@ -1,4 +1,0 @@
-# Ignorar ficheros de configuración musthave, mayhave o maynothave
-IGNORE_MUSTHAVE="no"
-IGNORE_MAYHAVE="no"
-IGNORE_MAYNOTHAVE="no"

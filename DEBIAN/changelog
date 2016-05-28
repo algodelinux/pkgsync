@@ -1,3 +1,8 @@
+pkgsync (1.29) unstable; urgency=low
+
+  * Modified pkgsync to wait if it's making indexes updates or packages updates
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  27 May 2016 07:46:00 +0100
+
 pkgsync (1.28) unstable; urgency=low
 
   * Modified pkgsync to wait if the package manager is running

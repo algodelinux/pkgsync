@@ -68,7 +68,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.28
+export VERSION=1.29
 
 
 print_help () {
@@ -247,8 +247,8 @@ parse_options "$@"
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
 
-# Esperamos mientras se esté realizando una actualización de índices
-while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
+# Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
+while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
    sleep 1
 done
 
@@ -301,8 +301,8 @@ mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
 rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 
-# Esperamos mientras se esté realizando una actualización de paquetes
-while [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
+# Esperamos mientras se esté realizando una actualización de paquetes o una actualización de índices
+while [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
    sleep 1
 done
 

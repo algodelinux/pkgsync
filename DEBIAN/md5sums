@@ -1,5 +1,5 @@
-e745f6e83cb3d174a5adb914d16e83e2  usr/local/sbin/pkgsync
-1c1c3e3604d3e6a8420c803f9d8ce397  usr/share/doc/pkgsync/changelog
+e44122d58e18c4c579edcefc3a35fed4  usr/local/sbin/pkgsync
+a395add9f9a9cfc8c1a0b47d7f13d62f  usr/share/doc/pkgsync/changelog
 d689faff79501dae6ceccddfe019265f  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
