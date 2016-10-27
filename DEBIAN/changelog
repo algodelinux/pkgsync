@@ -1,3 +1,32 @@
+pkgsync (1.31) unstable; urgency=low
+
+  * Changed the way of waiting for sinc_puppet to ensure the delay when the script is started 
+    from pkgsync as it's initiated from another shell
+  * Added -c, --clean option which allow remove uninstalled packages dependencies, purge uninstalled 
+    packages and clean the cache
+  * Added -p, --purge option to let remove old kernels. It's don't remove the last two kernels
+  * Added -S, --shutdown option to let shutdown system after pkgsync execution
+  * Added -R, --reboot option for reboot system after pkgsync execution
+  * Added new options to /etc/default/pkgsync:
+
+    # Eliminar kernels antiguos (por defecto deja los dos últimos)
+    # PURGE_OLD_KERNELS="no": no elimina kernels antiguos (opción por defecto)
+    # PURGE_OLD_KERNELS="yes": elimina kernels antiguos
+    PURGE_OLD_KERNELS="no"
+
+    # Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
+    # CLEAN="no": no hacer limpieza (opción por defecto)
+    # CLEAN="yes": hacer limpieza
+    CLEAN="no"
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  26 Oct 2016 12:30:00 +0100
+
+pkgsync (1.30) unstable; urgency=low
+
+  * Modified pkgsync to kill stopped processes
+  * Launch sinc_puppet if it's installed and wait before update. It's guarantee 
+    pkgsync files are updated before execute pkgsync
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  24 Oct 2016 11:28:00 +0100
+
 pkgsync (1.29) unstable; urgency=low
 
   * Modified pkgsync to wait if it's making indexes updates or packages updates

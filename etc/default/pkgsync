@@ -14,3 +14,12 @@ IGNORE_MAYNOTHAVE="no"
 #  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'yes'.
 ENABLE="yes"
 
+# Eliminar kernels antiguos (por defecto deja los dos últimos)
+# PURGE_OLD_KERNELS="no": no elimina kernels antiguos (opción por defecto)
+# PURGE_OLD_KERNELS="yes": elimina kernels antiguos
+PURGE_OLD_KERNELS="no"
+
+# Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
+# CLEAN="no": no hacer limpieza (opción por defecto)
+# CLEAN="yes": hacer limpieza
+CLEAN="no"

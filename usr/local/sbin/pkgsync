@@ -6,6 +6,8 @@
 # Modificado: 19/11/2015 Esteban M. Navas Martín <algodelinux@gmail.com>
 # Modificado: 09/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
 # Modificado: 19/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
+# Modificado: 24/10/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
+# Modificado: 26/10/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 # Permite fusionar los archivos musthave, maynothave y mayhave gestionados
 # por la sección de administración de sistemas con los archivos
@@ -19,9 +21,9 @@
 # Con ésto facilitamos una gestión compartida
 #
 # A veces, por circunstancias, resulta imposible realizar una gestión compartida
-# En este caso, podemos ignorar los ficheros musthave, mayhave y maynothave, 
+# En este caso, podemos ignorar los ficheros musthave, mayhave y maynothave,
 # cambiando el valor de las siguientes variables en el fichero /etc/default/pkgsync:
-# 
+#
 # IGNORE_MUSTHAVE="no"
 # IGNORE_MAYHAVE="no"
 # IGNORE_MAYNOTHAVE="no"
@@ -33,19 +35,19 @@
 # IGNORE_MAYNOTHAVE="yes"
 #
 # Además permite comprobar si alguno de los ficheros de pkgsync contiene paquetes
-# que no se encuentran disponibles en los repositorios utilizando el parámetro -t, 
+# que no se encuentran disponibles en los repositorios utilizando el parámetro -t,
 # --test-files, mostrándolo por pantalla y volcándolo al fichero de log
 # /var/log/pkgsync/removefromlist.log:
 #
 # pkgsync -t
 #
 # También he añadido una mejora que considero importante: Se dará prioridad
-# a los ficheros maynothave, de tal manera que, cuando el administrador especifique 
-# un nombre de paquete en un fichero maynothave, si el nombre del fichero se encuentra 
+# a los ficheros maynothave, de tal manera que, cuando el administrador especifique
+# un nombre de paquete en un fichero maynothave, si el nombre del fichero se encuentra
 # añadido a cualquiera de los ficheros musthave, pkgsync lo ignorará para que aptitude
 # no trate de instalarlo.
-# 
-# Incorporamos la posibilidad de desactivar pkgsync con tan sólo definir  
+#
+# Incorporamos la posibilidad de desactivar pkgsync con tan sólo definir
 # el valor de la variable ENABLE="no" en el fichero de configuración /etc/default/pkgsync
 #
 # ENABLE="no"
@@ -56,9 +58,42 @@
 # Esta  novedad es muy interesante porque nos permite, por ejemplo, desactivar pkgsync
 # en portátiles, donde resulta conveniente hacerlo.
 #
-# Por último he añadido una nueva opción -f o --force para permitir forzar la ejecución
+# He añadido una nueva opción -f o --force para permitir forzar la ejecución
 # manual de pkgsync cuando ha sido desactivado por el usuario mediante la variable
 # ENABLE="no".
+#
+# En la versión 1.30 incorporo dos nuevas mejoras:
+#
+# * Modifico pkgsync para matar procesos detenidos (en estado T)
+#
+# * Modifico pkgsync para que inicie sinc_puppet si se encuentra instalado y espere a
+#   que termine antes de acualizar. Ésto garantiza que los ficheros de pkgsync se 
+#   encuentren actualizados antes de ejecutar pkgsync     
+#   
+# En la versión 1.31 he incorporado nuevas mejoras:
+#
+# * Cambio la forma de esperar a que sinc_puppet termine para garantizar la espera tanto 
+#   cuando sinc_puppet es iniciado desde pkgsync como cuando sinc_puppet es iniciado 
+#   desde otro shell del sistema.
+#
+# * Añado una opción -c, --clean que permite eliminar dependencias de paquetes desinstalados,
+#   purgar paquetes desinstalados y limpiar la cache:
+#
+#   pkgsync -c
+#
+# * Añado también otra opción -p, --purge-old-kernels que permite eliminar todos los kernels
+#   instalados, salvo los dos últimos. Esta opción utiliza el script purge-old-kernels de
+#   Dustin Kirkland <kirkland@ubuntu.com>
+#
+#   pkgsync -p
+#
+# * Añado una opción que permita apagar el sistema al terminar la ejecución de pkgsync
+#
+#   pkgsync -S  
+#
+# * Añado una opción que permita reiniciar el sistema al terminar la ejecución de pkgsync
+#
+#   pkgsync -R  
 #
 # Licensed under the GNU GPL version 2, as publicshed by the FSF;
 # see /usr/share/common-licenses/GPL-2 on Debian systems or visit
@@ -68,8 +103,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.29
-
+export VERSION=1.31
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -77,13 +111,18 @@ print_help () {
 	echo ""
 	echo "Usage: pkgsync [OPTIONS]"
 	echo "Recognized options:"
-	echo "  -h, --help           display this help and exit"
-	echo "  -k, --keep-unused    don't remove unused packages"
-	echo "  -s, --simulate       don't do anything, just print out what would have happened"
-	echo "  -d, --dpkg-glob      use dpkg's globbing (deprecated)"
-	echo "  -a, --aptitude-glob  use aptitude's globbing (default, recommended)"
-        echo "  -t, --test-files     test pkgsync files"
-        echo "  -f, --force          force pkgsync"
+	echo "  -h, --help               display this help and exit"
+	echo "  -k, --keep-unused        don't remove unused packages"
+	echo "  -s, --simulate           don't do anything, just print out what would have happened"
+	echo "  -d, --dpkg-glob          use dpkg's globbing (deprecated)"
+	echo "  -a, --aptitude-glob      use aptitude's globbing (default, recommended)"
+    echo "  -t, --test-files         test pkgsync files"
+    echo "  -f, --force              force pkgsync"
+    echo "  -c, --clean              remove uninstalled packages dependencies, 
+                                     purge uninstalled packages and clean cache"
+    echo "  -p, --purge-old-kernels  remove old kernels keeping the last two"
+    echo "  -S, --shutdown           shutdown machine after pkgsync"
+    echo "  -R, --reboot             reboot machine after pkgsync"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -95,7 +134,7 @@ test_files () {
     echo "Checking $fichero"
     while read paquete; do
        existe=$(apt-cache policy $paquete 2>/dev/null)
-       if [ ! "$existe" ]; then 
+       if [ ! "$existe" ]; then
           echo "Package $paquete in file $fichero isn't in repositories"
           echo "Package $paquete in file $fichero isn't in repositories" >> /var/log/pkgsync/removefromlist.log
        fi
@@ -106,7 +145,7 @@ test_files () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hftksad --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hftksadcpSR --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,shutdown,reboot -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -133,10 +172,26 @@ parse_options () {
 			-f|--force)
 				shift
 				;;
-                        -t|--test-files)
-                                test_files
-                                exit 0
-                                ;;
+			-c|--clean)
+				CLEAN="yes"
+				shift
+				;;
+			-p|--purge-old-kernels)
+				PURGE_OLD_KERNELS="yes"
+				shift
+				;;
+			-S|--shutdown)
+				SHUTDOWN=true
+				shift
+				;;
+			-R|--reboot)
+				REBOOT=true
+				shift
+				;;
+            -t|--test-files)
+                test_files
+                exit 0
+                ;;
 			# -h|--help)
 			#	print_help
 			#	exit 0
@@ -200,25 +255,31 @@ getpkgs () {
 }
 run_aptitude () {
 	echo RUNNING: aptitude $APTITUDE_ARGS "$@"
-	aptitude $APTITUDE_ARGS "$@" 
+	aptitude $APTITUDE_ARGS "$@"
 }
 run_debtags () {
 	if [ "$USE_DEBTAGS" ]; then
 		echo RUNNING: debtags "$@"
-		debtags "$@" 
+		debtags "$@"
 	fi
 }
 
 # The beautiful look of hacks in the morning...
-filter () { 
+filter () {
 	echo "$@" | tr " " "\n" | sort | uniq -c | grep "     2" | cut -c9-
 }
 
+function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
+
 # Mostrar ayuda
-if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then 
+if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
    print_help
    exit 0
 fi
+
+# Establecemos valores por defecto al terminar
+SHUTDOWN=false # No apagar
+REBOOT=false   # No reiniciar
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
@@ -236,7 +297,7 @@ if [ ! -r /etc/pkgsync/musthave -o \
      ! -r /etc/pkgsync/maynothave ]; then
 	echo Error: Missing files in /etc/pkgsync. Aborting.
 	echo
-	echo Please see /usr/share/doc/pkgsync/README.Debian for information on 
+	echo Please see /usr/share/doc/pkgsync/README.Debian for information on
 	echo configuring pkgsync.
 
 	exit 1
@@ -246,6 +307,23 @@ parse_options "$@"
 
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
+
+# Matamos procesos detenidos
+stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
+if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
+
+# Si se encuentra sinc_puppet, lo iniciamos
+installed_version=$(dpkg -s linex-ubuntu-puppet | grep 'Version:' | cut -f2 -d" ")
+if version_ge $installed_version "2.7"; then
+   [ -x /usr/sbin/sinc_puppet ] && /usr/sbin/sinc_puppet -f now
+else
+   [ -x /usr/sbin/sinc_puppet ] && /usr/sbin/sinc_puppet -f
+fi
+
+# Si está corriendo sinc_puppet, esperamos hasta que termine
+while [ $(pgrep sinc_puppet) ]; do
+   sleep 1
+done
 
 # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
 while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
@@ -309,3 +387,18 @@ done
 run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 run_aptitude autoclean
 
+# Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/purge-old-kernels
+if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then /usr/local/sbin/purge-old-kernels -qy; fi
+
+# Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
+if [ $CLEAN = "yes" ]; then
+   apt-get -y autoremove
+   apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
+   apt-get -y clean
+fi
+
+# Apagar el equipo si el usuario pasó el parámetro -S
+if [ $SHUTDOWN = true ]; then /sbin/poweroff; fi
+
+# Reiniciar el equipo si el usuario pasó el parámetro -R
+if [ $REBOOT = true ]; then /sbin/reboot; fi
