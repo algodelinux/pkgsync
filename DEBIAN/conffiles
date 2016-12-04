@@ -1,1 +1,2 @@
 /etc/cron.daily/nightly-pkgsync
+/etc/default/pkgsync

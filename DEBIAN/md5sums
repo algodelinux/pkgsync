@@ -1,14 +1,12 @@
-c5890a00f7bb0413db53b72013c880aa  etc/default/pkgsync
+048a17b4685db5f47b1b53d4adfd1d07  etc/default/pkgsync
 6d351879accf54351998651bf11a13ea  etc/cron.daily/nightly-pkgsync
-f55d58623ebcbdecb225a9dd09182635  usr/local/sbin/pkgsync
-97e771df5e7e9aae858d723e36cea68e  usr/local/sbin/purge-old-kernels
-0b6c323b7a790b0bff964bb3500e2936  usr/share/doc/pkgsync/changelog
+dca2a4c04064d6ab41c9872f35512036  usr/local/sbin/pkgsync
+4670d8168ac5f498fa7fed295e843b17  usr/share/doc/pkgsync/changelog
 d689faff79501dae6ceccddfe019265f  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-6962fa4fe51154a52db5cc190d795195  usr/share/doc/pkgsync/NEWS.Debian.gz
+888711eae333d1f4130000e4111d3efa  usr/share/doc/pkgsync/NEWS.Debian.gz
 3eadb2d392c6cbf4e4174b4733a8cb17  usr/share/doc/pkgsync/README.Debian
-7289c885d33c43e75a6994b663a2933a  usr/share/man/man8/pkgsync.8.gz
-7760924c508f7f177123de09d19ea5a0  usr/share/man/man8/purge-old-kernels.8.gz
-
+852d2a56ce5d7806c3d56b0d660221df  usr/share/man/man8/pkgsync.8.gz
+20281955c98e701e21d0c4a150d59d65  usr/share/man/man8/purge-old-kernels.8.gz

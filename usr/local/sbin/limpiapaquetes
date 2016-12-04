@@ -1,0 +1,10 @@
+#!/bin/bash
+# limpiapaquetes - Hace limpieza purgando paquetes desinstalados, huérfanos y limpiando la cache de apt
+# 2013-2016 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+#apt-get -y remove --purge $(deborphan)
+#apt-get -y remove --purge $(deborphan --libdev)
+apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
+apt-get -y autoremove
+apt-get clean

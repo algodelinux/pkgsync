@@ -1,3 +1,48 @@
+pkgsync (1.35-1) unstable; urgency=low
+
+  * Added  new option to /etc/default/pkgsync:
+    # LAUNCH_SINC_PUPPET="no": Don't boot sinc_puppet before do pkgsync
+    # LAUNCH_SINC_PUPPET="yes": Launch sinc_puppet before do pkgsync (default option)
+    LAUNCH_SINC_PUPPET="yes"
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  1 Nov 2016 07:00:00 +0100
+
+pkgsync (1.35) unstable; urgency=low
+
+  * Added  -r, --remove-orphan-libs which allow remove orphan libraries.
+    The orphan libraries list is stored at /var/log/pkgsync/removefrommusthave.log
+    and /etc/pkgsync/musthave.orphan
+  * Modified pkgsync code to wait and inform user when pkgsync is waiting for
+    apk, dpkg or sinc_puppet.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  1 Nov 2016 07:00:00 +0100
+
+pkgsync (1.34-1) unstable; urgency=low
+
+  * Modified function solveapterrors to solve a bug
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  21 Nov 2016 12:00:00 +0100
+
+pkgsync (1.34) unstable; urgency=low
+
+  * Modified pkgsync to detect and solve apt problems. Now, apart configure packages when dpkg
+    was interrupted, it remove /var/lib/apt/lists if there are corrupted lists.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  20 Nov 2016 21:00:00 +0100
+
+pkgsync (1.33) unstable; urgency=low
+
+  * Modified pkgsync to guarantee all operations are done before poweroff or
+    reboot machine
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  14 Nov 2016 11:20:00 +0100
+
+pkgsync (1.32) unstable; urgency=low
+
+  * Modified pkgsync to guarantee status of packages and purge old kernels at start
+   
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  04 Nov 2016 14:00:00 +0100
+
 pkgsync (1.31) unstable; urgency=low
 
   * Changed the way of waiting for sinc_puppet to ensure the delay when the script is started 
