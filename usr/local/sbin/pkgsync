@@ -2,108 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# Modificado: 11/12/2013 Esteban M. Navas Martín <algodelinux@gmail.com>
-# Modificado: 19/11/2015 Esteban M. Navas Martín <algodelinux@gmail.com>
-# Modificado: 09/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
-# Modificado: 19/05/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
-# Modificado: 24/10/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
-# Modificado: 26/10/2016 Esteban M. Navas Martín <algodelinux@gmail.com>
-#
-# Permite fusionar los archivos musthave, maynothave y mayhave gestionados
-# por la sección de administración de sistemas con los archivos
-# musthave.ies, maynothave.ies y mayhave.ies gestionados por el administrador
-# informático del centro, fusioándolos en los siguientes archivos:
-# musthave.all, maynothave.all y mayhave.all
-#
-# En esta última versión he añadido la posibilidad de crear ficheros
-# en /etc/pkgsync/musthave.d, /etc/pkgsync/mayhave.d y /etc/pkgsync/maynothave.d
-# lo que permite al administrador organizar las listas de paquetes
-# Con ésto facilitamos una gestión compartida
-#
-# A veces, por circunstancias, resulta imposible realizar una gestión compartida
-# En este caso, podemos ignorar los ficheros musthave, mayhave y maynothave,
-# cambiando el valor de las siguientes variables en el fichero /etc/default/pkgsync:
-#
-# IGNORE_MUSTHAVE="no"
-# IGNORE_MAYHAVE="no"
-# IGNORE_MAYNOTHAVE="no"
-#
-# por:
-#
-# IGNORE_MUSTHAVE="yes"
-# IGNORE_MAYHAVE="yes"
-# IGNORE_MAYNOTHAVE="yes"
-#
-# Además permite comprobar si alguno de los ficheros de pkgsync contiene paquetes
-# que no se encuentran disponibles en los repositorios utilizando el parámetro -t,
-# --test-files, mostrándolo por pantalla y volcándolo al fichero de log
-# /var/log/pkgsync/removefromlist.log:
-#
-# pkgsync -t
-#
-# También he añadido una mejora que considero importante: Se dará prioridad
-# a los ficheros maynothave, de tal manera que, cuando el administrador especifique
-# un nombre de paquete en un fichero maynothave, si el nombre del fichero se encuentra
-# añadido a cualquiera de los ficheros musthave, pkgsync lo ignorará para que aptitude
-# no trate de instalarlo.
-#
-# Incorporamos la posibilidad de desactivar pkgsync con tan sólo definir
-# el valor de la variable ENABLE="no" en el fichero de configuración /etc/default/pkgsync
-#
-# ENABLE="no"
-#
-# La opción por defecto es ENABLE="yes", de manera que tan sólo es necesario definir
-# el parámetro si se desea desactivarlo.
-# Aportación de Antonio Abasolo
-# Esta  novedad es muy interesante porque nos permite, por ejemplo, desactivar pkgsync
-# en portátiles, donde resulta conveniente hacerlo.
-#
-# He añadido una nueva opción -f o --force para permitir forzar la ejecución
-# manual de pkgsync cuando ha sido desactivado por el usuario mediante la variable
-# ENABLE="no".
-#
-# En la versión 1.30 incorporo dos nuevas mejoras:
-#
-# * Modifico pkgsync para matar procesos detenidos (en estado T)
-#
-# * Modifico pkgsync para que inicie sinc_puppet si se encuentra instalado y espere a
-#   que termine antes de acualizar. Ésto garantiza que los ficheros de pkgsync se 
-#   encuentren actualizados antes de ejecutar pkgsync     
-#   
-# En la versión 1.31 he incorporado nuevas mejoras:
-#
-# * Cambio la forma de esperar a que sinc_puppet termine para garantizar la espera tanto 
-#   cuando sinc_puppet es iniciado desde pkgsync como cuando sinc_puppet es iniciado 
-#   desde otro shell del sistema.
-#
-# * Añado una opción -c, --clean que permite eliminar dependencias de paquetes desinstalados,
-#   purgar paquetes desinstalados y limpiar la cache:
-#
-#   pkgsync -c
-#
-# * Añado también otra opción -p, --purge-old-kernels que permite eliminar todos los kernels
-#   instalados, salvo los dos últimos. Esta opción utiliza el script purge-old-kernels de
-#   Dustin Kirkland <kirkland@ubuntu.com>
-#
-#   pkgsync -p
-#
-# * Añado una opción que permita apagar el sistema al terminar la ejecución de pkgsync
-#
-#   pkgsync -S  
-#
-# * Añado una opción que permita reiniciar el sistema al terminar la ejecución de pkgsync
-#
-#   pkgsync -R  
-#
-# Licensed under the GNU GPL version 2, as publicshed by the FSF;
-# see /usr/share/common-licenses/GPL-2 on Debian systems or visit
-# www.fsf.org.
+# 2013-2016 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.31
+export VERSION=1.35-1
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -111,18 +16,19 @@ print_help () {
 	echo ""
 	echo "Usage: pkgsync [OPTIONS]"
 	echo "Recognized options:"
-	echo "  -h, --help               display this help and exit"
-	echo "  -k, --keep-unused        don't remove unused packages"
-	echo "  -s, --simulate           don't do anything, just print out what would have happened"
-	echo "  -d, --dpkg-glob          use dpkg's globbing (deprecated)"
-	echo "  -a, --aptitude-glob      use aptitude's globbing (default, recommended)"
-    echo "  -t, --test-files         test pkgsync files"
-    echo "  -f, --force              force pkgsync"
-    echo "  -c, --clean              remove uninstalled packages dependencies, 
-                                     purge uninstalled packages and clean cache"
-    echo "  -p, --purge-old-kernels  remove old kernels keeping the last two"
-    echo "  -S, --shutdown           shutdown machine after pkgsync"
-    echo "  -R, --reboot             reboot machine after pkgsync"
+	echo "  -h, --help                display this help and exit"
+	echo "  -k, --keep-unused         don't remove unused packages"
+	echo "  -s, --simulate            don't do anything, just print out what would have happened"
+	echo "  -d, --dpkg-glob           use dpkg's globbing (deprecated)"
+	echo "  -a, --aptitude-glob       use aptitude's globbing (default, recommended)"
+	echo "  -t, --test-files          test pkgsync files"
+	echo "  -f, --force               force pkgsync"
+	echo "  -c, --clean               remove uninstalled packages dependencies, 
+                                          purge uninstalled packages and clean cache"
+	echo "  -p, --purge-old-kernels   remove old kernels keeping the last two"
+	echo "  -r, --remove-orphan-libs  remove orphan libs"
+	echo "  -S, --shutdown            shutdown machine after pkgsync"
+	echo "  -R, --reboot              reboot machine after pkgsync"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -130,7 +36,7 @@ print_help () {
 test_files () {
   :>/var/log/pkgsync/removefromlist.log
 
-  for fichero in $(find /etc/pkgsync -type f); do
+  for fichero in $(find /etc/pkgsync -type f -not -name *.all); do
     echo "Checking $fichero"
     while read paquete; do
        existe=$(apt-cache policy $paquete 2>/dev/null)
@@ -145,7 +51,7 @@ test_files () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hftksadcpSR --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,shutdown,reboot -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hftksadcprSR --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,remove-orphan-libs,shutdown,reboot -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -170,6 +76,7 @@ parse_options () {
 				shift
 				;;
 			-f|--force)
+				FORCE=true
 				shift
 				;;
 			-c|--clean)
@@ -180,6 +87,10 @@ parse_options () {
 				PURGE_OLD_KERNELS="yes"
 				shift
 				;;
+			-r|--remove-orphan-libs)
+				REMOVE_ORPHAN_LIBS="yes"
+				shift
+				;;
 			-S|--shutdown)
 				SHUTDOWN=true
 				shift
@@ -188,14 +99,14 @@ parse_options () {
 				REBOOT=true
 				shift
 				;;
-            -t|--test-files)
-                test_files
-                exit 0
-                ;;
-			# -h|--help)
-			#	print_help
-			#	exit 0
-			#	;;
+			-t|--test-files)
+				test_files
+				exit 0
+				;;
+			-h|--help)
+				print_help
+				exit 0
+				;;
 			--)
 				shift
 				break
@@ -271,25 +182,95 @@ filter () {
 
 function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
 
-# Mostrar ayuda
-if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
-   print_help
-   exit 0
-fi
+wait_for_apt_or_dpkg() {
+  # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
+  if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; then
+     echo "Esperando mientras se actualizan índices o paquetes..."
+  fi
+  while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
+     sleep 1
+  done
+}
 
-# Establecemos valores por defecto al terminar
+solveapterrors() {
+  idioma=$LC_ALL
+  export LC_ALL=C
+
+  apt-get check 1>/dev/null 2>/tmp/apterrors
+
+  if [ -s /tmp/apterrors ]; then
+     grep "Unmet dependencies. Try using -f." /tmp/apterrors && apt-get -yf install && dpkg --configure -a && apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors && dpkg --configure -a && apt-get -yf install && apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors && rm -rf /var/lib/apt/lists/
+  fi
+
+  export LC_ALL=$idioma
+}
+
+eliminar_kernels() {
+  # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/purge-old-kernels
+  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then /usr/local/sbin/purge-old-kernels -qy; fi
+}
+
+eliminar_paquetes_huerfanos() {
+  # Eliminar librerías huérfanas
+  if [ $REMOVE_ORPHAN_LIBS = "yes" ] && [ -x /usr/bin/deborphan ]; then
+    /usr/bin/deborphan>/tmp/orphan_libs
+    if [ -s /tmp/orphan_libs ]; then
+       sort -o /tmp/orphan_libs /tmp/orphan_libs
+       apt-get -y remove --purge $(cat /tmp/orphan_libs)
+       echo "Remove these packages from musthave files:" > /var/log/pkgsync/removefrommusthave.log
+       echo > /var/log/pkgsync/removefrommusthave.log
+       cat /tmp/orphan_libs >> /var/log/pkgsync/removefrommusthave.log
+       cat /tmp/orphan_libs > /etc/pkgsync/musthave.orphan
+    fi
+  fi
+}
+
+eliminar_dependencias() {
+  # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
+  if [ $CLEAN = "yes" ]; then
+     apt-get -y autoremove
+     apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
+     apt-get -y clean
+  fi
+}
+
+apagar_equipo() {
+  # Apagar el equipo si el usuario pasó el parámetro -S
+  if [ $SHUTDOWN = true ]; then /sbin/poweroff; fi
+}
+
+reiniciar_equipo() {
+  # Reiniciar el equipo si el usuario pasó el parámetro -R
+  if [ $REBOOT = true ]; then /sbin/reboot; fi
+}
+
+# Matamos procesos detenidos
+stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
+if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
+
+# Establecemos valores por defecto
+HELP=false
+FORCE=false
 SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
+PURGE_OLD_KERNELS=no
+CLEAN=no
+REMOVE_ORPHAN_LIBS=no
+LAUNCH_SINC_PUPPET=yes
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
 [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
-if [ "$1" == "-f" ] || [ "$1" == "--force" ]; then ENABLE=yes; fi
+if [ $FORCE ]; then ENABLE=yes; fi
 if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
   echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
   echo "           Para activarla poner el valor ENABLE=yes."
   exit 0
 fi
+
+parse_options "$@"
 
 # No ejecutar pkgsync cuando falta alguno de los ficheros musthave, mayhave o maynothave
 if [ ! -r /etc/pkgsync/musthave -o \
@@ -303,41 +284,42 @@ if [ ! -r /etc/pkgsync/musthave -o \
 	exit 1
 fi
 
-parse_options "$@"
-
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
 
-# Matamos procesos detenidos
-stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
-if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
+# Aseguramos el estado de los paquetes y eliminamos kernels antiguos
+wait_for_apt_or_dpkg;solveapterrors;eliminar_kernels
 
-# Si se encuentra sinc_puppet, lo iniciamos
-installed_version=$(dpkg -s linex-ubuntu-puppet | grep 'Version:' | cut -f2 -d" ")
-if version_ge $installed_version "2.7"; then
-   [ -x /usr/sbin/sinc_puppet ] && /usr/sbin/sinc_puppet -f now
-else
-   [ -x /usr/sbin/sinc_puppet ] && /usr/sbin/sinc_puppet -f
+runned_sinc_puppet=false
+# Si está corriendo sinc_puppet, esperamos hasta que termine
+if [ $(pgrep sinc_puppet) ]; then
+   echo "Esperando a que termine sinc_puppet..."
+   runned_sinc_puppet=true
 fi
 
-# Si está corriendo sinc_puppet, esperamos hasta que termine
 while [ $(pgrep sinc_puppet) ]; do
    sleep 1
 done
 
-# Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
-while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
-   sleep 1
-done
+# Si se encuentra sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
+if [ $runned_sinc_puppet = false ]; then
+   installed_version=$(dpkg -s linex-ubuntu-puppet | grep 'Version:' | cut -f2 -d" ")
+   if version_ge $installed_version "2.7"; then
+      if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now; fi
+   else
+      if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f; fi
+   fi
+fi
 
 # Update the package lists
-aptitude update
+wait_for_apt_or_dpkg;aptitude update
 run_debtags update
 
 # Create ies files if don't exists
 test -f /etc/pkgsync/musthave.ies || touch /etc/pkgsync/musthave.ies
 test -f /etc/pkgsync/maynothave.ies || touch /etc/pkgsync/maynothave.ies
 test -f /etc/pkgsync/mayhave.ies || touch /etc/pkgsync/mayhave.ies
+test -f /etc/pkgsync/musthave.orphan || touch /etc/pkgsync/musthave.orphan
 
 if [ "$IGNORE_MUSTHAVE" = "yes" ]; then
    MUSTHAVE=""
@@ -367,9 +349,9 @@ sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/mus
 sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/mayhave.all
 sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/maynothave.all
 
-# Remove maynothave.all packages from musthave.all
-comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/maynothave.all > /tmp/musthave.all
-cp /tmp/musthave.all /etc/pkgsync/musthave.all
+# Remove maynothave.all and musthave.orphan packages from musthave.all
+comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all
+comm -23 /tmp/musthave.all /etc/pkgsync/maynothave.all > /etc/pkgsync/musthave.all
 
 # Find out what parameters to give to aptitude.
 installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
@@ -379,26 +361,7 @@ mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
 rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 
-# Esperamos mientras se esté realizando una actualización de paquetes o una actualización de índices
-while [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
-   sleep 1
-done
-
-run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+wait_for_apt_or_dpkg;run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 run_aptitude autoclean
 
-# Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/purge-old-kernels
-if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then /usr/local/sbin/purge-old-kernels -qy; fi
-
-# Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
-if [ $CLEAN = "yes" ]; then
-   apt-get -y autoremove
-   apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
-   apt-get -y clean
-fi
-
-# Apagar el equipo si el usuario pasó el parámetro -S
-if [ $SHUTDOWN = true ]; then /sbin/poweroff; fi
-
-# Reiniciar el equipo si el usuario pasó el parámetro -R
-if [ $REBOOT = true ]; then /sbin/reboot; fi
+wait_for_apt_or_dpkg;eliminar_kernels;eliminar_dependencias;eliminar_paquetes_huerfanos;apagar_equipo;reiniciar_equipo

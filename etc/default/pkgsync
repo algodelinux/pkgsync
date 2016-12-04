@@ -23,3 +23,14 @@ PURGE_OLD_KERNELS="no"
 # CLEAN="no": no hacer limpieza (opción por defecto)
 # CLEAN="yes": hacer limpieza
 CLEAN="no"
+
+# Eliminar librerías huérfanas
+# REMOVE_ORPHAN_LIBS="no": no eliminar librerías huérfanas (opción por defecto)
+# REMOVE_ORPHAN_LIBS="yes": eliminar librerías huérfanas
+REMOVE_ORPHAN_LIBS="no"
+
+# Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de pkgsync 
+# se encuentren actualizados
+# LAUNCH_SINC_PUPPET="no": no iniciar sinc_puppet antes de hacer pkgsync
+# LAUNCH_SINC_PUPPET="yes": iniciar sinc_puppet antes de hacer pkgsync (opción por defecto)
+LAUNCH_SINC_PUPPET="yes"
