@@ -1,9 +1,9 @@
 Package: pkgsync
-Version: 1.35-1
+Version: 1.36
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
 Installed-Size: 64
-Depends: aptitude (>= 0.6.1.4-1), deborphan
+Depends: aptitude (>= 0.6.1.4-1), deborphan, facter
 Suggests: puppet | cfengine2 | cfengine | rdist, tagcoll
 Section: admin
 Priority: optional

@@ -1,0 +1,43 @@
+#!/bin/bash
+#
+# Crea un fichero /etc/pkgsync/musthave con la lista de paquetes instalados de forma
+# intencionada en el sistema.
+# Normalmente lo utilizamos para mantener el mismo software instalado en una serie de máquinas
+# mediante pkgsync, aunque también podríamos usarlo para clonar los paquetes instalados en otra
+# máquina con dpkg --set-selections.
+#
+# 2013-2016 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+test -d /etc/pkgsync || mkdir /etc/pkgsync
+
+codename=`lsb_release --codename | cut -f2`
+
+case $codename in
+"squeeze")
+  echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
+  aptitude show "?installed ?not(?priority(required)) ?not(?essential) ?not(?automatic)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " | sort > /etc/pkgsync/musthave
+  ;;
+"wheezy"|"jessie")
+  echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
+  aptitude show "?installed ?not(?priority(required)) ?not(?essential) ?not(?automatic)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " | sort > /etc/pkgsync/musthave
+  echo "Obteniendo lista de paquetes multiarch..."
+  aptitude show "?installed ?multiarch(same)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " > /tmp/same
+  sort -u -o /tmp/same /tmp/same
+
+  echo "Procesando lista de paquetes multiarch..."
+  for paquete in `cat /tmp/same`; do
+      sed -i 's|$paquete||' /etc/pkgsync/musthave
+      dpkg -l|grep "$paquete:i386" 1>/dev/null && echo "$paquete:i386" >> /etc/pkgsync/musthave
+      dpkg -l|grep "$paquete:amd64" 1>/dev/null && echo "$paquete:amd64" >> /etc/pkgsync/musthave
+  done
+  sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
+  ;;
+"trusty")
+  echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
+  aptitude search '~i !~M' -F '%p' --disable-columns | sort -u > /etc/pkgsync/musthave
+  sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
+  ;;
+esac
+
+echo "Proceso concluido."

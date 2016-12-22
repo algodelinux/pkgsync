@@ -1,7 +1,10 @@
-048a17b4685db5f47b1b53d4adfd1d07  etc/default/pkgsync
+72c64c90e9d5bc91e40859969d08a4db  etc/default/pkgsync
 6d351879accf54351998651bf11a13ea  etc/cron.daily/nightly-pkgsync
-dca2a4c04064d6ab41c9872f35512036  usr/local/sbin/pkgsync
-4670d8168ac5f498fa7fed295e843b17  usr/share/doc/pkgsync/changelog
+1ea23cab1d22f945d0d6f97f614c9248  usr/local/sbin/limpiapaquetes
+3b4eaf3d139887ec2bb8d0064c800e23  usr/local/sbin/musthave-build
+5834f5dc8a9157f9c4a1a4a94895127e  usr/local/sbin/pkgsync
+97e771df5e7e9aae858d723e36cea68e  usr/local/sbin/purge-old-kernels
+1c77c6fab4605d3a3d657efa368e6234  usr/share/doc/pkgsync/changelog
 d689faff79501dae6ceccddfe019265f  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave

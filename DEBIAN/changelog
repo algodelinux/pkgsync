@@ -1,3 +1,19 @@
+pkgsync (1.36) unstable; urgency=low
+
+  * Added  new option to /etc/default/pkgsync:
+    # AUTOMATIC_SHUTDOWN_BETWEEN="": Don't shutdown computer after pkgsync (default option)
+    # AUTOMATIC_SHUTDOWN_BETWEEN="22:00-07:00": Auto shutdown computer after pkgsync in specified interval
+    AUTOMATIC_SHUTDOWN_BETWEEN=""
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  22 Dec 2016 09:27:00 +0100
+
+pkgsync (1.35-2) unstable; urgency=low
+
+  * Solved a bug in remove-orphan-libs option.
+  * Added script usr/local/sbin/musthave-build
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  13 Dec 2016 09:54:00 +0100
+
 pkgsync (1.35-1) unstable; urgency=low
 
   * Added  new option to /etc/default/pkgsync:
@@ -13,7 +29,7 @@ pkgsync (1.35) unstable; urgency=low
     The orphan libraries list is stored at /var/log/pkgsync/removefrommusthave.log
     and /etc/pkgsync/musthave.orphan
   * Modified pkgsync code to wait and inform user when pkgsync is waiting for
-    apk, dpkg or sinc_puppet.
+    apk, dpkg or pkgsync.
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  1 Nov 2016 07:00:00 +0100
 

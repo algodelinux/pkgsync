@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.35-1
+export VERSION=1.36
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -222,7 +222,7 @@ eliminar_paquetes_huerfanos() {
        echo "Remove these packages from musthave files:" > /var/log/pkgsync/removefrommusthave.log
        echo > /var/log/pkgsync/removefrommusthave.log
        cat /tmp/orphan_libs >> /var/log/pkgsync/removefrommusthave.log
-       cat /tmp/orphan_libs > /etc/pkgsync/musthave.orphan
+       sed -e "s/:.*$//" /tmp/orphan_libs | sort -u > /etc/pkgsync/musthave.orphan
     fi
   fi
 }
@@ -246,6 +246,30 @@ reiniciar_equipo() {
   if [ $REBOOT = true ]; then /sbin/reboot; fi
 }
 
+check_auto_shutdown() {
+  time=$(date +%H%M)
+
+  if [ -n "$AUTOMATIC_SHUTDOWN_BETWEEN" ]; then
+     (echo "$AUTOMATIC_SHUTDOWN_BETWEEN" | grep -Eq ^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$)
+     horaini=$(expr match "$AUTOMATIC_SHUTDOWN_BETWEEN" '\(..:..\)' | tr -d ':')
+     horafin=$(expr "$AUTOMATIC_SHUTDOWN_BETWEEN" : '.*\(..:..\)' | tr -d ':')
+
+     if [ "$horaini" -lt "$horafin" ]; then
+        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && SHUTDOWN=true || SHUTDOWN=false
+     else
+        if [ "$horaini" -gt "$horafin" ]; then
+           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && SHUTDOWN=true || SHUTDOWN=false
+        fi
+     fi
+  fi
+
+  # Defined only for testing purposes
+  # echo hora actual: $time
+  # echo $SHUTDOWN
+  # echo hora inicio: [$horaini]
+  # echo hora fin: [$horafin]
+}
+
 # Matamos procesos detenidos
 stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
 if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
@@ -259,6 +283,7 @@ PURGE_OLD_KERNELS=no
 CLEAN=no
 REMOVE_ORPHAN_LIBS=no
 LAUNCH_SINC_PUPPET=yes
+AUTOMATIC_SHUTDOWN_BETWEEN=""
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
@@ -286,6 +311,9 @@ fi
 
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
+
+# Determinar si se debe apagar el equipo al terminar
+check_auto_shutdown
 
 # Aseguramos el estado de los paquetes y eliminamos kernels antiguos
 wait_for_apt_or_dpkg;solveapterrors;eliminar_kernels

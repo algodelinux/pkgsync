@@ -34,3 +34,8 @@ REMOVE_ORPHAN_LIBS="no"
 # LAUNCH_SINC_PUPPET="no": no iniciar sinc_puppet antes de hacer pkgsync
 # LAUNCH_SINC_PUPPET="yes": iniciar sinc_puppet antes de hacer pkgsync (opción por defecto)
 LAUNCH_SINC_PUPPET="yes"
+
+# Apagar automáticamente el equipo después de ejecutar pkgsync en el intervalo especificado
+# AUTOMATIC_SHUTDOWN_BETWEEN="22:00-07:00"
+AUTOMATIC_SHUTDOWN_BETWEEN=""
+
