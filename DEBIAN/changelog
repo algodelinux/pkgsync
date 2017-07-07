@@ -1,3 +1,57 @@
+pkgsync (1.40) unstable; urgency=low
+
+  * Solved a misprint in man
+  * Modified purge-old-kernels to do remove dependencies installed on kernel upgrade
+  * Modified pkgsync to execute wait_for_apt_or_dpkg before shutdown or reboot to ensure
+    do not shutdown system when packages are installed
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  07 Jul 2017 12:24:00 +0100
+
+pkgsync (1.39) unstable; urgency=low
+
+  * Solved a bug: Pkgsync could not be disabled
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  16 Mar 2017 11:58:00 +0100
+
+pkgsync (1.38) unstable; urgency=low
+
+  * Added  new option to /etc/default/pkgsync:
+    # AUTOMATIC_REBOOT_BETWEEN="": Don't reboot computer after pkgsync (default option)
+    # AUTOMATIC_REBOOT_BETWEEN="22:00-07:00": Auto reboot computer after pkgsync in specified interval
+    AUTOMATIC_REBOOT_BETWEEN=""
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  25 Feb 2017 12:17:00 +0100
+
+pkgsync (1.37-2) unstable; urgency=low
+
+  * Added /usr/local/sbin/launchpad-getkeys script to get missing repo keys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com> 02 Feb 2017 13:34:00 +0100
+
+pkgsync (1.37-1) unstable; urgency=low
+
+  * Modified /usr/local/sbin/pkgsync to avoid an error message when linex-ubuntu-puppet wasn't installed,
+    by example: on IES servers.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  31 Jan 2017 19:17:00 +0100
+
+pkgsync (1.37) unstable; urgency=low
+
+  * Added  new options to /etc/default/pkgsync:
+    # Obtener claves de repositorios mediante launchpad-getkeys si launchpad-getkeys se encuentra
+    # instalado
+    # LAUNCHPAD_GETKEYS="no": no tratar de obtener claves mediante launchpad-getkeys
+    # LAUNCHPAD_GETKEYS="yes": tratar de obtener claves mediante launchpad-getkeys (opción por defecto)
+    LAUNCHPAD_GETKEYS="yes"
+
+    # Definimos un tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync
+    # Este parámetro sirve para evitar evitar que pkgsync quede bloqueado por un fallo anterior de dpkg o apt
+    # Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días (2d).
+    # TIMEOUT_FOR_DPKG_OR_APT="3m": Esperar un tiempo máximo de 3 minutos (valor por defecto)
+    TIMEOUT_FOR_DPKG_OR_APT="3m"
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  10 Jan 2017 14:11:00 +0100
+
 pkgsync (1.36) unstable; urgency=low
 
   * Added  new option to /etc/default/pkgsync:

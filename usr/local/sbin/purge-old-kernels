@@ -45,7 +45,12 @@ while [ ! -z "$1" ]; do
 done
 
 # Build our list of kernel packages to purge
-CANDIDATES=$(ls -tr /boot/vmlinuz-* | head -n -${KEEP} | grep -v "$(uname -r)$" | cut -d- -f2- | awk '{print "linux-image-" $0 " linux-headers-" $0}' )
+if [ $(uname -r|grep pve) ]; then
+   CANDIDATES=$(ls -tr /boot/vmlinuz-* | head -n -${KEEP} | grep -v "$(uname -r)$" | cut -d- -f2- | awk '{print "pve-kernel-" $0 " pve-headers-" $0}' )
+else
+   CANDIDATES=$(ls -tr /boot/vmlinuz-* | head -n -${KEEP} | grep -v "$(uname -r)$" | cut -d- -f2- | awk '{print "linux-image-" $0 " linux-headers-" $0}' )
+fi
+
 for c in $CANDIDATES; do
 	dpkg-query -s "$c" >/dev/null 2>&1 && PURGE="$PURGE $c"
 done
@@ -55,4 +60,4 @@ if [ -z "$PURGE" ]; then
 	exit 0
 fi
 
-apt-get $APT_OPTS remove --purge $PURGE
+apt-get $APT_OPTS remove --purge $PURGE;apt-get -y autoremove
