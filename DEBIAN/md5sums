@@ -3,10 +3,10 @@ ed358495e89d2efc6037b300838187f6  etc/default/pkgsync
 3334472352843ad45129c6e4fbfcda9e  usr/local/sbin/launchpad-getkeys
 1ea23cab1d22f945d0d6f97f614c9248  usr/local/sbin/limpiapaquetes
 3b4eaf3d139887ec2bb8d0064c800e23  usr/local/sbin/musthave-build
-0b131ba66ab2f9227dbb50265b6d83a8  usr/local/sbin/pkgsync
-c25a967a763ca47e76e5acfbbdd3ee68  usr/local/sbin/purge-old-kernels
+e17af38adae63d8dcebde56175e78ed4  usr/local/sbin/pkgsync
+dca57bf061934da5c65c8461ac378a9b  usr/local/sbin/purge-old-kernels
 7447ddf2d03e714c9da58b2715548b22  usr/local/sbin/wait_for_apt_or_dpkg
-2bfac1e3a6364a6a3055303aeb4a093c  usr/share/doc/pkgsync/changelog
+bbcdaf7a58d64d1f67e09dc951d84594  usr/share/doc/pkgsync/changelog
 d689faff79501dae6ceccddfe019265f  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave

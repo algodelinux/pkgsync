@@ -29,7 +29,7 @@ fi
 # NOTE: Default is to keep 2 more, user overrides with --keep N
 KEEP=2
 # NOTE: Any unrecognized option will be passed straight through to apt-get
-APT_OPTS=
+APT_OPTS="-y"
 while [ ! -z "$1" ]; do
 	case "$1" in
 		--keep)

@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.40
+export VERSION=1.41
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -316,11 +316,12 @@ AUTOMATIC_SHUTDOWN_BETWEEN=""
 LAUNCHPAD_GETKEYS=yes
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 
-parse_options "$@"
-
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
 [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
+
+parse_options "$@"
+
 $FORCE && ENABLE=yes
 if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
   echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."

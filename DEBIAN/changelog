@@ -1,3 +1,9 @@
+pkgsync (1.41) unstable; urgency=low
+
+  * Modified purge-old-kernels to no request confirmation
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  20 Oct 2017 12:15:00 +0100
+
 pkgsync (1.40) unstable; urgency=low
 
   * Solved a misprint in man
