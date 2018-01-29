@@ -1,3 +1,10 @@
+pkgsync (1.42) unstable; urgency=low
+
+  * Modified purge-old-kernels to remove old uninstalled kernels
+  * Modified purge-old-kernels to remove old kernel headers
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  25 Jan 2018 13:12:00 +0100
+
 pkgsync (1.41) unstable; urgency=low
 
   * Modified purge-old-kernels to no request confirmation

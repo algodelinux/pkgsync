@@ -2,9 +2,11 @@
 #
 #    purge-old-kernels - remove old kernel packages
 #    Copyright (C) 2012 Dustin Kirkland <kirkland@ubuntu.com>
+#                  2017 Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 #    Authors: Dustin Kirkland <kirkland@ubuntu.com>
 #             Kees Cook <kees@ubuntu.com>
+#             Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -29,7 +31,7 @@ fi
 # NOTE: Default is to keep 2 more, user overrides with --keep N
 KEEP=2
 # NOTE: Any unrecognized option will be passed straight through to apt-get
-APT_OPTS="-y"
+APT_OPTS=
 while [ ! -z "$1" ]; do
 	case "$1" in
 		--keep)
@@ -47,8 +49,21 @@ done
 # Build our list of kernel packages to purge
 if [ $(uname -r|grep pve) ]; then
    CANDIDATES=$(ls -tr /boot/vmlinuz-* | head -n -${KEEP} | grep -v "$(uname -r)$" | cut -d- -f2- | awk '{print "pve-kernel-" $0 " pve-headers-" $0}' )
+   REMOVED=$(dpkg -l| grep ^rc | awk '{print $2}' | grep -e pve-kernel -e pve-keaders)
 else
    CANDIDATES=$(ls -tr /boot/vmlinuz-* | head -n -${KEEP} | grep -v "$(uname -r)$" | cut -d- -f2- | awk '{print "linux-image-" $0 " linux-headers-" $0}' )
+   REMOVED=$(dpkg -l| grep ^rc | awk '{print $2}' | grep -e linux-image -e linux-keaders)
+   OLD_HEADERS=$(dpkg -l|grep linux-headers | grep -v $(ls -tr /boot/vmlinuz-* | sed -e "s/^\/boot\/vmlinuz-/-e /" -e "s/-generic$//" | tr '\n' ' ') -e generic | awk '{print $2}')
+fi
+
+if [ -n "$REMOVED" ]; then
+   # Purge old uninstalled kernels
+   apt-get $APT_OPTS remove --purge $REMOVED
+fi
+
+if [ -n "$OLD_HEADERS" ]; then
+   # Purge old headers
+   apt-get $APT_OPTS remove --purge $OLD_HEADERS
 fi
 
 for c in $CANDIDATES; do
@@ -60,4 +75,5 @@ if [ -z "$PURGE" ]; then
 	exit 0
 fi
 
-apt-get $APT_OPTS remove --purge $PURGE;apt-get -y autoremove
+# Purge old installed kernels
+apt-get $APT_OPTS remove --purge $PURGE
