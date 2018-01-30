@@ -2,13 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# 2013-2017 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.42
+export VERSION=1.43
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -196,9 +196,10 @@ solveapterrors() {
   idioma=$LC_ALL
   export LC_ALL=C
 
-  apt-get check 1>/dev/null 2>/tmp/apterrors
+  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get check 1>/dev/null 2>/tmp/apterrors
 
   if [ -s /tmp/apterrors ]; then
+     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg
      grep "Unmet dependencies. Try using -f." /tmp/apterrors && apt-get -yf install && dpkg --configure -a && apt-get -y autoremove
      grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors && dpkg --configure -a && apt-get -yf install && apt-get -y autoremove
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors && rm -rf /var/lib/apt/lists/
@@ -209,7 +210,7 @@ solveapterrors() {
 
 eliminar_kernels() {
   # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/purge-old-kernels
-  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then /usr/local/sbin/purge-old-kernels -qy; fi
+  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels -qy; fi
 }
 
 launchpad_getkeys() {
@@ -223,7 +224,7 @@ eliminar_paquetes_huerfanos() {
     /usr/bin/deborphan>/tmp/orphan_libs
     if [ -s /tmp/orphan_libs ]; then
        sort -o /tmp/orphan_libs /tmp/orphan_libs
-       apt-get -y remove --purge $(cat /tmp/orphan_libs)
+       timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(cat /tmp/orphan_libs)
        echo "Remove these packages from musthave files:" > /var/log/pkgsync/removefrommusthave.log
        echo > /var/log/pkgsync/removefrommusthave.log
        cat /tmp/orphan_libs >> /var/log/pkgsync/removefrommusthave.log
@@ -235,20 +236,20 @@ eliminar_paquetes_huerfanos() {
 eliminar_dependencias() {
   # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
   if [ $CLEAN = "yes" ]; then
-     apt-get -y autoremove
-     apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
-     apt-get -y clean
+     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
+     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y clean
   fi
 }
 
 apagar_equipo() {
   # Apagar el equipo si el usuario pasó el parámetro -S
-  if [ $SHUTDOWN = true ]; then wait_for_apt_or_dpkg;/sbin/poweroff; fi
+  if [ $SHUTDOWN = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/poweroff; fi
 }
 
 reiniciar_equipo() {
   # Reiniciar el equipo si el usuario pasó el parámetro -R
-  if [ $REBOOT = true ]; then wait_for_apt_or_dpkg;/sbin/reboot; fi
+  if [ $REBOOT = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/reboot; fi
 }
 
 check_auto_shutdown() {
@@ -354,7 +355,7 @@ check_auto_reboot
 launchpad_getkeys
 
 # Aseguramos el estado de los paquetes y eliminamos kernels antiguos
-timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;solveapterrors;eliminar_kernels
+solveapterrors;eliminar_kernels
 
 runned_sinc_puppet=false
 # Si está corriendo sinc_puppet, esperamos hasta que termine
@@ -427,7 +428,7 @@ mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
 rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 
-timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 run_aptitude autoclean
 
-timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;eliminar_kernels;eliminar_dependencias;eliminar_paquetes_huerfanos;apagar_equipo;reiniciar_equipo
+eliminar_kernels;eliminar_dependencias;eliminar_paquetes_huerfanos;apagar_equipo;reiniciar_equipo

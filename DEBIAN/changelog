@@ -1,3 +1,9 @@
+pkgsync (1.43) unstable; urgency=low
+
+  * Modified checking of wait_for_apt_or_dpkg function in pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  29 Jan 2018 11:48:00 +0100
+
 pkgsync (1.42) unstable; urgency=low
 
   * Modified purge-old-kernels to remove old uninstalled kernels
