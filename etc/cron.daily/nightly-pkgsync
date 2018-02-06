@@ -7,5 +7,9 @@
 export PATH=/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 
 if [ -x /usr/local/sbin/pkgsync ]; then
+   if [ -x /bin/systemd-inhibit ]; then
+	( /bin/systemd-inhibit --what="idle:sleep:shutdown:handle-power-key:handle-suspend-key:handle-hibernate-key:handle-lid-switch" --why="Doing pkgsync" bash /usr/local/sbin/pkgsync >/var/log/pkgsync.log 2>&1 ) || cat /var/log/pkgsync.log
+   else
 	( /usr/local/sbin/pkgsync >/var/log/pkgsync.log 2>&1 ) || cat /var/log/pkgsync.log
+   fi
 fi
