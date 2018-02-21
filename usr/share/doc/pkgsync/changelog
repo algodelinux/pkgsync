@@ -1,3 +1,9 @@
+pkgsync (1.46) unstable; urgency=low
+
+  * Modified /etc/default/pkgsync and /usr/local/sbin/pkgsync to let select the number of kernels to keep
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  21 Feb 2018 12:51:00 +0100
+
 pkgsync (1.45) unstable; urgency=low
 
   * Modified nightly-pkgsync to inhibit shutdown or reboot if systemd is installed in all cases

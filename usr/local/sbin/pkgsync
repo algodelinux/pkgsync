@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.45
+export VERSION=1.46
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -210,7 +210,7 @@ solveapterrors() {
 
 eliminar_kernels() {
   # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/purge-old-kernels
-  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels -qy; fi
+  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels --keep $KEEP_LAST_KERNELS -qy; fi
 }
 
 launchpad_getkeys() {
@@ -310,6 +310,7 @@ FORCE=false
 SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
 PURGE_OLD_KERNELS=no
+KEEP_LAST_KERNELS="2"
 CLEAN=no
 REMOVE_ORPHAN_LIBS=no
 LAUNCH_SINC_PUPPET=yes

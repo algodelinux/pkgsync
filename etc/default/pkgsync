@@ -19,6 +19,10 @@ ENABLE="yes"
 # PURGE_OLD_KERNELS="yes": elimina kernels antiguos
 PURGE_OLD_KERNELS="no"
 
+# Número de kernels que se desea conservar (por defecto deja los dos últimos)
+# Si no existe la variable KEEP_LAST_KERNELS o no tiene valor, es equivalente al valor '2'.
+# KEEP_LAST_KERNELS="2"
+
 # Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
 # CLEAN="no": no hacer limpieza (opción por defecto)
 # CLEAN="yes": hacer limpieza
