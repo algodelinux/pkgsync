@@ -1,3 +1,13 @@
+pkgsync (1.47) unstable; urgency=low
+
+  * Added  new option to /etc/default/pkgsync:
+    # Iniciar Windows al reiniciar el equipo automáticamente en el intervalo especificado
+    # AUTOMATIC_REBOOT_INTO_WINDOWS="no": no iniciar windows tras el reinicio en el intervalo especificado
+    # AUTOMATIC_REBOOT_INTO_WINDOWS="yes": iniciar windows tras el reinicio en el intervalo especificado
+    AUTOMATIC_REBOOT_INTO_WINDOWS="no"
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  16 May 2018 12:00:00 +0100
+
 pkgsync (1.46) unstable; urgency=low
 
   * Modified /etc/default/pkgsync and /usr/local/sbin/pkgsync to let select the number of kernels to keep

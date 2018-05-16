@@ -47,6 +47,11 @@ AUTOMATIC_SHUTDOWN_BETWEEN=""
 # AUTOMATIC_REBOOT_BETWEEN="06:01-08:00"
 AUTOMATIC_REBOOT_BETWEEN=""
 
+# Iniciar Windows al reiniciar el equipo automáticamente en el intervalo especificado
+# AUTOMATIC_REBOOT_INTO_WINDOWS="no": no iniciar windows tras el reinicio en el intervalo especificado
+# AUTOMATIC_REBOOT_INTO_WINDOWS="yes": iniciar windows tras el reinicio en el intervalo especificado
+AUTOMATIC_REBOOT_INTO_WINDOWS="no"
+
 # Obtener claves de repositorios mediante launchpad-getkeys si launchpad-getkeys se encuentra
 # instalado
 # LAUNCHPAD_GETKEYS="no": no tratar de obtener claves mediante launchpad-getkeys

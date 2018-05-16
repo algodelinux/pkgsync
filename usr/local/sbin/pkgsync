@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.46
+export VERSION=1.47
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -298,6 +298,20 @@ check_auto_reboot() {
   # echo $REBOOT
   # echo hora inicio: [$horaini]
   # echo hora fin: [$horafin]
+
+  if [ $REBOOT ] && [ "$AUTOMATIC_REBOOT_INTO_WINDOWS" = "yes" ] && [ -x /bin/efibootmgr ]; then
+     # Obtenemos el orden de arranque actual
+     bootorder=$(/bin/efibootmgr | sed -n 's|^BootOrder: \(.*\)|\1|p')
+
+     # Creamos una entrada específica para Windows 10, si no está creada
+     /bin/efibootmgr | grep "W10IES" 2>&1 > /dev/null || /bin/efibootmgr -c -d $EFI_DISK -p $(gdisk -l $EFI_DISK | grep "EFI system partition" | awk '{print $1}') -L "W10IES" -l "\EFI\Microsoft\Boot\bootmgfw.efi"
+
+     # Restauramos el bootorder
+     /bin/efibootmgr -o $bootorder
+
+     # Establecemos un arranque temporal de Windows
+     /bin/efibootmgr -n $(/bin/efibootmgr | grep "W10IES" | sed -ne 's/[^0-9A-F]*\(\([0-9A-F]\)\{4\}\).*/\1/p') 2>&1>/dev/null
+  fi
 }
 
 # Matamos procesos detenidos
@@ -315,8 +329,11 @@ CLEAN=no
 REMOVE_ORPHAN_LIBS=no
 LAUNCH_SINC_PUPPET=yes
 AUTOMATIC_SHUTDOWN_BETWEEN=""
+AUTOMATIC_REBOOT_BETWEEN=""
+AUTOMATIC_REBOOT_INTO_WINDOWS=no
 LAUNCHPAD_GETKEYS=yes
 TIMEOUT_FOR_DPKG_OR_APT="3m"
+EFI_DISK=/dev/sda # Disco que contiene EFI
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
