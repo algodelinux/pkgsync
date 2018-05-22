@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.47
+export VERSION=1.48
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -29,6 +29,7 @@ print_help () {
 	echo "  -r, --remove-orphan-libs  	remove orphan libs"
 	echo "  -S, --shutdown            	shutdown machine after pkgsync"
 	echo "  -R, --reboot              	reboot machine after pkgsync"
+	echo "  -Rw, --reboot w              	reboot machine into windows after pkgsync on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -51,7 +52,7 @@ test_files () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hftksadcprSR --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,remove-orphan-libs,shutdown,reboot -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hftksadcprSR:: --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,remove-orphan-libs,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -97,7 +98,11 @@ parse_options () {
 				;;
 			-R|--reboot)
 				REBOOT=true
-				shift
+                                case "$2" in
+                                   "") shift 2 ;;
+                                   "w") AUTOMATIC_REBOOT_INTO_WINDOWS=yes; shift 2 ;;
+                                   *)  shift 2 ;;
+                                esac
 				;;
 			-t|--test-files)
 				test_files
