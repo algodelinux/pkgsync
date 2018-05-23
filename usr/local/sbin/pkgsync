@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.49
+export VERSION=1.50
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -234,6 +234,8 @@ eliminar_paquetes_huerfanos() {
        echo > /var/log/pkgsync/removefrommusthave.log
        cat /tmp/orphan_libs >> /var/log/pkgsync/removefrommusthave.log
        sed -e "s/:.*$//" /tmp/orphan_libs | sort -u > /etc/pkgsync/musthave.orphan
+    else
+       :> /etc/pkgsync/musthave.orphan
     fi
   fi
 }
