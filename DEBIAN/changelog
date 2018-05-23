@@ -1,3 +1,9 @@
+pkgsync (1.49) unstable; urgency=low
+
+  * Modified /usr/local/sbin/pkgsync to avoid simultaneous execution of multiple instances of pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  23 May 2018 11:04:00 +0100
+
 pkgsync (1.48) unstable; urgency=low
 
   * Added an optional argument (w)  to -R, --reboot option to let reboot into windows after pkgsync execution

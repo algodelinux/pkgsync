@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.48
+export VERSION=1.49
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -273,12 +273,6 @@ check_auto_shutdown() {
         fi
      fi
   fi
-
-  # Defined only for testing purposes
-  # echo hora actual: $time
-  # echo $SHUTDOWN
-  # echo hora inicio: [$horaini]
-  # echo hora fin: [$horafin]
 }
 
 check_auto_reboot() {
@@ -297,12 +291,6 @@ check_auto_reboot() {
         fi
      fi
   fi
-
-  # Defined only for testing purposes
-  # echo hora actual: $time
-  # echo $REBOOT
-  # echo hora inicio: [$horaini]
-  # echo hora fin: [$horafin]
 
   if [ $REBOOT ] && [ "$AUTOMATIC_REBOOT_INTO_WINDOWS" = "yes" ] && [ -x /bin/efibootmgr ]; then
      # Obtenemos el orden de arranque actual
@@ -352,6 +340,14 @@ if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
   echo "           Para activarla poner el valor ENABLE=yes."
   exit 0
 fi
+
+# Definimos el fichero de lock
+lockfile=/var/lock/$(basename $0)
+lockfile-create $lockfile || exit 2
+lockfile-touch $lockfile &
+BADGER="$!"
+
+trap "kill "${BADGER}" 2>/dev/null || true; lockfile-remove $lockfile; exit" QUIT INT TERM EXIT
 
 # No ejecutar pkgsync cuando falta alguno de los ficheros musthave, mayhave o maynothave
 if [ ! -r /etc/pkgsync/musthave -o \
