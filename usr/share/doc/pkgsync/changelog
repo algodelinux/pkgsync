@@ -1,3 +1,9 @@
+pkgsync (1.51) unstable; urgency=low
+
+  * Added r argument to -t, --test-files option to let remove packages non existents from file lists
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  24 May 2018 12:33:00 +0100
+
 pkgsync (1.50) unstable; urgency=low
 
   * Solved a bug: Empty /etc/pkgsync/musthave.orphan when not exists orphan files
