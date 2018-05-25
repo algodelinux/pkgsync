@@ -1,3 +1,9 @@
+pkgsync (1.52) unstable; urgency=low
+
+  * Added /usr/sbin/pkgsync wrapper to inhibit shutdown if systemd is installed when pkgsync is running
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  25 May 2018 11:42:00 +0100
+
 pkgsync (1.51) unstable; urgency=low
 
   * Added r argument to -t, --test-files option to let remove packages non existents from file lists
@@ -275,7 +281,7 @@ pkgsync (1.25-2) unstable; urgency=low
        IGNORE_MUSTHAVE="yes"
        IGNORE_MAYHAVE="yes"
        IGNORE_MAYNOTHAVE="yes"
-  * Add -t, --test-files option for test if pkgsync files have packages that aren't at
+  * Added -t, --test-files option for test if pkgsync files have packages that aren't at
     repositories.
  
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  19 Nov 2015 13:00:05 +0100

@@ -1,0 +1,12 @@
+#! /bin/sh
+#
+# /usr/sbin/pkgsync - Wrapper to inhibit shutdown if systemd is installed when pkgsync is running
+# 2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
+
+if [ -x /usr/local/sbin/pkgsync ]; then
+   if [ -x /bin/systemd-inhibit ]; then
+      /bin/systemd-inhibit --what="idle:sleep:shutdown:handle-power-key:handle-suspend-key:handle-hibernate-key:handle-lid-switch" --why="Doing pkgsync" bash /usr/local/sbin/pkgsync "$@"
+   else
+      bash /usr/local/sbin/pkgsync "$@"
+   fi
+fi
