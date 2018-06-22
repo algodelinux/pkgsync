@@ -6,7 +6,7 @@
 # mediante pkgsync, aunque también podríamos usarlo para clonar los paquetes instalados en otra
 # máquina con dpkg --set-selections.
 #
-# 2013-2016 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 test -d /etc/pkgsync || mkdir /etc/pkgsync
@@ -15,10 +15,14 @@ codename=`lsb_release --codename | cut -f2`
 
 case $codename in
 "squeeze")
+  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
+
   echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
   aptitude show "?installed ?not(?priority(required)) ?not(?essential) ?not(?automatic)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " | sort > /etc/pkgsync/musthave
   ;;
 "wheezy"|"jessie")
+  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
+
   echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
   aptitude show "?installed ?not(?priority(required)) ?not(?essential) ?not(?automatic)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " | sort > /etc/pkgsync/musthave
   echo "Obteniendo lista de paquetes multiarch..."
@@ -33,7 +37,9 @@ case $codename in
   done
   sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
   ;;
-"trusty")
+"trusty"|"bionic")
+  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
+
   echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
   aptitude search '~i !~M' -F '%p' --disable-columns | sort -u > /etc/pkgsync/musthave
   sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave

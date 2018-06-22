@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.52
+export VERSION=1.54
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -39,9 +39,10 @@ print_help () {
 test_files () {
   :>/var/log/pkgsync/removefromlists.log
 
-  for fichero in $(find /etc/pkgsync -type f -not -name *.all); do
+  for fichero in $(find /etc/pkgsync -type f -not -name "*.all"); do
     echo "Checking $fichero"
     while read paquete; do
+       echo "Checking $fichero: $paquete"
        existe=$(apt-cache policy $paquete 2>/dev/null)
        if [ ! "$existe" ]; then
           echo "Package $paquete in file $fichero isn't in repositories"

@@ -1,3 +1,16 @@
+pkgsync (1.54) unstable; urgency=low
+
+  * Modified /usr/local/sbin/pkgsync to show info about "file: package" when -t, --test-files is used
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  18 Jun 2018 21:00:00 +0100
+
+pkgsync (1.53) unstable; urgency=low
+
+  * Modified /usr/local/sbin/musthave-build to generate musthave list for ubuntu bionic, backing musthave
+    file if exists
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  18 Jun 2018 21:00:00 +0100
+
 pkgsync (1.52) unstable; urgency=low
 
   * Added /usr/sbin/pkgsync wrapper to inhibit shutdown if systemd is installed when pkgsync is running
