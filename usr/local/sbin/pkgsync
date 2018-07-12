@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.47
+export VERSION=1.57
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -22,36 +22,56 @@ print_help () {
 	echo "  -d, --dpkg-glob           	use dpkg's globbing (deprecated)"
 	echo "  -a, --aptitude-glob       	use aptitude's globbing (default, recommended)"
 	echo "  -t, --test-files          	test pkgsync files"
+	echo "  -tr, --test-files r          	test and remove packages from pkgsync files lists"
 	echo "  -f, --force               	force pkgsync"
 	echo "  -c, --clean               	remove uninstalled packages dependencies,
-                                                purge uninstalled packages and clean cache"
-	echo "  -p, --purge-old-kernels   	remove old kernels keeping the last two"
-	echo "  -r, --remove-orphan-libs  	remove orphan libs"
+				purge uninstalled packages and clean cache"
+	echo "  -p, --purge-old-kernels   	remove old kernels keeping the last two (by default)
+				or the number specified in /etc/default/pkgsync file"
 	echo "  -S, --shutdown            	shutdown machine after pkgsync"
 	echo "  -R, --reboot              	reboot machine after pkgsync"
+	echo "  -Rw, --reboot w              	reboot machine into windows after pkgsync on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
 
 test_files () {
-  :>/var/log/pkgsync/removefromlist.log
+  :>/var/log/pkgsync/removefromlists.log
 
-  for fichero in $(find /etc/pkgsync -type f -not -name *.all); do
+  for fichero in $(find /etc/pkgsync -type f -not -name "*.all"); do
     echo "Checking $fichero"
     while read paquete; do
+       echo "Checking $fichero: $paquete"
        existe=$(apt-cache policy $paquete 2>/dev/null)
        if [ ! "$existe" ]; then
           echo "Package $paquete in file $fichero isn't in repositories"
-          echo "Package $paquete in file $fichero isn't in repositories" >> /var/log/pkgsync/removefromlist.log
+          echo "Package $paquete in file $fichero isn't in repositories" >> /var/log/pkgsync/removefromlists.log
        fi
     done < $fichero
   done
-  echo "See /var/log/pkgsync/removefromlist.log"
+  echo "See /var/log/pkgsync/removefromlists.log"
+}
+
+remove_packages_from_lists () {
+  :>/var/log/pkgsync/removedfromlists.log
+
+  if [ -s /var/log/pkgsync/removefromlists.log ]; then
+     while read linea; do
+        paquete=$(echo $linea | cut -f2 -d" ")
+        fichero=$(echo $linea | cut -f5 -d" ")
+
+        echo "Removing package $paquete from file $fichero"
+        echo "Removed package $paquete from file $fichero" >> /var/log/pkgsync/removedfromlists.log
+
+        sed -i "/$paquete/ d" $fichero
+     done < /var/log/pkgsync/removefromlists.log
+     echo "See /var/log/pkgsync/removedfromlists.log"
+  fi
 }
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hftksadcprSR --long help,force,test-files,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,remove-orphan-libs,shutdown,reboot -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hft::ksadcpSR:: --long help,force,test-files::,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -87,20 +107,21 @@ parse_options () {
 				PURGE_OLD_KERNELS="yes"
 				shift
 				;;
-			-r|--remove-orphan-libs)
-				REMOVE_ORPHAN_LIBS="yes"
-				shift
-				;;
 			-S|--shutdown)
 				SHUTDOWN=true
 				shift
 				;;
 			-R|--reboot)
 				REBOOT=true
-				shift
+                                case "$2" in
+                                   "") shift 2 ;;
+                                   "w") AUTOMATIC_REBOOT_INTO_WINDOWS=yes; shift 2 ;;
+                                   *)  shift 2 ;;
+                                esac
 				;;
 			-t|--test-files)
 				test_files
+                                if [ "$2" = "r" ]; then remove_packages_from_lists; fi
 				exit 0
 				;;
 			-h|--help)
@@ -215,21 +236,12 @@ eliminar_kernels() {
 
 launchpad_getkeys() {
   # Obtener claves de repositorios siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/launchpad-getkeys
-  if [ $LAUNCHPAD_GETKEYS = "yes" ] && [ -x /usr/bin/launchpad-getkeys ]; then /usr/bin/launchpad-getkeys; fi
-}
-
-eliminar_paquetes_huerfanos() {
-  # Eliminar librerías huérfanas
-  if [ $REMOVE_ORPHAN_LIBS = "yes" ] && [ -x /usr/bin/deborphan ]; then
-    /usr/bin/deborphan>/tmp/orphan_libs
-    if [ -s /tmp/orphan_libs ]; then
-       sort -o /tmp/orphan_libs /tmp/orphan_libs
-       timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(cat /tmp/orphan_libs)
-       echo "Remove these packages from musthave files:" > /var/log/pkgsync/removefrommusthave.log
-       echo > /var/log/pkgsync/removefrommusthave.log
-       cat /tmp/orphan_libs >> /var/log/pkgsync/removefrommusthave.log
-       sed -e "s/:.*$//" /tmp/orphan_libs | sort -u > /etc/pkgsync/musthave.orphan
-    fi
+  if [ $LAUNCHPAD_GETKEYS = "yes" ] && [ -x /usr/local/sbin/launchpad-getkeys ]; then
+     if [ -n "$LAUNCHPAD_GETKEYS_PROXY" ]; then
+        /usr/local/sbin/launchpad-getkeys -p $LAUNCHPAD_GETKEYS_PROXY
+     else
+        /usr/local/sbin/launchpad-getkeys
+     fi
   fi
 }
 
@@ -268,12 +280,6 @@ check_auto_shutdown() {
         fi
      fi
   fi
-
-  # Defined only for testing purposes
-  # echo hora actual: $time
-  # echo $SHUTDOWN
-  # echo hora inicio: [$horaini]
-  # echo hora fin: [$horafin]
 }
 
 check_auto_reboot() {
@@ -292,12 +298,6 @@ check_auto_reboot() {
         fi
      fi
   fi
-
-  # Defined only for testing purposes
-  # echo hora actual: $time
-  # echo $REBOOT
-  # echo hora inicio: [$horaini]
-  # echo hora fin: [$horafin]
 
   if [ $REBOOT ] && [ "$AUTOMATIC_REBOOT_INTO_WINDOWS" = "yes" ] && [ -x /bin/efibootmgr ]; then
      # Obtenemos el orden de arranque actual
@@ -326,12 +326,12 @@ REBOOT=false   # No reiniciar
 PURGE_OLD_KERNELS=no
 KEEP_LAST_KERNELS="2"
 CLEAN=no
-REMOVE_ORPHAN_LIBS=no
 LAUNCH_SINC_PUPPET=yes
 AUTOMATIC_SHUTDOWN_BETWEEN=""
 AUTOMATIC_REBOOT_BETWEEN=""
 AUTOMATIC_REBOOT_INTO_WINDOWS=no
 LAUNCHPAD_GETKEYS=yes
+LAUNCHPAD_GETKEYS_PROXY=""
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 EFI_DISK=/dev/sda # Disco que contiene EFI
 
@@ -347,6 +347,14 @@ if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
   echo "           Para activarla poner el valor ENABLE=yes."
   exit 0
 fi
+
+# Definimos el fichero de lock
+lockfile=/var/lock/$(basename $0)
+lockfile-create $lockfile || exit 2
+lockfile-touch $lockfile &
+BADGER="$!"
+
+trap "kill "${BADGER}" 2>/dev/null || true; lockfile-remove $lockfile; exit" QUIT INT TERM EXIT
 
 # No ejecutar pkgsync cuando falta alguno de los ficheros musthave, mayhave o maynothave
 if [ ! -r /etc/pkgsync/musthave -o \
@@ -449,4 +457,4 @@ rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 run_aptitude autoclean
 
-eliminar_kernels;eliminar_dependencias;eliminar_paquetes_huerfanos;apagar_equipo;reiniciar_equipo
+eliminar_kernels;eliminar_dependencias;apagar_equipo;reiniciar_equipo

@@ -1,3 +1,72 @@
+pkgsync (1.57) unstable; urgency=low
+
+  * Removed option -r, --remove-orphan-libs
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  11 Jul 2018 13:47:00 +0100
+
+pkgsync (1.56) unstable; urgency=low
+
+  * Added parameter --no-guess-dummy to deborphan command in pkgsync
+  * Added script /usr/local/sbin/get-package-dependencies to list package dependencies
+  * Added script /usr/local/sbin/musthave-minimize to minimize /etc/pkgsync/musthave removing
+    packages and their dependencies included on files located at /etc/pkgsync/musthave.d
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  29 Jun 2018 07:47:00 +0100
+
+pkgsync (1.55) unstable; urgency=low
+
+  * Added  new option to /etc/default/pkgsync:
+    # Es posible indicar un proxy a launchpad-getkeys para obtener las claves de repositorios
+    # LAUNCHPAD_GETKEYS_PROXY="": no utilizar proxy
+    # LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128": utilizar un proxy específico
+    LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  27 Jun 2018 11:28:00 +0100
+
+pkgsync (1.54) unstable; urgency=low
+
+  * Modified /usr/local/sbin/pkgsync to show info about "file: package" when -t, --test-files is used
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  18 Jun 2018 21:00:00 +0100
+
+pkgsync (1.53) unstable; urgency=low
+
+  * Modified /usr/local/sbin/musthave-build to generate musthave list for ubuntu bionic, backing musthave
+    file if exists
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  18 Jun 2018 21:00:00 +0100
+
+pkgsync (1.52) unstable; urgency=low
+
+  * Added /usr/sbin/pkgsync wrapper to inhibit shutdown if systemd is installed when pkgsync is running
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  25 May 2018 11:42:00 +0100
+
+pkgsync (1.51) unstable; urgency=low
+
+  * Added r argument to -t, --test-files option to let remove packages non existents from file lists
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  24 May 2018 12:33:00 +0100
+
+pkgsync (1.50) unstable; urgency=low
+
+  * Solved a bug: Empty /etc/pkgsync/musthave.orphan when not exists orphan files
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  23 May 2018 13:09:00 +0100
+
+pkgsync (1.49) unstable; urgency=low
+
+  * Modified /usr/local/sbin/pkgsync to avoid simultaneous execution of multiple instances of pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  23 May 2018 11:04:00 +0100
+
+pkgsync (1.48) unstable; urgency=low
+
+  * Added an optional argument (w)  to -R, --reboot option to let reboot into windows after pkgsync execution
+    This new argument is only for computers with EFI
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  21 May 2018 13:28:00 +0100
+
 pkgsync (1.47) unstable; urgency=low
 
   * Added  new option to /etc/default/pkgsync:
@@ -7,7 +76,7 @@ pkgsync (1.47) unstable; urgency=low
     AUTOMATIC_REBOOT_INTO_WINDOWS="no"
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  16 May 2018 12:00:00 +0100
-
+	
 pkgsync (1.46) unstable; urgency=low
 
   * Modified /etc/default/pkgsync and /usr/local/sbin/pkgsync to let select the number of kernels to keep
@@ -250,7 +319,7 @@ pkgsync (1.25-2) unstable; urgency=low
        IGNORE_MUSTHAVE="yes"
        IGNORE_MAYHAVE="yes"
        IGNORE_MAYNOTHAVE="yes"
-  * Add -t, --test-files option for test if pkgsync files have packages that aren't at
+  * Added -t, --test-files option for test if pkgsync files have packages that aren't at
     repositories.
  
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  19 Nov 2015 13:00:05 +0100

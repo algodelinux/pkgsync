@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [ -n "$1" ]; then
+   LC_ALL=C apt-cache depends --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances --no-pre-depends $1 2>/dev/null |  sed 's/^ *//; s/^|Depends: //; s/Depends: //; /<.*>/d; 1d'|sort -u
+fi

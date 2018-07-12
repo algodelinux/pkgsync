@@ -1,0 +1,17 @@
+#!/bin/bash
+
+get-package-dependencies () {
+   if [ -n "$1" ]; then
+      LC_ALL=C apt-cache depends --no-recommends --no-suggests --no-conflicts --no-breaks --no-replaces --no-enhances --no-pre-depends $1 2>/dev/null |  sed 's/^ *//; s/^|Depends: //; s/^Depends: //; /<.*>/d;' | sort -u
+   fi
+}
+
+[ -f /etc/pkgsync/musthave ] && cp /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d")
+
+for file in $(ls /etc/pkgsync/musthave.d/); do
+    sed -i "/$file/d" /etc/pkgsync/musthave
+    get-package-dependencies $file > /tmp/$file
+    comm -23 /etc/pkgsync/musthave /tmp/$file > /tmp/musthave
+    mv /tmp/musthave /etc/pkgsync/musthave
+done
+

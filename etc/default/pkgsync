@@ -22,16 +22,12 @@ PURGE_OLD_KERNELS="no"
 # Número de kernels que se desea conservar (por defecto deja los dos últimos)
 # Si no existe la variable KEEP_LAST_KERNELS o no tiene valor, es equivalente al valor '2'.
 # KEEP_LAST_KERNELS="2"
+KEEP_LAST_KERNELS="3"
 
 # Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
 # CLEAN="no": no hacer limpieza (opción por defecto)
 # CLEAN="yes": hacer limpieza
 CLEAN="no"
-
-# Eliminar librerías huérfanas
-# REMOVE_ORPHAN_LIBS="no": no eliminar librerías huérfanas (opción por defecto)
-# REMOVE_ORPHAN_LIBS="yes": eliminar librerías huérfanas
-REMOVE_ORPHAN_LIBS="no"
 
 # Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de pkgsync 
 # se encuentren actualizados
@@ -57,6 +53,11 @@ AUTOMATIC_REBOOT_INTO_WINDOWS="no"
 # LAUNCHPAD_GETKEYS="no": no tratar de obtener claves mediante launchpad-getkeys
 # LAUNCHPAD_GETKEYS="yes": tratar de obtener claves mediante launchpad-getkeys (opción por defecto)
 LAUNCHPAD_GETKEYS="yes"
+
+# Es posible indicar un proxy a launchpad-getkeys para obtener las claves de repositorios
+# LAUNCHPAD_GETKEYS_PROXY="": no utilizar proxy
+# LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128": utilizar un proxy específico
+LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 
 # Definimos un tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync
 # Este parámetro sirve para evitar evitar que pkgsync quede bloqueado por un fallo anterior de dpkg o apt
