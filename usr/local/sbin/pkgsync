@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.57
+export VERSION=1.58
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -16,7 +16,7 @@ print_help () {
 	echo ""
 	echo "Usage: pkgsync [OPTIONS]"
 	echo "Recognized options:"
-	echo "  -h, --help                	display this help and exit"
+	echo "  -h, --help		       	display this help and exit"
 	echo "  -k, --keep-unused         	don't remove unused packages"
 	echo "  -s, --simulate            	don't do anything, just print out what would have happened"
 	echo "  -d, --dpkg-glob           	use dpkg's globbing (deprecated)"
@@ -24,13 +24,14 @@ print_help () {
 	echo "  -t, --test-files          	test pkgsync files"
 	echo "  -tr, --test-files r          	test and remove packages from pkgsync files lists"
 	echo "  -f, --force               	force pkgsync"
-	echo "  -c, --clean               	remove uninstalled packages dependencies,
-				purge uninstalled packages and clean cache"
-	echo "  -p, --purge-old-kernels   	remove old kernels keeping the last two (by default)
-				or the number specified in /etc/default/pkgsync file"
+	echo "  -c, --clean               	remove uninstalled packages dependencies,"
+	echo "				purge uninstalled packages and clean cache"
+	echo "  -p, --purge-old-kernels	remove old kernels keeping the last two (by default)"
+	echo "				or the number specified in /etc/default/pkgsync file"
+	echo "  -n, --no-sincpuppet		don't launch sinc_puppet from pkgsync"
+	echo "  -g, --get-keys		exec launchpad-keys to get repositories keys"
 	echo "  -S, --shutdown            	shutdown machine after pkgsync"
 	echo "  -R, --reboot              	reboot machine after pkgsync"
-	echo "  -Rw, --reboot w              	reboot machine into windows after pkgsync on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -71,7 +72,7 @@ remove_packages_from_lists () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hft::ksadcpSR:: --long help,force,test-files::,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hft::ksadcpngSR:: --long help,force,test-files::,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,no-sincpuppet,get-keys,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -105,6 +106,14 @@ parse_options () {
 				;;
 			-p|--purge-old-kernels)
 				PURGE_OLD_KERNELS="yes"
+				shift
+				;;
+			-n|--no-sincpuppet)
+				LAUNCH_SINC_PUPPET="no"
+				shift
+				;;
+			-g|--get-keys)
+				LAUNCHPAD_GETKEYS="yes"
 				shift
 				;;
 			-S|--shutdown)
