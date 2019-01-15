@@ -1,4 +1,10 @@
 #!/bin/bash
+#
+# Elimina del fichero /etc/pkgsync/musthave los paquetes listados en los ficheros alojados en
+# /etc/pkgsync/musthave.d/ junto con sus dependencias.
+#
+# 2013-2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
 
 get-package-dependencies () {
    if [ -n "$1" ]; then
@@ -9,9 +15,14 @@ get-package-dependencies () {
 [ -f /etc/pkgsync/musthave ] && cp /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d")
 
 for file in $(ls /etc/pkgsync/musthave.d/); do
-    sed -i "/$file/d" /etc/pkgsync/musthave
-    get-package-dependencies $file > /tmp/$file
-    comm -23 /etc/pkgsync/musthave /tmp/$file > /tmp/musthave
-    mv /tmp/musthave /etc/pkgsync/musthave
+    for package in $(cat /etc/pkgsync/musthave.d/$file); do
+        echo "Borrando paquete $package del fichero /etc/pkgsync/musthave"
+        sed -i "/$package/d" /etc/pkgsync/musthave
+        get-package-dependencies $package > /tmp/dependencies
+        echo "Borrando dependencias del paquete $package del fichero /etc/pkgsync/musthave"
+        cat /tmp/dependencies
+        comm -23 /etc/pkgsync/musthave /tmp/dependencies > /tmp/musthave
+        mv /tmp/musthave /etc/pkgsync/musthave
+    done
 done
 

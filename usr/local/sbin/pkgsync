@@ -2,13 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# 2013-2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2019 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.58
+export VERSION=1.61
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -19,8 +19,6 @@ print_help () {
 	echo "  -h, --help		       	display this help and exit"
 	echo "  -k, --keep-unused         	don't remove unused packages"
 	echo "  -s, --simulate            	don't do anything, just print out what would have happened"
-	echo "  -d, --dpkg-glob           	use dpkg's globbing (deprecated)"
-	echo "  -a, --aptitude-glob       	use aptitude's globbing (default, recommended)"
 	echo "  -t, --test-files          	test pkgsync files"
 	echo "  -tr, --test-files r          	test and remove packages from pkgsync files lists"
 	echo "  -f, --force               	force pkgsync"
@@ -72,7 +70,7 @@ remove_packages_from_lists () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hft::ksadcpngSR:: --long help,force,test-files::,keep-unused,simulate,dpkg-glob,aptitude-glob,clean,purge-old-kernels,no-sincpuppet,get-keys,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hft::kscpngSR:: --long help,force,test-files::,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -86,14 +84,6 @@ parse_options () {
 				;;
 			-k|--keep-unused)
 				APTITUDE_ARGS="$APTITUDE_ARGS -o Aptitude::Delete-Unused=false"
-				shift
-				;;
-			-d|--dpkg-glob)
-				GLOB_STYLE="dpkg"
-				shift
-				;;
-			-a|--aptitude-glob)
-				GLOB_STYLE="aptitude"
 				shift
 				;;
 			-f|--force)
@@ -148,9 +138,11 @@ parse_options () {
 		esac
 	done
 }
+
 readpkgs () {
 	grep -vE '^#' "$1" | grep -vE '^\s*$' | tr -d " \t"
 }
+
 getpkgs () {
 	IFS="
 "
@@ -169,31 +161,20 @@ getpkgs () {
 			# for the currently running kernel, if it exists
 			if [ "$pkg" = "meta:current-kernel" ]; then
 				KVERS=$( uname -r )
-				if [ "$GLOB_STYLE" = "dpkg" ]; then
-					dpkg-query --showformat '${Package}\n' -W "*-image-$KVERS" 2>/dev/null || true
-				else
-					aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
-				fi
+				aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
 			else
-				# if there's a wildcard in this, push it through dpkg/aptitude
+				# if there's a wildcard in this, push it through aptitude
 				# to glob. if not, just print it out.
-				if [ "$GLOB_STYLE" = "dpkg" ]; then
-					if echo "$pkg" | grep -Eq '[][*?]'; then
-						dpkg-query --showformat '${Package}\n' -W "$pkg" 2>/dev/null || true
-					else
-						echo "$pkg"
-					fi
+				if echo "$pkg" | grep -Eq '[][*?()|~]'; then
+					aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
 				else
-					if echo "$pkg" | grep -Eq '[][*?()|~]'; then
-						aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
-					else
-						echo "$pkg"
-					fi
+					echo "$pkg"
 				fi
 			fi
 		fi
 	done
 }
+
 run_aptitude () {
 	echo RUNNING: aptitude $APTITUDE_ARGS "$@"
 	aptitude $APTITUDE_ARGS "$@"

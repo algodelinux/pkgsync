@@ -1,3 +1,25 @@
+pkgsync (1.61) unstable; urgency=low
+
+  * Added script /usr/local/sbin/clean-pkgsync-files
+  * Removed deprecated support for dpkg-style globbing, --dpkg-glob and --aptitude-glob
+    options
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  15 Ene 2019 11:15:00 +0100
+
+pkgsync (1.60) unstable; urgency=low
+
+  * Modified script /usr/local/sbin/musthave-minimize 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  13 Ene 2019 21:49:00 +0100
+
+pkgsync (1.59) unstable; urgency=low
+
+  * Create user pkgsync, added user pkgsync to sudoers and added getty@tty12.service to 
+    /lib/systemd/system. Now, we can change to tty12 and do "sudo pkgsync" as user
+    pkgsync to upgrade the machine.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  22 Jul 2018 10:47:00 +0100
+
 pkgsync (1.58) unstable; urgency=low
 
   * Added new parameters to /usr/local/sbin/pkgsync:

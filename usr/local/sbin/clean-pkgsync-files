@@ -1,0 +1,23 @@
+#!/bin/bash
+#
+# Elimina de las listas de paquetes de pkgsync aquellos ficheros que no se encuentran en los repositorios
+#
+# 2019 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+:>/var/log/pkgsync/removedfromlists.log
+
+for fichero in $(find /etc/pkgsync -type f -not -name "*.all"); do
+    echo "Checking $fichero"
+    while read paquete; do
+       echo "Checking $fichero: $paquete"
+       existe=$(apt-cache policy $paquete 2>/dev/null)
+       if [ ! "$existe" ]; then
+          echo "Removing package $paquete from file $fichero"
+          echo "Removed package $paquete from file $fichero" >> /var/log/pkgsync/removedfromlists.log
+
+          sed -i "/$paquete/ d" $fichero
+       fi
+    done < $fichero
+ done
+ echo "See /var/log/pkgsync/removedfromlists.log"
