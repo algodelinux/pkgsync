@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.61
+export VERSION=1.62
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -204,6 +204,7 @@ wait_for_apt_or_dpkg() {
 }
 
 solveapterrors() {
+  set +e
   idioma=$LC_ALL
   export LC_ALL=C
 
@@ -211,9 +212,9 @@ solveapterrors() {
 
   if [ -s /tmp/apterrors ]; then
      timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg
-     grep "Unmet dependencies. Try using -f." /tmp/apterrors && apt-get -yf install && dpkg --configure -a && apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors && dpkg --configure -a && apt-get -yf install && apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors && rm -rf /var/lib/apt/lists/
+     grep -oE "Unmet dependencies. Try using -f." /tmp/apterrors && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
+     grep -oE "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
+     grep -oE 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors && rm -rf /var/lib/apt/lists/
   fi
 
   export LC_ALL=$idioma

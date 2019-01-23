@@ -1,3 +1,11 @@
+pkgsync (1.62) unstable; urgency=low
+
+  * Replaced apt-get by aptitude in /usr/share/linex-ubuntu-puppet/sinc_puppet to 
+    solve apt errors
+  * Added script solve-apt-errors to let solve apt errors without pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 23 Ene 2019 10:47:00 +0100
+
 pkgsync (1.61) unstable; urgency=low
 
   * Added script /usr/local/sbin/clean-pkgsync-files

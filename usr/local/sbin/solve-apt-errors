@@ -1,0 +1,21 @@
+#!/bin/bash
+# solve-apt-errors - Trata de resolver posibles errores de apt
+# 2013-2019 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+TIMEOUT_FOR_DPKG_OR_APT="3m"
+
+idioma=$LC_ALL
+export LC_ALL=C
+
+timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get check 1>/dev/null 2>/tmp/apterrors
+
+if [ -s /tmp/apterrors ]; then
+     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg
+     grep "Unmet dependencies." /tmp/apterrors && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors && rm -rf /var/lib/apt/lists/
+fi
+
+export LC_ALL=$idioma
+
