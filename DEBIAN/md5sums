@@ -1,7 +1,7 @@
 85f587867590ff4efbf60e8713c85869  usr/share/man/man8/pkgsync.8.gz
 20281955c98e701e21d0c4a150d59d65  usr/share/man/man8/purge-old-kernels.8.gz
-c61eb5543b6693fd1931f20c5134b020  usr/share/doc/pkgsync/changelog
-0d129bfdb564d37f955b6e76dc3f3515  usr/share/doc/pkgsync/NEWS.Debian.gz
+44be89395d1848463f2a47a9f1e2e440  usr/share/doc/pkgsync/changelog
+622745a1956eee7a36b025700dcebc51  usr/share/doc/pkgsync/NEWS.Debian.gz
 3eadb2d392c6cbf4e4174b4733a8cb17  usr/share/doc/pkgsync/README.Debian
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
 d689faff79501dae6ceccddfe019265f  usr/share/doc/pkgsync/copyright
@@ -14,11 +14,11 @@ c4bff1e5a1c26a6158241d5fe508acf4  usr/local/sbin/get-package-dependencies
 1ea23cab1d22f945d0d6f97f614c9248  usr/local/sbin/limpiapaquetes
 e807e8d23e18dd2468da8ada6c6aa1af  usr/local/sbin/musthave-build
 e90b6eca4b1833dfe0de8c645f9973bf  usr/local/sbin/musthave-minimize
-b5847df53a50bf227c6324a075f9f59a  usr/local/sbin/pkgsync
+e4277976207fad6906bfe8b8e2c9639f  usr/local/sbin/pkgsync
 140c6301fa2887f307fd8cb9555599fc  usr/local/sbin/purge-old-kernels
 7447ddf2d03e714c9da58b2715548b22  usr/local/sbin/wait_for_apt_or_dpkg
 3334472352843ad45129c6e4fbfcda9e  usr/local/sbin/launchpad-getkeys
-4555a53b37a86399aab948dbf1270577  usr/local/sbin/solve-apt-errors
+d71719bb8c7b89a5d24731222635bc68  usr/local/sbin/solve-apt-errors
 7447ddf2d03e714c9da58b2715548b22  usr/local/sbin/wait_for_apt_or_dpkg
 221edf90c401d269ec2e4c502d465afa  lib/systemd/system/getty@tty12.service
 dfe63f3e4520b08a73e068902dada8d5  etc/cron.daily/nightly-pkgsync
