@@ -35,6 +35,9 @@ CLEAN="no"
 # LAUNCH_SINC_PUPPET="yes": iniciar sinc_puppet antes de hacer pkgsync (opción por defecto)
 LAUNCH_SINC_PUPPET="yes"
 
+# Tiempo máximo en minutos que puede estar corriendo sinc_puppet antes de matarlo
+TIMEOUT_FOR_SINC_PUPPET="5"
+
 # Apagar automáticamente el equipo después de ejecutar pkgsync en el intervalo especificado
 # AUTOMATIC_SHUTDOWN_BETWEEN="22:00-06:00"
 AUTOMATIC_SHUTDOWN_BETWEEN=""
@@ -64,4 +67,3 @@ LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 # Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días (2d).
 # TIMEOUT_FOR_DPKG_OR_APT="3m": Esperar un tiempo máximo de 3 minutos (valor por defecto)
 TIMEOUT_FOR_DPKG_OR_APT="3m"
-

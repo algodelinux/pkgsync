@@ -4,7 +4,7 @@
 #
 
 killprocess() {
-   
+
    updatehour=$(ps aux|grep $1 | grep -v grep | head -1 | awk '{print $9}')
    if [ -n $updatehour ]; then
       timestampupdate=$(date -d "$updatehour" +'%s')
@@ -12,9 +12,9 @@ killprocess() {
       diference=$(($timestampnow - $timestampupdate))
       minutesfromupdate=$(($diference / 60))
 
-      if [ "$minutesfromupdate" -gt "$MAXMINUTES_FROM_FIRST_UPDATE_COMMAND" ]; then
-         # Matamos procesos de actualización de paquetes
-         killall $1 2>/dev/null
+      if [ "$minutesfromupdate" -gt "$2" ]; then
+         # Matamos proceso
+         pkill -9 $1 2>/dev/null
       fi
    fi
 }
@@ -22,27 +22,51 @@ killprocess() {
 idioma=$LC_ALL
 export LC_ALL=C
 
-MAXMINUTES_FROM_FIRST_UPDATE_COMMAND='1'
-TIMEOUT_FOR_DPKG_OR_APT="10s"
+TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
+TIMEOUT_FOR_SINC_PUPPET=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
+TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
+TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+
+case "$TIMEOUT_UNITS" in
+
+"s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER
+    ;;
+"m")  AFTER_TIMEOUT=$(($TIMEOUT_NUMBER * 60))
+    ;;
+"h")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 3600))
+    ;;
+"d")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 86400))
+   ;;
+esac
+
+if [ "$1" == "-f" ]; then
+   $TIMEOUT_FOR_SINC_PUPPET=0
+   $AFTER_TIMEOUT=0
+fi
 
 # Matamos procesos detenidos
 stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
 if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 
+# Matamos sinc_puppet si está corriendo desde hace más de xx minutos
+if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
+
 apt-get check 1>/dev/null 2>/tmp/apterrors
 
 if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-   if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude; fi
-   if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get; fi
-   if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg; fi
+   if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
+   if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
+   if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
 fi
 
 if [ -s /tmp/apterrors ]; then
-     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg
      grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
      grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -rf /var/lib/apt/lists/
 fi
+
+# Instalamos paquetes a medio instalar
+aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
 
 export LC_ALL=$idioma
 

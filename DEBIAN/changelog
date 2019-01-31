@@ -1,3 +1,28 @@
+pkgsync (1.68) linex; urgency=medium
+
+  * Modificado bug en función solveapterrors por el que se solicitaba
+    confirmación al usuario para instalar paquetes medio instalados
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 31 Ene 2019 13:45:00 +0100
+
+pkgsync (1.67) unstable; urgency=low
+
+  * Improved solve-apt-errors script and added same code to pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 31 Ene 2019 11:06:00 +0100
+
+pkgsync (1.66) unstable; urgency=low
+
+  * Improved solve-apt-errors script and added same code to pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 30 Ene 2019 12:36:00 +0100
+
+pkgsync (1.65) unstable; urgency=low
+
+  * Improved solve-apt-errors script and added same code to pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 29 Ene 2019 19:01:00 +0100
+
 pkgsync (1.64) unstable; urgency=low
 
   * Improved solve-apt-errors script and added same code to pkgsync
