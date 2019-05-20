@@ -66,7 +66,7 @@ if [ -s /tmp/apterrors ]; then
 fi
 
 # Instalamos paquetes a medio instalar
-aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
+dpkg -l|grep ^iF | awk '{print $2}' || aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
 
 export LC_ALL=$idioma
 

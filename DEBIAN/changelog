@@ -1,3 +1,24 @@
+pkgsync (1.71) linex; urgency=medium
+
+  * Modificado pkgsync para garantizar el reinicio en Windows cuando el sistema operativo
+    se encuentra en otro disco
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 20 May 2019 11:25:00 +0100
+
+pkgsync (1.70) linex; urgency=medium
+
+  * Modificada funcion solveapterrors para tratar de reinstalar paquetes a medio instalar
+    sólo si los hay
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 08 Mar 2019 13:53:00 +0100
+
+pkgsync (1.69) linex; urgency=medium
+
+  * Modificado pkgsync para esperar si se están realizando actualización de paquetes
+    o índices desde el entorno gráfico
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 19 Feb 2019 10:39:00 +0100
+
 pkgsync (1.68) linex; urgency=medium
 
   * Modificado bug en función solveapterrors por el que se solicitaba

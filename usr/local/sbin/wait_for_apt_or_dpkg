@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
-if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; then
+if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; then
    echo "Esperando mientras se actualizan índices o paquetes..."
 fi
-while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
+while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; do
    sleep 1
 done
 

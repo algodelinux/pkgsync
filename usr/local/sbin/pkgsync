@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.68
+export VERSION=1.71
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -30,6 +30,7 @@ print_help () {
 	echo "  -g, --get-keys		exec launchpad-keys to get repositories keys"
 	echo "  -S, --shutdown            	shutdown machine after pkgsync"
 	echo "  -R, --reboot              	reboot machine after pkgsync"
+	echo "  -Rw, --reboot              	reboot machine and boot into windows on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -195,10 +196,10 @@ function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)"
 
 wait_for_apt_or_dpkg() {
   # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
-  if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; then
+  if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; then
      echo "Esperando mientras se actualizan índices o paquetes..."
   fi
-  while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ]; do
+  while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; do
      sleep 1
   done
 }
@@ -261,7 +262,7 @@ solveapterrors() {
   fi
 
   # Instalamos paquetes a medio instalar
-  aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
+  dpkg -l|grep ^iF | awk '{print $2}' || aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
 
   # Aseguramos la actualización de pkgsync
   aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude install -y pkgsync
@@ -343,14 +344,20 @@ check_auto_reboot() {
      # Obtenemos el orden de arranque actual
      bootorder=$(/bin/efibootmgr | sed -n 's|^BootOrder: \(.*\)|\1|p')
 
-     # Creamos una entrada específica para Windows 10, si no está creada
-     /bin/efibootmgr | grep "W10IES" 2>&1 > /dev/null || /bin/efibootmgr -c -d $EFI_DISK -p $(gdisk -l $EFI_DISK | grep "EFI system partition" | awk '{print $1}') -L "W10IES" -l "\EFI\Microsoft\Boot\bootmgfw.efi"
+     for DISK in $(lsblk --nodeps |grep disk | awk '{print $1}'); do
+        EFIPART=$(gdisk -l "/dev/$DISK" | grep "EFI system partition" | awk '{print $1}')
+
+        # Creamos una entrada específica para Windows 10, si no está creada
+        if [ "$EFIPART" ]; then
+           /bin/efibootmgr | grep "W10IES" 2>&1 > /dev/null || /bin/efibootmgr -c -d $EFI_DISK -p $EFIPART -L "W10IES" -l "\EFI\Microsoft\Boot\bootmgfw.efi"
+        fi
+     done
 
      # Restauramos el bootorder
      /bin/efibootmgr -o $bootorder
 
      # Establecemos un arranque temporal de Windows
-     /bin/efibootmgr -n $(/bin/efibootmgr | grep "W10IES" | sed -ne 's/[^0-9A-F]*\(\([0-9A-F]\)\{4\}\).*/\1/p') 2>&1>/dev/null
+     /bin/efibootmgr -n $(/bin/efibootmgr | grep "W10IES" | cut -f1 -d" " | sed -e "s/^Boot//" -e "s/*$//") 2>&1>/dev/null
   fi
 }
 
@@ -373,7 +380,7 @@ AUTOMATIC_REBOOT_INTO_WINDOWS=no
 LAUNCHPAD_GETKEYS=yes
 LAUNCHPAD_GETKEYS_PROXY=""
 TIMEOUT_FOR_DPKG_OR_APT="3m"
-EFI_DISK=/dev/sda # Disco que contiene EFI
+EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
