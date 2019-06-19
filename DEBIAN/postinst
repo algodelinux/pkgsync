@@ -6,7 +6,7 @@ fi
 
 [ "`id -u pkgsync &>/dev/null`" ] || adduser --system --shell /bin/bash --home /var/home/pkgsync pkgsync
 
-[ "`grep 'pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/pkgsync' /etc/sudoers`" ] || echo 'pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/pkgsync' >> /etc/sudoers
+# [ "`grep 'pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/pkgsync' /etc/sudoers`" ] || echo 'pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/pkgsync' >> /etc/sudoers
 
 if [ -f /lib/systemd/system/getty@tty12.service ]; then
    systemctl start getty@tty12.service

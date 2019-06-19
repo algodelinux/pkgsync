@@ -1,25 +1,37 @@
-pkgsync (1.71) linex; urgency=medium
+pkgsync (1.72) ubuntu; urgency=medium
+
+  * Modificado launchpad-getkeys para obtener configuración del proxy del fichero de 
+    configuración /etc/default/launchpad-getkeys. Incluir información del proxy en 
+    este fichero es opcional.
+  * Realizada modificación en sudoers para permitir que el usuario pkgsync tenga 
+    permisos para ejecutar clean-pkgsync-files, launchpad-getkeys, musthave-build,
+    solve-apt-errors, get-package-dependencies, limpiapaquetes, musthave-minimize,
+    purge-old-kernels y  wait_for_apt_or_dpkg además de pkgsync.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 13 Jun 2019 13:29:00 +0100
+
+pkgsync (1.71) ubuntu; urgency=medium
 
   * Modificado pkgsync para garantizar el reinicio en Windows cuando el sistema operativo
     se encuentra en otro disco
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 20 May 2019 11:25:00 +0100
 
-pkgsync (1.70) linex; urgency=medium
+pkgsync (1.70) ubuntu; urgency=medium
 
   * Modificada funcion solveapterrors para tratar de reinstalar paquetes a medio instalar
     sólo si los hay
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 08 Mar 2019 13:53:00 +0100
 
-pkgsync (1.69) linex; urgency=medium
+pkgsync (1.69) ubuntu; urgency=medium
 
   * Modificado pkgsync para esperar si se están realizando actualización de paquetes
     o índices desde el entorno gráfico
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 19 Feb 2019 10:39:00 +0100
 
-pkgsync (1.68) linex; urgency=medium
+pkgsync (1.68) ubuntu; urgency=medium
 
   * Modificado bug en función solveapterrors por el que se solicitaba
     confirmación al usuario para instalar paquetes medio instalados

@@ -1,0 +1,11 @@
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/clean-pkgsync-files
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/musthave-build
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/solve-apt-errors
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/get-package-dependencies
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/musthave-minimize
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/wait_for_apt_or_dpkg
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/launchpad-getkeys
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/pkgsync
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/limpiapaquetes
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/purge-old-kernels
+

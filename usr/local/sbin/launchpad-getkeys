@@ -24,6 +24,12 @@ keyserver is down
 exit 0
 }
 
+. /etc/default/launchpad-getkeys
+
+if [[ $SERVER ]] && [[ $PORT ]]; then
+   PROXY=http://$SERVER:$PORT
+fi
+
 while getopts "k:p:h\?" opt; do
 	case "$opt" in
 		k ) KEYSERVER="$OPTARG"			;;
@@ -54,7 +60,7 @@ if [[ $PROXY ]]; then
 fi
 
 if [[ ! $PROXY ]]; then
-	PROXY=$http_proxy	
+	PROXY=$http_proxy
 fi
 
 # use apt proxy
