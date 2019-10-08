@@ -1,3 +1,10 @@
+pkgsync (1.73) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para garantizar el reinicio en Windows
+    cuando se utiliza la opción -Rw
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 08 Oct 2019 08:44:00 +0100
+
 pkgsync (1.72) ubuntu; urgency=medium
 
   * Modificado launchpad-getkeys para obtener configuración del proxy del fichero de 

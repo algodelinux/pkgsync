@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.72
+export VERSION=1.73
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -258,7 +258,7 @@ solveapterrors() {
   if [ -s /tmp/apterrors ]; then
      grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
      grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -rf /var/lib/apt/lists/
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*;apt update -y; dpkg --configure -a; apt -f install
   fi
 
   # Instalamos paquetes a medio instalar
@@ -345,7 +345,8 @@ check_auto_reboot() {
      bootorder=$(/bin/efibootmgr | sed -n 's|^BootOrder: \(.*\)|\1|p')
 
      for DISK in $(lsblk --nodeps |grep disk | awk '{print $1}'); do
-        EFIPART=$(gdisk -l "/dev/$DISK" | grep "EFI system partition" | awk '{print $1}')
+        EFI_DISK="/dev/$DISK"
+        EFIPART=$(gdisk -l $EFI_DISK | grep -w "EFI system partition" | awk '{print $1}')
 
         # Creamos una entrada específica para Windows 10, si no está creada
         if [ "$EFIPART" ]; then

@@ -62,11 +62,14 @@ fi
 if [ -s /tmp/apterrors ]; then
      grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
      grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -rf /var/lib/apt/lists/
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -rf /var/lib/apt/lists/*;apt update -y; dpkg --configure -a; apt -f install
 fi
 
 # Instalamos paquetes a medio instalar
 dpkg -l|grep ^iF | awk '{print $2}' || aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
+
+# Aseguramos la actualización de pkgsync
+aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude install -y pkgsync
 
 export LC_ALL=$idioma
 
