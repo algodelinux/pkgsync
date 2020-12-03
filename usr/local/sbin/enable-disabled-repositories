@@ -1,0 +1,10 @@
+#!/bin/bash
+# enable-disabled-repositories - Habilita repositorios deshabilitados en
+# /etc/apt/sources.list.d/ quitando a los ficheros.list la extensión .disabled
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+for file in /etc/apt/sources.list.d/*.disabled; do
+    [ -f $file ] && mv -f "$file" "${file%%.disabled}"
+done
+

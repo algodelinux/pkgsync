@@ -1,0 +1,15 @@
+#!/bin/bash
+# disable-failed-repositories - Deshabilita los repositorios que fallan en
+# /etc/apt/sources.list.d/ añadiendo a los ficheros .list la extensión .disabled
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+# Buscamos los repositorios que fallan
+LC_ALL=C apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+
+# Deshabilitamos los repositorios que fallan de /etc/apt/sources.list.d
+while read repository; do
+  failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
+  mv $failedfilerepository $failedfilerepository.disabled
+done </tmp/failedrepositories
+

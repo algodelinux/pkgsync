@@ -1,0 +1,33 @@
+#!/bin/bash
+# softwareupdate - Actualiza paquetes instalados mediante apt, flatpak, snap y realiza limpieza
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+# Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
+[ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && sudo /usr/local/sbin/launchpad-getkeys
+
+# Actualizamos paquetes deb
+[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && sudo /usr/bin/apt update && sudo /usr/bin/apt -y upgrade
+
+# Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
+[ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
+
+# Si se encuentra instalado snap, actualizamos el software instalado mediante snap
+[ -x /usr/bin/snap ] && echo -e "${GREEN}\nActualizando software instalado via snap...\n${NC}"  && sudo /usr/bin/snap refresh
+
+# Realizamos limpieza de paquetes
+echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
+sudo apt-get -fy install &&
+sudo dpkg --configure -a &&
+sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+sudo apt-get -y autoremove &&
+sudo apt-get -y clean
+[ $(which flatpak) ] && sudo flatpak uninstall --unused -y
+[ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
+  while read snapname revision; do
+     sudo snap remove "$snapname" --revision="$revision"
+  done

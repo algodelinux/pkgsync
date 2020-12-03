@@ -1,0 +1,7 @@
+#!/bin/bash
+# backup-repositories - Realiza un backup de los repositorios
+# alojados en el directorio /etc/apt/ en ficheros con extensión .orig
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+find /etc/apt/ -type f -iname "*.list" -exec cp {} {}.orig \;

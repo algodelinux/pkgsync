@@ -1,6 +1,6 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
-# 2013-2019 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 killprocess() {
@@ -66,7 +66,8 @@ if [ -s /tmp/apterrors ]; then
 fi
 
 # Instalamos paquetes a medio instalar
-dpkg -l|grep ^iF | awk '{print $2}' || aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
+bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+if [ "$bad_packages" ]; then aptitude -y install $bad_packages; fi
 
 # Aseguramos la actualización de pkgsync
 aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude install -y pkgsync

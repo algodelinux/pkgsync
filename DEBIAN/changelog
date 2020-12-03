@@ -1,3 +1,105 @@
+pkgsync (1.82) ubuntu; urgency=medium
+
+  * Añadido a /usr/local/sbin/ el script softwareupdate que permite actualizar el  
+    software instalado mediante apt, snap o flatpak y realizar limpieza
+  * Habilitado en el fichero /etc/sudoers.d/pkgsync el permiso del usuario pkgsync para 
+    ejecutar el script /usr/local/sbin/softwareupdate
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 02 Dic 2020 09:23:00 +0100
+
+pkgsync (1.81) ubuntu; urgency=medium
+
+  * Deshabilitado en el fichero /etc/sudoers.d/pkgsync el permiso del usuario pkgsync para 
+    ejecutar los siguientes scripts:
+    - /usr/local/sbin/clean-pkgsync-files
+    - /usr/local/sbin/disable-failed-repositories
+    - /usr/local/sbin/enable-disabled-repositories
+    - /usr/local/sbin/enable-non-failed-repositories
+    - /usr/local/sbin/musthave-build
+    - /usr/local/sbin/musthave-minimize
+    - /usr/local/sbin/remove-backup-repositories
+    - /usr/local/sbin/remove-failed-repositories
+    - /usr/local/sbin/restore-backup-repositories
+    Se dejan comentados por si alguien quiere editar el fichero para habilitar el permiso.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 30 Nov 2020 08:46:00 +0100
+
+pkgsync (1.80) ubuntu; urgency=medium
+
+  * Añadida modificación para que pkgsync se ejecute aunque el fichero /etc/pkgsync/musthave 
+    no exista en el cliente (Modificación introducida por Ismael Campos).
+  * Añadida nueva opción ABORT_ON_FAILED_REPOS al fichero /etc/default/pkgsync qye nos permite 
+    elegir entre abortar la ejecución de pkgsync cuando alguno de los repositorios falle o 
+    continuar la ejecución ignorando los repositorios que fallan.
+    # ABORT_ON_FAILED_REPOS="yes": abortar la ejecución si alguno de los repositorios da error (opción por defecto)
+    # ABORT_ON_FAILED_REPOS="no": continuar la ejecución ignorando los repositorios que fallan
+  * Añadido a /usr/local/sbin/ el script list-failed-repositories para listar los ficheros de 
+    repositorios alojados en /etc/apt/sources.list.d/ que fallan
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 17 Nov 2020 10:47:00 +0100
+
+pkgsync (1.79) ubuntu; urgency=medium
+
+  * Añadidos los siguientes scripts a /usr/local/sbin/: 
+    - backup-repositories: Realiza un backup de los repositorios alojados en el directorio 
+      /etc/apt/ en ficheros con extensión .orig
+    - restore-backup-repositories: Restaura el backup de los repositorios alojados en /etc/apt
+    - remove-failed-repositories: Elimina de /etc/apt/sources.list.d/ los repositorios
+    - disable-failed-repositories: Deshabilita en /etc/apt/sources.list.d/ los repositorios
+      que hayan fallado añadiendoles la extensión .disabled.
+    - remove-backup-repositories: Elimina de /etc/apt/ los ficheros de backup de repositorios
+      con extensión .save y .orig
+    - list-backup-repositories: Lista los ficheros de backup de repositorios alojados en /etc/apt
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 17 Nov 2020 10:47:00 +0100
+
+pkgsync (1.78) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para mejorar el testeo de ficheros. 
+  * Modificado /usr/local/sbin/clean-pkgsync-files para mejorar el proceso de limpieza 
+    de ficheros.
+  * Actualizado /usr/local/sbin/limpiapaquetes a nueva versión que además de realizar
+    limpieza de paquetes deb, limpia paquetes snap y flatpak.
+    
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 23 May 2020 11:49:00 +0100
+
+pkgsync (1.77) ubuntu; urgency=medium
+
+  * Modificada comprobación de ejecución de sinc_puppet en /usr/local/sbin/pkgsync para 
+    garantizar su buen funcionamiento.
+  * Separadas las comprobaciones de apagado manual y programado.
+  * Separadas las comprobaciones de reinicio manual y programado.
+    
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 23 May 2020 11:49:00 +0100
+
+pkgsync (1.76) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para abortar el proceso si alguno de los repositorios
+    no se encuentra accesible.
+    
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 29 Abr 2020 08:54:00 +0100
+
+pkgsync (1.75) ubuntu; urgency=medium
+
+  * Añadida opción -d, --delete-files para eliminar todos los ficheros de listas de pkgsync.
+  * Añadida opción -b, --build-musthave para generar el fichero /etc/pkgsync/musthave y
+    crear los ficheros /etc/pkgsync/mayhave y /etc/pkgsync/maynothave si no existen.
+    
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 11 Feb 2020 11:19:00 +0100
+
+pkgsync (1.74) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para garantizar la actualización de paquetes
+    aunque se haya introducido un nombre de paquete que no se encuentra en los repositorios.
+    Este es un problema derivado del funcionamiento actual de aptitude, que aborta
+    la actualización de paquetes cuando se le pide instalar/desinstalar un paquete
+    que no existe en los repositorios.
+  * Mejorada la gestión de paquetes mediante solve-apt-errors para tratar de instalar 
+    paquetes medio instalados (en estado ^iF y ^ri).
+  * Añadida opción -v para mostrar la versión de pkgsync.
+    
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 07 Feb 2020 11:08:00 +0100
+
 pkgsync (1.73) ubuntu; urgency=medium
 
   * Modificado /usr/local/sbin/pkgsync para garantizar el reinicio en Windows

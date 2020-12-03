@@ -1,0 +1,9 @@
+#!/bin/bash
+# restore-backup-repositories - Restaura el backup de los repositorios con extensión .orig
+# alojados en el directorio /etc/apt/sources.list.d/
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+for file in /etc/apt/sources.list.d/*.orig; do
+    [ -f $file ] && cp -f "$file" "${file%%.orig}"
+done

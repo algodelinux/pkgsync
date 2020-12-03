@@ -67,3 +67,9 @@ LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 # Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días (2d).
 # TIMEOUT_FOR_DPKG_OR_APT="3m": Esperar un tiempo máximo de 3 minutos (valor por defecto)
 TIMEOUT_FOR_DPKG_OR_APT="3m"
+
+# ABORT_ON_FAILED_REPOS nos permite elegir entre abortar la ejecución de pkgsync cuando alguno de 
+# los repositorios falle o continuar la ejecución ignorando los repositorios que fallan.
+# ABORT_ON_FAILED_REPOS="yes": abortar la ejecución si alguno de los repositorios da error (opción por defecto)
+# ABORT_ON_FAILED_REPOS="no": continuar la ejecución ignorando los repositorios que fallan
+ABORT_ON_FAILED_REPOS="yes"

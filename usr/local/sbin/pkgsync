@@ -2,13 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# 2013-2019 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.73
+export VERSION=1.82
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -16,40 +16,53 @@ print_help () {
 	echo ""
 	echo "Usage: pkgsync [OPTIONS]"
 	echo "Recognized options:"
-	echo "  -h, --help		       	display this help and exit"
-	echo "  -k, --keep-unused         	don't remove unused packages"
-	echo "  -s, --simulate            	don't do anything, just print out what would have happened"
-	echo "  -t, --test-files          	test pkgsync files"
-	echo "  -tr, --test-files r          	test and remove packages from pkgsync files lists"
-	echo "  -f, --force               	force pkgsync"
-	echo "  -c, --clean               	remove uninstalled packages dependencies,"
+	echo "  -h,  --help			display this help and exit"
+	echo "  -v,  --version		display pkgsync version and exit"
+	echo "  -k,  --keep-unused		don't remove unused packages"
+	echo "  -s,  --simulate		don't do anything, just print out what would have happened"
+	echo "  -t,  --test-files		test pkgsync files"
+	echo "  -tr, --test-files r		test and remove packages from pkgsync files lists"
+	echo "  -d,  --delete-files		delete all pkgsync files"
+	echo "  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist"
+	echo "  -f,  --force			force pkgsync"
+	echo "  -c,  --clean			remove uninstalled packages dependencies,"
 	echo "				purge uninstalled packages and clean cache"
-	echo "  -p, --purge-old-kernels	remove old kernels keeping the last two (by default)"
+	echo "  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)"
 	echo "				or the number specified in /etc/default/pkgsync file"
-	echo "  -n, --no-sincpuppet		don't launch sinc_puppet from pkgsync"
-	echo "  -g, --get-keys		exec launchpad-keys to get repositories keys"
-	echo "  -S, --shutdown            	shutdown machine after pkgsync"
-	echo "  -R, --reboot              	reboot machine after pkgsync"
-	echo "  -Rw, --reboot              	reboot machine and boot into windows on EFI computers"
+	echo "  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync"
+	echo "  -g,  --get-keys		exec launchpad-keys to get repositories keys"
+	echo "  -S,  --shutdown		shutdown machine after pkgsync"
+	echo "  -R,  --reboot			reboot machine after pkgsync"
+	echo "  -Rw, --reboot			reboot machine and boot into windows on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
 
 test_files () {
+  set +e
   :>/var/log/pkgsync/removefromlists.log
 
-  for fichero in $(find /etc/pkgsync -type f -not -name "*.all"); do
-    echo "Checking $fichero"
-    while read paquete; do
-       echo "Checking $fichero: $paquete"
-       existe=$(apt-cache policy $paquete 2>/dev/null)
-       if [ ! "$existe" ]; then
-          echo "Package $paquete in file $fichero isn't in repositories"
-          echo "Package $paquete in file $fichero isn't in repositories" >> /var/log/pkgsync/removefromlists.log
-       fi
-    done < $fichero
+  for fichero in $(find /etc/pkgsync -type f -not -name "*.all" -not -name "*.bak*" -not -name "musthave.????????"); do
+      if [ -s "$fichero" ]; then
+
+         for paquete in $(cat $fichero); do
+            echo "Checking $fichero: $paquete"
+
+            LC_ALL=C apt-cache --quiet=0 policy $paquete 2>&1 | tr -d " " | grep -e 'Candidate:(none)' -e 'N:Unabletolocatepackage' 2>&1>/dev/null
+
+            if [ $? -eq 0 ]; then
+               echo "Package $paquete in file $fichero isn't in repositories"
+               echo "Package $paquete in file $fichero isn't in repositories" >> /var/log/pkgsync/removefromlists.log
+            fi
+         done
+      fi
   done
   echo "See /var/log/pkgsync/removefromlists.log"
+  set -e
+}
+
+delete_files () {
+  find /etc/pkgsync/ -not -type d -exec rm -f {} \;
 }
 
 remove_packages_from_lists () {
@@ -60,7 +73,7 @@ remove_packages_from_lists () {
         paquete=$(echo $linea | cut -f2 -d" ")
         fichero=$(echo $linea | cut -f5 -d" ")
 
-        echo "Removing package $paquete from file $fichero"
+        echo "Removed package $paquete from file $fichero"
         echo "Removed package $paquete from file $fichero" >> /var/log/pkgsync/removedfromlists.log
 
         sed -i "/$paquete/ d" $fichero
@@ -69,9 +82,24 @@ remove_packages_from_lists () {
   fi
 }
 
+disable_failed_repositories () {
+  # Deshabilitamos los repositorios que fallan de /etc/apt/sources.list.d
+  while read repository; do
+    failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
+    mv $failedfilerepository $failedfilerepository.disabled
+  done </tmp/failedrepositories	
+}
+
+enable_repositories () {
+  # Habilitamos los repositorios deshabilitados en /etc/apt/sources.list.d
+  for file in $(find /etc/apt/sources.list.d/ -iname "*.disabled"); do
+    [ -f $file ] && mv -f "$file" "${file%%.disabled}"
+  done
+}
+
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hft::kscpngSR:: --long help,force,test-files::,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hvft::dbkscpngSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -124,8 +152,20 @@ parse_options () {
                                 if [ "$2" = "r" ]; then remove_packages_from_lists; fi
 				exit 0
 				;;
+			-d|--delete-files)
+				delete_files
+				exit 0
+				;;
+			-b|--build-files)
+				/usr/local/sbin/musthave-build
+				exit 0
+				;;
 			-h|--help)
 				print_help
+				exit 0
+				;;
+			-v|--version)
+				echo "$(basename $0) $VERSION"
 				exit 0
 				;;
 			--)
@@ -162,12 +202,12 @@ getpkgs () {
 			# for the currently running kernel, if it exists
 			if [ "$pkg" = "meta:current-kernel" ]; then
 				KVERS=$( uname -r )
-				aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
+				timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
 			else
 				# if there's a wildcard in this, push it through aptitude
 				# to glob. if not, just print it out.
 				if echo "$pkg" | grep -Eq '[][*?()|~]'; then
-					aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
+					timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
 				else
 					echo "$pkg"
 				fi
@@ -176,23 +216,22 @@ getpkgs () {
 	done
 }
 
-run_aptitude () {
-	echo RUNNING: aptitude $APTITUDE_ARGS "$@"
-	aptitude $APTITUDE_ARGS "$@"
-}
-run_debtags () {
-	if [ "$USE_DEBTAGS" ]; then
-		echo RUNNING: debtags "$@"
-		debtags "$@"
-	fi
-}
+merge_files() {
 
-# The beautiful look of hacks in the morning...
-filter () {
-	echo "$@" | tr " " "\n" | sort | uniq -c | grep "     2" | cut -c9-
-}
+  # Merge files
+  sort -u -o /etc/pkgsync/musthave.all $MUSTHAVE /etc/pkgsync/musthave.ies $(find /etc/pkgsync/musthave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
+  sort -u -o /etc/pkgsync/maynothave.all $MAYNOTHAVE /etc/pkgsync/maynothave.ies $(find /etc/pkgsync/maynothave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
+  sort -u -o /etc/pkgsync/mayhave.all $MAYHAVE /etc/pkgsync/mayhave.ies $(find /etc/pkgsync/mayhave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
 
-function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
+  # Remove empty lines, blank spaces and tabs
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/musthave.all
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/mayhave.all
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/maynothave.all
+
+  # Remove maynothave.all and musthave.orphan packages from musthave.all
+  comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all
+  comm -23 /tmp/musthave.all /etc/pkgsync/maynothave.all > /etc/pkgsync/musthave.all
+}
 
 wait_for_apt_or_dpkg() {
   # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
@@ -203,6 +242,26 @@ wait_for_apt_or_dpkg() {
      sleep 1
   done
 }
+
+run_aptitude () {
+  echo RUNNING: aptitude $APTITUDE_ARGS "$@"
+  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude $APTITUDE_ARGS "$@"
+  return $?
+}
+
+run_debtags () {
+  if [ "$USE_DEBTAGS" ]; then
+     echo RUNNING: debtags "$@"
+     debtags "$@"
+  fi
+}
+
+# The beautiful look of hacks in the morning...
+filter () {
+	echo "$@" | tr " " "\n" | sort | uniq -c | grep "     2" | cut -c9-
+}
+
+function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
 
 killprocess() {
 
@@ -256,16 +315,17 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*;apt update -y; dpkg --configure -a; apt -f install
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -yf install
   fi
 
   # Instalamos paquetes a medio instalar
-  dpkg -l|grep ^iF | awk '{print $2}' || aptitude -y install $(dpkg -l|grep ^iF | awk '{print $2}')
+  bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+  if [ "$bad_packages" ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -y install $bad_packages; fi
 
   # Aseguramos la actualización de pkgsync
-  aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude install -y pkgsync
+  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
 
   export LC_ALL=$idioma
 }
@@ -297,12 +357,12 @@ eliminar_dependencias() {
 
 apagar_equipo() {
   # Apagar el equipo si el usuario pasó el parámetro -S
-  if [ $SHUTDOWN = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/poweroff; fi
+  if [ $SHUTDOWN = true ] || [ $AUTOSHUTDOWN = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/poweroff; fi
 }
 
 reiniciar_equipo() {
   # Reiniciar el equipo si el usuario pasó el parámetro -R
-  if [ $REBOOT = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/reboot; fi
+  if [ $REBOOT = true ] || [ $AUTOREBOOT = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/reboot; fi
 }
 
 check_auto_shutdown() {
@@ -314,10 +374,10 @@ check_auto_shutdown() {
      horafin=$(expr "$AUTOMATIC_SHUTDOWN_BETWEEN" : '.*\(..:..\)' | tr -d ':')
 
      if [ "$horaini" -lt "$horafin" ]; then
-        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && SHUTDOWN=true || SHUTDOWN=false
+        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOSHUTDOWN=true || AUTOSHUTDOWN=false
      else
         if [ "$horaini" -gt "$horafin" ]; then
-           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && SHUTDOWN=true || SHUTDOWN=false
+           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOSHUTDOWN=true || AUTOSHUTDOWN=false
         fi
      fi
   fi
@@ -332,10 +392,10 @@ check_auto_reboot() {
      horafin=$(expr "$AUTOMATIC_REBOOT_BETWEEN" : '.*\(..:..\)' | tr -d ':')
 
      if [ "$horaini" -lt "$horafin" ]; then
-        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && REBOOT=true || REBOOT=false
+        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOREBOOT=true || AUTOREBOOT=false
      else
         if [ "$horaini" -gt "$horafin" ]; then
-           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && REBOOT=true || REBOOT=false
+           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOREBOOT=true || AUTOREBOOT=false
         fi
      fi
   fi
@@ -362,6 +422,7 @@ check_auto_reboot() {
   fi
 }
 
+
 # Matamos procesos detenidos
 stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
 if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
@@ -371,6 +432,8 @@ HELP=false
 FORCE=false
 SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
+AUTOSHUTDOWN=false # No apagar
+AUTOREBOOT=false   # No reiniciar
 PURGE_OLD_KERNELS=no
 KEEP_LAST_KERNELS="2"
 CLEAN=no
@@ -382,6 +445,8 @@ LAUNCHPAD_GETKEYS=yes
 LAUNCHPAD_GETKEYS_PROXY=""
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
+ABORT_ON_FAILED_REPOS="yes"
+DISABLED_FAILED_REPOS=false
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
@@ -404,14 +469,18 @@ BADGER="$!"
 
 trap "kill "${BADGER}" 2>/dev/null || true; lockfile-remove $lockfile; exit" QUIT INT TERM EXIT
 
+if [ ! -r /etc/pkgsync/musthave ]; then
+        IGNORE_MUSTHAVE="yes"
+fi
+
 # No ejecutar pkgsync cuando falta alguno de los ficheros musthave, mayhave o maynothave
-if [ ! -r /etc/pkgsync/musthave -o \
+if [ ! -r /etc/pkgsync/musthave -a ! "$IGNORE_MUSTHAVE" = "yes" -o \
      ! -r /etc/pkgsync/mayhave -o \
      ! -r /etc/pkgsync/maynothave ]; then
-	echo Error: Missing files in /etc/pkgsync. Aborting.
+	echo "Error: Missing files in /etc/pkgsync. Aborting."
 	echo
-	echo Please see /usr/share/doc/pkgsync/README.Debian for information on
-	echo configuring pkgsync.
+	echo "Please see /usr/share/doc/pkgsync/README.Debian for information on"
+	echo "configuring pkgsync."
 
 	exit 1
 fi
@@ -433,12 +502,12 @@ solveapterrors;eliminar_kernels
 
 runned_sinc_puppet=false
 # Si está corriendo sinc_puppet, esperamos hasta que termine
-if [ $(pgrep sinc_puppet) ]; then
+if [[ $(pgrep sinc_puppet) ]]; then
    echo "Esperando a que termine sinc_puppet..."
    runned_sinc_puppet=true
 fi
 
-while [ $(pgrep sinc_puppet) ]; do
+while [[ $(pgrep sinc_puppet) ]]; do
    sleep 1
 done
 
@@ -453,7 +522,22 @@ if [ $runned_sinc_puppet = false ]; then
 fi
 
 # Update the package lists
-timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;aptitude update
+timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; LC_ALL=C apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+
+if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
+   # Abortamos pkgsync si algún repositorio no se encuentra accesible
+   if [ -s /tmp/failedrepositories ]; then
+      echo -e "\n[ERR] aptitude update error" | tee -a /var/log/pkgsync.log
+      echo "The following repositories fail:" | tee -a /var/log/pkgsync.log
+      cat /tmp/failedrepositories | tee -a /var/log/pkgsync.log
+      echo "      Aborting" | tee -a /var/log/pkgsync.log
+      exit 1
+   fi
+elif [ $ABORT_ON_FAILED_REPOS = "no" ]; then
+   disable_failed_repositories
+   DISABLED_FAILED_REPOS=true
+fi
+
 run_debtags update
 
 # Create ies files if don't exists
@@ -481,18 +565,7 @@ else
 fi
 
 # Merge files
-sort -u -o /etc/pkgsync/musthave.all $MUSTHAVE /etc/pkgsync/musthave.ies $(find /etc/pkgsync/musthave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
-sort -u -o /etc/pkgsync/maynothave.all $MAYNOTHAVE /etc/pkgsync/maynothave.ies $(find /etc/pkgsync/maynothave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
-sort -u -o /etc/pkgsync/mayhave.all $MAYHAVE /etc/pkgsync/mayhave.ies $(find /etc/pkgsync/mayhave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
-
-# Remove empty lines, blank spaces and tabs
-sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/musthave.all
-sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/mayhave.all
-sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/maynothave.all
-
-# Remove maynothave.all and musthave.orphan packages from musthave.all
-comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all
-comm -23 /tmp/musthave.all /etc/pkgsync/maynothave.all > /etc/pkgsync/musthave.all
+merge_files
 
 # Find out what parameters to give to aptitude.
 installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
@@ -500,9 +573,32 @@ musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
 maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
 mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
-rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+if [ "$IGNORE_MUSTHAVE" = "no" ]; then
+ rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+fi
 
-timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+
+if [ $? -ne 0 ]; then
+   test_files; remove_packages_from_lists; merge_files
+
+   # Find out what parameters to give to aptitude.
+   installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
+   musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
+   maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
+   mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
+   mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
+   if [ "$IGNORE_MUSTHAVE" = "no" ]; then
+    rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+   fi
+
+   run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+fi
+
 run_aptitude autoclean
 
-eliminar_kernels;eliminar_dependencias;apagar_equipo;reiniciar_equipo
+eliminar_kernels;eliminar_dependencias
+
+if [ $ABORT_ON_FAILED_REPOS = "no" ] && [ $DISABLED_FAILED_REPOS = true ]; then enable_repositories; fi
+
+apagar_equipo;reiniciar_equipo

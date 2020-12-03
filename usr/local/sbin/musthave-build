@@ -10,6 +10,8 @@
 #
 
 test -d /etc/pkgsync || mkdir /etc/pkgsync
+test -f /etc/pkgsync/mayhave || touch /etc/pkgsync/mayhave
+test -f /etc/pkgsync/maynothave || touch /etc/pkgsync/maynothave
 
 codename=`lsb_release --codename | cut -f2`
 

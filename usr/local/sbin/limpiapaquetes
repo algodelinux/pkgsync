@@ -1,10 +1,16 @@
 #!/bin/bash
-# limpiapaquetes - Hace limpieza purgando paquetes desinstalados, huérfanos y limpiando la cache de apt
-# 2013-2016 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# limpiapaquetes - Hace limpieza purgando paquetes desinstalados y limpia la cache de apt
+#
+# 2013-2020 Esteban M. Navas Martín
 #
 
-#apt-get -y remove --purge $(deborphan)
-#apt-get -y remove --purge $(deborphan --libdev)
-apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
-apt-get -y autoremove
-apt-get clean
+sudo apt-get -fy install &&
+sudo dpkg --configure -a &&
+sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+sudo apt-get -y autoremove &&
+sudo apt-get -y clean
+[ $(which flatpak) ] && sudo flatpak uninstall --unused -y
+[ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
+  while read snapname revision; do
+     sudo snap remove "$snapname" --revision="$revision"
+  done
