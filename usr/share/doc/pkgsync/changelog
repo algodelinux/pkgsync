@@ -1,3 +1,49 @@
+pkgsync (1.88) ubuntu; urgency=medium
+
+  * Añadido permiso a /etc/sudoers.d/pkgsync para que el usuario pkgsync pueda 
+    ejecutar el script /usr/local/sbin/softwareupdate
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 15 Dic 2020 10:39:00 +0100
+
+pkgsync (1.87) ubuntu; urgency=medium
+
+  * Mejorado el código de /usr/local/sbin/purge-old-kernels que realiza la limpieza
+    de kernels desintalados, headers y módulos después de eliminar kernels antiguos
+  * Añadidos el script /usr/local/sbin/apt-list-expired-keys que permite obtener un
+    listado de claves públicas de repositorios expiradas.
+  * Añadidos el script /usr/local/sbin/apt-remove-expired-keys que permite eliminar
+    del anillo de claves las claves públicas de repositorios expiradas.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 15 Dic 2020 00:02:00 +0100
+
+pkgsync (1.86) ubuntu; urgency=medium
+
+  * Añadida nueva versión de /usr/local/sbin/purge-old-kernels que realiza la limpieza
+    de kernels desintalados, headers y módulos después de eliminar kernels antiguos
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 14 Dic 2020 09:11:00 +0100
+
+pkgsync (1.85) ubuntu; urgency=medium
+
+  * Modificado script /usr/local/sbin/softwareupdate para que antes de utilizar apt o
+    dpkg espere si se está realizando una actualización de índices o de paquetes
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 11 Dic 2020 09:46:00 +0100
+
+pkgsync (1.84) ubuntu; urgency=medium
+
+  * Añadidos /etc/default/launchpad-getkeys, /etc/default/pkgsync y /etc/sudoers.d/pkgsync
+    a DEBIAN/conffiles
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 09 Dic 2020 11:12:00 +0100
+
+pkgsync (1.83) ubuntu; urgency=medium
+
+  * Modificados a 755 los permisos de los scripts /usr/local/sbin/enable-disabled-repositories,
+    /usr/local/sbin/enable-non-failed-repositories y /usr/local/sbin/softwareupdate
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 09 Dic 2020 10:59:00 +0100
+
 pkgsync (1.82) ubuntu; urgency=medium
 
   * Añadido a /usr/local/sbin/ el script softwareupdate que permite actualizar el  

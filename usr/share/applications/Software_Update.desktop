@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Software Update
+Version=1.0
+Exec=/usr/local/sbin/softwareupdate
+Comment=Actualización de software del equipo incluyendo paquetes deb, paquetes snap y flatpak
+Icon=/usr/share/pixmaps/softwareupdate.png
+Type=Application
+Terminal=true
+StartupNotify=true
+Encoding=UTF-8

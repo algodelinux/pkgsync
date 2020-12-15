@@ -1,3 +1,5 @@
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/apt-list-expired-keys
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/apt-remove-expired-keys
 pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/backup-repositories
 #pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/clean-pkgsync-files
 #pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/disable-failed-repositories
@@ -16,6 +18,7 @@ pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/purge-old-kernels
 #pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/remove-backup-repositories
 #pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/remove-failed-repositories
 #pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/restore-backup-repositories
+pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/softwareupdate
 pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/solve-apt-errors
 pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/softwareupdate
 pkgsync ALL=(ALL) NOPASSWD:/usr/local/sbin/wait_for_apt_or_dpkg

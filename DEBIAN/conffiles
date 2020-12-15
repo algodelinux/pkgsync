@@ -1,2 +1,4 @@
 /etc/cron.daily/nightly-pkgsync
+/etc/default/launchpad-getkeys
 /etc/default/pkgsync
+/etc/sudoers.d/pkgsync
