@@ -13,8 +13,8 @@ c4750310c3ccd94bb5229e33645d4a3e  usr/local/sbin/limpiapaquetes
 d5f3bebb5a9bffd2660212396bd3a5ba  usr/local/sbin/list-failed-repositories
 09d840b0456b6377a14c9928b9a2d283  usr/local/sbin/musthave-build
 e90b6eca4b1833dfe0de8c645f9973bf  usr/local/sbin/musthave-minimize
-029e0b5515e0a10089dfdc1ed3ec4e4c  usr/local/sbin/pkgsync
-79531073bcf10d17189c5baeeed8a005  usr/local/sbin/purge-old-kernels
+7b6dcd7b060b3383aa62d500702afeac  usr/local/sbin/pkgsync
+c59ad8e52bd194d937cf543358c42162  usr/local/sbin/purge-old-kernels
 f937b0c9ac915f1a5a6cd4b8b65c8d56  usr/local/sbin/remove-backup-repositories
 bc87a01bf56901a271efe92ff1beac17  usr/local/sbin/remove-failed-repositories
 e1a425e53845b584e379263a004a8975  usr/local/sbin/restore-backup-repositories
@@ -22,12 +22,12 @@ e1a425e53845b584e379263a004a8975  usr/local/sbin/restore-backup-repositories
 4ba470e03b7fcf247c77fd859c9a6b05  usr/local/sbin/solve-apt-errors
 4d856cf360810c966c90dbb8fd4bd751  usr/local/sbin/wait_for_apt_or_dpkg
 8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
-dd7d0e5be0978fab068851e09d633bfc  usr/share/doc/pkgsync/changelog
+a36abbbfa57946a7fdae3e8db3b73bd5  usr/share/doc/pkgsync/changelog
 46e10b37f37fdaecd769b33bfa98b1e0  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-aa09abc5f47da32735342e5f62c2b13c  usr/share/doc/pkgsync/NEWS.Debian.gz
+c09bf93bd0adfeec5df292e2e84aca1f  usr/share/doc/pkgsync/NEWS.Debian.gz
 3eadb2d392c6cbf4e4174b4733a8cb17  usr/share/doc/pkgsync/README.Debian
 8915e4eeaa24dfa5051df8a5a037489f  usr/share/man/man8/backup-repositories.8.gz
 6da552f25b00135208a19f1f3f61e6d3  usr/share/man/man8/clean-pkgsync-files.8.gz

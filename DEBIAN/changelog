@@ -1,3 +1,10 @@
+pkgsync (1.89) ubuntu; urgency=medium
+
+  * Añadida nueva versión de purge-old-kernels que purga también los paquetes  
+    linux-modules desinstalados
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 16 Dic 2020 09:46:00 +0100
+
 pkgsync (1.88) ubuntu; urgency=medium
 
   * Añadido permiso a /etc/sudoers.d/pkgsync para que el usuario pkgsync pueda 
