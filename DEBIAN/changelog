@@ -1,3 +1,9 @@
+pkgsync (1.90) ubuntu; urgency=medium
+
+  * Añadida nueva versión del script launchpad-getkeys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 18 Dic 2020 10:59:00 +0100
+
 pkgsync (1.89) ubuntu; urgency=medium
 
   * Añadida nueva versión de purge-old-kernels que purga también los paquetes  

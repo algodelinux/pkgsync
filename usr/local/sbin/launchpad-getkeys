@@ -1,30 +1,28 @@
 #! /bin/bash
-if [ "`whoami`" != "root" ];
-then
-echo "Please run with SUDO"
-exit 1
+# Modified version by Esteban M. Navas <algodelinux@gmail.com>
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+WHITE='\033[1;37m'
+NC='\033[0m' # No Color
+
+if [ "`whoami`" != "root" ]; then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
 fi
 
 function HELP ()
 {
-echo "
-
-launchpad-getkeys is an utility to automatically import all
-Lunchpad PPAs missing GPG keys.
-
-The tool does not fix broken keys.
+echo -e "${WHITE}\n\nlaunchpad-getkeys${NC} is an utility to automatically import all Lunchpad PPAs missing GPG keys.
 
 Usage:
-* use without any parameter to automatically import all the missing
-GPG keys
-* -k SERVER:PORT will pass a new keyserver, in case the default
-keyserver is down
-* -p http://PROXY:PORT lets you specify a proxy-server other than the default one.
-"
+* use without any parameter to automatically import all the missing GPG keys.
+* ${WHITE}-k SERVER:PORT${NC} will pass a new keyserver, in case the default keyserver is down.
+* ${WHITE}-p PROXY:PORT${NC} lets you specify a proxy-server other than the default one.\n${NC}"
 exit 0
 }
 
-. /etc/default/launchpad-getkeys
+[ -s /etc/default/launchpad-getkeys ] && . /etc/default/launchpad-getkeys
 
 if [[ $SERVER ]] && [[ $PORT ]]; then
    PROXY=http://$SERVER:$PORT
@@ -44,67 +42,89 @@ shift $(($OPTIND -1))
 if [[ $KEYSERVER ]]; then
 
 	KEYSERVERANDPORT=$(echo $KEYSERVER | grep ":")
-		if [[ ! $KEYSERVERANDPORT ]]; then
-		echo "Error: please enter a keyserver and a port, like so: sudo launchpad-getkeys -k http://SERVER:PORT"
-		exit 0
+	if [[ ! $KEYSERVERANDPORT ]]; then
+	   echo -e "${RED}Error: please enter a keyserver and a port, like so: sudo launchpad-getkeys -k SERVER:PORT${NC}"
+	   exit 0
 	fi
 fi
 
 if [[ $PROXY ]]; then
 
 	PROXYSERVERANDPORT=$(echo $PROXY | grep ":")
-		if [[ ! $PROXYSERVERANDPORT ]]; then
-		echo "Error: please enter a proxyserver and a port, like so: sudo launchpad-getkeys -p PROXYSERVER:PORT (without http://)"
-		exit 0
+	if [[ ! $PROXYSERVERANDPORT ]]; then
+	   echo -e "${RED}Error: please enter a proxyserver and a port, like so: sudo launchpad-getkeys -p http://PROXYSERVER:PORT${NC}"
+	   exit 0
 	fi
 fi
 
 if [[ ! $PROXY ]]; then
-	PROXY=$http_proxy
+	PROXY=$http_prox
 fi
 
-# use apt proxy
-APT_PROXIES=$(apt-config shell http_proxy Acquire::http::Proxy https_proxy Acquire::https::Proxy ftp_proxy Acquire::ftp::Proxy)
-
-if [ -n "$APT_PROXIES" ]; then
-	eval export $APT_PROXIES
-fi
-
-echo "
-Please wait... launchpad-getkeys is running an update so 
-it can detect the missing GPG keys"
+echo -e "${GREEN}\nPlease wait... launchpad-getkeys is running an update so
+it can detect the missing GPG keys${NC}"
 apt-get update -qq 2> /tmp/updateresults
 
 
-MISSINGKEYS=$(cat /tmp/updateresults)
+MISSINGGEYS=$(cat /tmp/updateresults)
 
-if [[ $MISSINGKEYS ]]; then
+PROXY_OPTS=()
+if [[ ! -z ${PROXY:-} ]]; then
+    PROXY_OPTS=( --keyserver-options http-proxy=$PROXY )
+fi
 
-echo "
-Trying to import all the missing keys"
+if [[ $MISSINGGEYS ]]; then
+
+declare -a IMPORTED_KEYS=()
+
+echo -e "${GREEN}\nTrying to import all the missing keys${NC}"
 
 	IFS=$'\n'
 	n=1
 	while read curline; do
 		GPGKEYTOGET=$(echo $curline | grep NO_PUBKEY | sed -e 's/.*: \|NO_PUBKEY //g')
+        [ -z "${GPGKEYTOGET}" ] && continue # Skip empty values
+        [[ " ${IMPORTED_KEYS[@]} " =~ " ${GPGKEYTOGET} " ]] && continue # Skip repeatable keys
+        GPGTMPHOME=$(mktemp -d /tmp/gpg-tmp-home.XXXXXXXXXX)
+        KEYBOX=$GPGTMPHOME/pubring.gpg
+        KEYSRV_OPTS=( --keyserver hkp://keyserver.ubuntu.com:80 )
 		if [[ $KEYSERVER ]]; then
-			apt-key adv --keyserver hkp://$KEYSERVER --keyserver-options http-proxy=$PROXY --recv-keys $GPGKEYTOGET
-		else
-			apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --keyserver-options http-proxy=$PROXY --recv-keys $GPGKEYTOGET
-		fi
+            KEYSRV_OPTS=( --keyserver hkp://$KEYSERVER )
+    fi
+
+		gpg --ignore-time-conflict --no-options --no-default-keyring \
+            --no-auto-check-trustdb --trust-model always \
+            --homedir "$GPGTMPHOME"                      \
+            --keyring "$KEYBOX"          \
+            "${KEYSRV_OPTS[@]}"  "${PROXY_OPTS[@]}"                    \
+            --recv $GPGKEYTOGET  2>$GPGTMPHOME/gpg.stderr
+        >&2 cat $GPGTMPHOME/gpg.stderr
+        TGT_NAME_BASE=$(cat  $GPGTMPHOME/gpg.stderr \
+                | grep -F -m 1 "public key" \
+                | sed -e 's/^[^"]*"//' \
+                | sed -e 's/"[^"]*//' \
+                | sed -e 's/ /__/g' \
+                | sed -e 's/[<>:]//g')
+
+        TGT_GPG_DIR=/etc/apt/trusted.gpg.d
+        mkdir -p $TGT_GPG_DIR
+        TGT_GPG="${TGT_GPG_DIR}/launchpad-getkeys_imported__${TGT_NAME_BASE}__${GPGKEYTOGET}.gpg"
+        [ -f "$TGT_GPG" ] && rm -f "$TGT_GPG"
+        gpg --ignore-time-conflict --no-options --no-default-keyring \
+            --no-auto-check-trustdb --trust-model always \
+            --homedir "$GPGTMPHOME" --keyring "$KEYBOX"  \
+            --export  --output $TGT_GPG
+        echo -e "${GREEN}Key $GPGKEYTOGET added at $TGT_GPG_DIR${NC}"
+        rm -Rf $GPGTMPHOME
+        IMPORTED_KEYS+=($GPGKEYTOGET)
 		let n=n+1
 	done < /tmp/updateresults
 
-	echo "
-launchpad-getkeys has finished importing all missing GPG keys. 
-Try running "sudo apt-get update" - you shouldn't see any key 
-errors any more.
-.............................................................
-Note that launchpad-getkeys imports missing GPG keys but does
-not fix broken keys."
+	echo -e "${GREEN}\nlaunchpad-getkeys has finished importing all missing GPG keys.
+Try running "sudo apt-get update" - you shouldn't see any key
+errors anymore${NC}"
 else
-	echo "
-There are no missing GPG keys!"
+	echo -e "${GREEN}\nThere are no missing GPG keys!${NC}"
 fi
 
 rm /tmp/updateresults

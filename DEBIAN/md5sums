@@ -6,14 +6,14 @@ c1caf2e80279aa24839923efc851cdbf  usr/local/sbin/disable-failed-repositories
 100af0496c96a7a7a49ec10a18276605  usr/local/sbin/enable-disabled-repositories
 9c425a530a63f7910a74c72ab8f56025  usr/local/sbin/enable-non-failed-repositories
 b406a218188209c3f0b53fca3fc4057a  usr/local/sbin/get-package-dependencies
-cd451a72eff2b1e046f743cb5bb094b2  usr/local/sbin/launchpad-getkeys
+6dbd4858fc1d7cf1a196c0a6fb5e2b48  usr/local/sbin/launchpad-getkeys
 c4750310c3ccd94bb5229e33645d4a3e  usr/local/sbin/limpiapaquetes
 209802bfe1198811d14b53c9ba64f330  usr/local/sbin/list-backup-repositories
 652c84517e4fe5d7cff83da0892a9e26  usr/local/sbin/list-disabled-repositories
 d5f3bebb5a9bffd2660212396bd3a5ba  usr/local/sbin/list-failed-repositories
 09d840b0456b6377a14c9928b9a2d283  usr/local/sbin/musthave-build
 e90b6eca4b1833dfe0de8c645f9973bf  usr/local/sbin/musthave-minimize
-7b6dcd7b060b3383aa62d500702afeac  usr/local/sbin/pkgsync
+56b4dc636c388af59c1891f7dc70d0bc  usr/local/sbin/pkgsync
 c59ad8e52bd194d937cf543358c42162  usr/local/sbin/purge-old-kernels
 f937b0c9ac915f1a5a6cd4b8b65c8d56  usr/local/sbin/remove-backup-repositories
 bc87a01bf56901a271efe92ff1beac17  usr/local/sbin/remove-failed-repositories
