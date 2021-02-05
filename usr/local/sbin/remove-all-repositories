@@ -1,0 +1,8 @@
+#!/bin/bash
+# remove-all-repositories - Elimina los los repositorios
+# alojados en el directorio /etc/apt/sources.list.d 
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+find /etc/apt/sources.list.d/ -type f -exec rm -f {} \;
+

@@ -7,21 +7,11 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-wait_for_apt_or_dpkg() {
-  # Esperamos mientras se esté realizando una actualización de índices o de paquetes
-  if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; then
-     echo "Esperando mientras se actualizan índices o paquetes..."
-  fi
-  while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; do
-     sleep 1
-  done
-}
-
 # Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
 [ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && sudo /usr/local/sbin/launchpad-getkeys
 
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_for_apt_or_dpkg && sudo /usr/bin/apt update && wait_for_apt_or_dpkg && sudo /usr/bin/apt -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" upgrade
+[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && sudo /usr/bin/apt update && sudo /usr/bin/apt -y upgrade
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
@@ -31,15 +21,10 @@ wait_for_apt_or_dpkg() {
 
 # Realizamos limpieza de paquetes
 echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
-wait_for_apt_or_dpkg &&
 sudo apt-get -fy install &&
-wait_for_apt_or_dpkg &&
 sudo dpkg --configure -a &&
-wait_for_apt_or_dpkg &&
 sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-wait_for_apt_or_dpkg &&
 sudo apt-get -y autoremove &&
-wait_for_apt_or_dpkg &&
 sudo apt-get -y clean
 [ $(which flatpak) ] && sudo flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |

@@ -11,33 +11,47 @@ if [ "`whoami`" != "root" ]; then
    exit 1
 fi
 
-function HELP ()
-{
-echo -e "${WHITE}\n\nlaunchpad-getkeys${NC} is an utility to automatically import all Lunchpad PPAs missing GPG keys.
+function HELP () {
+echo -e "${WHITE}\nlaunchpad-getkeys${NC} is an utility to automatically import all Lunchpad PPAs missing GPG keys.
 
 Usage:
-* use without any parameter to automatically import all the missing GPG keys.
-* ${WHITE}-k SERVER:PORT${NC} will pass a new keyserver, in case the default keyserver is down.
-* ${WHITE}-p PROXY:PORT${NC} lets you specify a proxy-server other than the default one.\n${NC}"
+   * use without any parameter to automatically import all the missing GPG keys.
+   * ${WHITE}-k SERVER:PORT${NC} will pass a new keyserver, in case the default keyserver is down.
+   * ${WHITE}-p PROXY:PORT${NC} lets you specify a proxy-server other than the default one.
+   * ${WHITE}-r${NC} remove all expired keys.\n"
 exit 0
 }
 
+function remove_expired_keys () {
+   APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 LC_ALL=C apt-key list |grep -E pub.*expired -A 1 | grep -v -e pub -e -- | sed 's/ //g' > /tmp/removeaptkeys
+   for key in $(cat /tmp/removeaptkeys); do
+       apt-key del $key && echo -e "${GREEN}Removed expired key ID: $key${NC}"
+   done
+}
+
+REMOVE_EXPIRED_KEYS="no"
+
 [ -s /etc/default/launchpad-getkeys ] && . /etc/default/launchpad-getkeys
 
-if [[ $SERVER ]] && [[ $PORT ]]; then
-   PROXY=http://$SERVER:$PORT
-fi
-
-while getopts "k:p:h\?" opt; do
+while getopts "k:p:rh\?" opt; do
 	case "$opt" in
 		k ) KEYSERVER="$OPTARG"			;;
 		p ) PROXY="$OPTARG"			;;
+		r ) remove_expired_keys 		;;
 		h ) HELP				;;
 		\?) HELP				;;
 		* ) warn "Unknown option '$opt'";	;;
 	esac
 done
 shift $(($OPTIND -1))
+
+if [[ $SERVER ]] && [[ $PORT ]]; then
+   ping -c 1 $SERVER >/dev/null 2>&1
+
+   if [ $? -eq 0 ]; then
+       PROXY=http://$SERVER:$PORT
+   fi
+fi
 
 if [[ $KEYSERVER ]]; then
 
@@ -55,10 +69,6 @@ if [[ $PROXY ]]; then
 	   echo -e "${RED}Error: please enter a proxyserver and a port, like so: sudo launchpad-getkeys -p http://PROXYSERVER:PORT${NC}"
 	   exit 0
 	fi
-fi
-
-if [[ ! $PROXY ]]; then
-	PROXY=$http_prox
 fi
 
 echo -e "${GREEN}\nPlease wait... launchpad-getkeys is running an update so

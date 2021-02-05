@@ -1,3 +1,36 @@
+pkgsync (1.92) ubuntu; urgency=medium
+
+  * Añadida nueva versión del script /usr/local/sbin/softwareupdate.
+  * Añadido script /usr/local/sbin/remove-all-repositories que permite borrar 
+    todos los ficheros de repositorios añadidos en /etc/apt/sources.list.d/.
+  * Añadida opción PUPPET_SERVER al fichero de configuración 
+    /etc/default/pkgsync que nos permite indicar el nombre o la IP del servidor
+    puppet:
+    # PUPPET_SERVER="puppetinstituto"
+    Con esta opción evitaremos ejecutar sinc_puppet si el servidor puppet
+    no responde. 
+  * Modificado /usr/local/sbin/pkgsync para:
+    - Comentar (en lugar de borrar) en los ficheros de listas de paquetes los nombres 
+      de los paquetes que no se encuentran en los repositorios.
+    - Ignorar los nombres de los paquetes que se encuentran comentados en los ficheros
+      de listas.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 5 Feb 2021 20:47:00 +0100
+
+pkgsync (1.91) ubuntu; urgency=medium
+
+  * Añadida nueva versión del script /usr/local/sbin/launchpad-getkeys que permite 
+    eliminar claves públicas de repositorios expiradas.
+  * Añadida opción LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS al fichero de configuración 
+    /etc/default/pkgsync para permitir eliminar claves públicas de repositorios 
+    caducadas desde pkgsync:
+    # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes": indicar a launchpad-getkeys que 
+      elimine claves públicas caducadas
+    # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no": no indicar a launchpad-getkeys que 
+      elimine claves públicas caducadas (opción por defecto)
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 21 Dic 2020 11:40:00 +0100
+
 pkgsync (1.90) ubuntu; urgency=medium
 
   * Añadida nueva versión del script launchpad-getkeys

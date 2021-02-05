@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.90
+export VERSION=1.92
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -42,7 +42,7 @@ test_files () {
   set +e
   :>/var/log/pkgsync/removefromlists.log
 
-  for fichero in $(find /etc/pkgsync -type f -not -name "*.all" -not -name "*.bak*" -not -name "musthave.????????"); do
+  for fichero in $(find /etc/pkgsync -type f -not -name "*.all" -not -name "*.bak*" -not -name "musthave.[[:digit:]]*"); do
       if [ -s "$fichero" ]; then
 
          for paquete in $(cat $fichero); do
@@ -76,7 +76,8 @@ remove_packages_from_lists () {
         echo "Removed package $paquete from file $fichero"
         echo "Removed package $paquete from file $fichero" >> /var/log/pkgsync/removedfromlists.log
 
-        sed -i "/$paquete/ d" $fichero
+        # Comentamos la línea que contiene el nombre del paquete
+        sed -i "s|$paquete|#$paquete|" $fichero
      done < /var/log/pkgsync/removefromlists.log
      echo "See /var/log/pkgsync/removedfromlists.log"
   fi
@@ -87,7 +88,7 @@ disable_failed_repositories () {
   while read repository; do
     failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
     mv $failedfilerepository $failedfilerepository.disabled
-  done </tmp/failedrepositories	
+  done </tmp/failedrepositories
 }
 
 enable_repositories () {
@@ -223,10 +224,11 @@ merge_files() {
   sort -u -o /etc/pkgsync/maynothave.all $MAYNOTHAVE /etc/pkgsync/maynothave.ies $(find /etc/pkgsync/maynothave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
   sort -u -o /etc/pkgsync/mayhave.all $MAYHAVE /etc/pkgsync/mayhave.ies $(find /etc/pkgsync/mayhave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
 
-  # Remove empty lines, blank spaces and tabs
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/musthave.all
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/mayhave.all
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;' /etc/pkgsync/maynothave.all
+  # Remove empty lines, blank spaces, tabs and commented lines
+
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[ \t]*#/d;' /etc/pkgsync/musthave.all
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[ \t]*#/d;' /etc/pkgsync/mayhave.all
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[ \t]*#/d;' /etc/pkgsync/maynothave.all
 
   # Remove maynothave.all and musthave.orphan packages from musthave.all
   comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all
@@ -337,12 +339,13 @@ eliminar_kernels() {
 
 launchpad_getkeys() {
   # Obtener claves de repositorios siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/launchpad-getkeys
+  options=""
+
   if [ $LAUNCHPAD_GETKEYS = "yes" ] && [ -x /usr/local/sbin/launchpad-getkeys ]; then
-     if [ -n "$LAUNCHPAD_GETKEYS_PROXY" ]; then
-        /usr/local/sbin/launchpad-getkeys -p $LAUNCHPAD_GETKEYS_PROXY
-     else
-        /usr/local/sbin/launchpad-getkeys
-     fi
+     [ -n "$LAUNCHPAD_GETKEYS_PROXY" ] && options+=" -p $LAUNCHPAD_GETKEYS_PROXY"
+     [ $LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS = "yes" ] && options+=" -r"
+
+     launchpad-getkeys $options
   fi
 }
 
@@ -438,11 +441,13 @@ PURGE_OLD_KERNELS=no
 KEEP_LAST_KERNELS="2"
 CLEAN=no
 LAUNCH_SINC_PUPPET=yes
+PUPPET_SERVER=puppetinstituto
 AUTOMATIC_SHUTDOWN_BETWEEN=""
 AUTOMATIC_REBOOT_BETWEEN=""
 AUTOMATIC_REBOOT_INTO_WINDOWS=no
 LAUNCHPAD_GETKEYS=yes
 LAUNCHPAD_GETKEYS_PROXY=""
+LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS=no
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
 ABORT_ON_FAILED_REPOS="yes"
@@ -511,13 +516,17 @@ while [[ $(pgrep sinc_puppet) ]]; do
    sleep 1
 done
 
-# Si se encuentra sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
-if [ $runned_sinc_puppet = false ]; then
-   installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
-   if version_ge $installed_version "2.7"; then
-      if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now; fi
-   else
-      if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f; fi
+# Si el servidor puppet responde, se encuentra el ejecutable de sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
+[ -n "$PUPPET_SERVER" ] && ping -c1 $PUPPET_SERVER > /dev/null 2>&1
+
+if [ $? -eq 0 ]; then
+   if [ $runned_sinc_puppet = false ]; then
+      installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
+      if version_ge $installed_version "2.7"; then
+         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now; fi
+      else
+         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f; fi
+      fi
    fi
 fi
 
