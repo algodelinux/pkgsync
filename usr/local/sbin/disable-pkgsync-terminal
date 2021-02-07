@@ -1,0 +1,11 @@
+#!/bin/bash
+# disable-pkgsync-terminal - Deshabilita el inicio automático del usuario pkgsync en el terminal 12
+# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+#
+
+if [ -f /lib/systemd/system/getty@tty12.service ]; then
+   systemctl stop getty@tty12.service
+   systemctl disable getty@tty12.service
+   systemctl daemon-reload
+fi
+

@@ -1,3 +1,12 @@
+pkgsync (1.93) ubuntu; urgency=medium
+
+  * Añadido script /usr/local/sbin/disable-pkgsync-terminal que permite deshabilitar
+    el inicio automático del usuario pkgsync en el terminal 12.
+  * Añadido script /usr/local/sbin/enable-pkgsync-terminal que permite habilitar
+    el inicio automático del usuario pkgsync en el terminal 12.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sun, 7 Feb 2021 12:01:00 +0100
+
 pkgsync (1.92) ubuntu; urgency=medium
 
   * Añadida nueva versión del script /usr/local/sbin/softwareupdate.
