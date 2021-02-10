@@ -1,9 +1,7 @@
-#! /bin/sh -e
+#!/bin/sh -e
 
-[ "`id -u pkgsync &>/dev/null`" ] && deluser --remove-home pkgsync
+systemctl stop getty@tty12.service
+systemctl disable getty@tty12.service
+systemctl daemon-reload
 
-if [ -f /lib/systemd/system/getty@tty12.service ]; then
-   systemctl stop getty@tty12.service
-   systemctl disable getty@tty12.service
-   systemctl daemon-reload
-fi
+deluser --quiet --system pkgsync

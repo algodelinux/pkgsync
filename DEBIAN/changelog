@@ -1,3 +1,18 @@
+pkgsync (1.95) ubuntu; urgency=medium
+
+  * Agregado script /usr/local/sbin/download_pkg_and_deps que permite descargar
+    un paquete pasado como parámetro junto a sus dependencias en un directorio
+    con el nombre del paquete. 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 10 Feb 2021 13:14:00 +0100
+
+pkgsync (1.94) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para permitir el uso de comentarios en los
+    ficheros de listas de paquetes.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 9 Feb 2021 16:35:00 +0100
+
 pkgsync (1.93) ubuntu; urgency=medium
 
   * Añadido script /usr/local/sbin/disable-pkgsync-terminal que permite deshabilitar
