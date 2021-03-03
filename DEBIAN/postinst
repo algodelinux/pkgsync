@@ -4,6 +4,8 @@ if [ -f /etc/cron.d/pkgsync ]; then
 	rm -f /etc/cron.d/pkgsync
 fi
 
+[ -d /var/log/pkgsync ] || mkdir -p /var/log/pkgsync
+
 adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync pkgsync
 
 systemctl start getty@tty12.service

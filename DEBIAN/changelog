@@ -1,3 +1,23 @@
+pkgsync (1.98) ubuntu; urgency=medium
+
+  * Añadida función killprocess al script softwareupdate
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 03 Mar 2021 09:30:00 +0100
+
+pkgsync (1.97) ubuntu; urgency=medium
+
+  * Modificado preinst para crear el directorio /var/log/pkgsync, si no está creado.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 02 Mar 2021 12:02:00 +0100
+
+pkgsync (1.96) ubuntu; urgency=medium
+
+  * Modificado script /usr/local/sbin/softwareupdate para realizar una espera
+    en caso de que se esté realizando una actualización de índices o paquetes
+    y se resuelvan problemas de paquetes a medio instalar.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 26 Feb 2021 12:58:00 +0100
+
 pkgsync (1.95) ubuntu; urgency=medium
 
   * Agregado script /usr/local/sbin/download_pkg_and_deps que permite descargar

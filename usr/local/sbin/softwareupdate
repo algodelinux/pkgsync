@@ -1,17 +1,90 @@
 #!/bin/bash
 # softwareupdate - Actualiza paquetes instalados mediante apt, flatpak, snap y realiza limpieza
-# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2021 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
+
+killprocess() {
+
+   updatehour=$(ps aux|grep $1 | grep -v grep | head -1 | awk '{print $9}')
+   if [ -n $updatehour ]; then
+      timestampupdate=$(date -d "$updatehour" +'%s')
+      timestampnow=$(date +'%s')
+      diference=$(($timestampnow - $timestampupdate))
+      minutesfromupdate=$(($diference / 60))
+
+      if [ "$minutesfromupdate" -gt "$2" ]; then
+         # Matamos proceso
+         pkill -9 $1 2>/dev/null
+      fi
+   fi
+}
+
+solveapterrors() {
+  set +e
+
+  idioma=$LC_ALL
+  export LC_ALL=C
+
+  TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
+  TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+
+  case "$TIMEOUT_UNITS" in
+     "s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER
+           ;;
+     "m")  AFTER_TIMEOUT=$(($TIMEOUT_NUMBER * 60))
+           ;;
+     "h")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 3600))
+           ;;
+     "d")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 86400))
+           ;;
+  esac
+
+  # Matamos procesos detenidos
+  stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
+  if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
+
+  # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
+  if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
+
+  apt-get check 1>/dev/null 2>/tmp/apterrors
+
+  if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
+     if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
+     if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
+     if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+  fi
+
+  if [ -s /tmp/apterrors ]; then
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install
+  fi
+
+  # Instalamos paquetes a medio instalar
+  bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+  if [ "$bad_packages" ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -y install $bad_packages; fi
+
+  # Aseguramos la actualización de pkgsync
+  timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
+
+  export LC_ALL=$idioma
+}
+
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
+TIMEOUT_FOR_DPKG_OR_APT="3m"
+
 # Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
 [ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && sudo /usr/local/sbin/launchpad-getkeys
 
+# Resolvemos errores de apt
+solveapterrors
+
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && sudo /usr/bin/apt update && sudo /usr/bin/apt -y upgrade
+[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt update && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt -y upgrade
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
@@ -21,11 +94,12 @@ NC='\033[0m' # No Color
 
 # Realizamos limpieza de paquetes
 echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
-sudo apt-get -fy install &&
-sudo dpkg --configure -a &&
-sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-sudo apt-get -y autoremove &&
-sudo apt-get -y clean
+timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -fy install &&
+timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo dpkg --configure -a &&
+timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y autoremove &&
+timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y clean
+
 [ $(which flatpak) ] && sudo flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
   while read snapname revision; do
