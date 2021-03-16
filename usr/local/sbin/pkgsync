@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=1.98
+export VERSION=2.0
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -586,7 +586,7 @@ if [ "$IGNORE_MUSTHAVE" = "no" ]; then
  rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 fi
 
-run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 
 if [ $? -ne 0 ]; then
    test_files; remove_packages_from_lists; merge_files
@@ -601,7 +601,7 @@ if [ $? -ne 0 ]; then
     rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
    fi
 
-   run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+   run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 fi
 
 run_aptitude autoclean

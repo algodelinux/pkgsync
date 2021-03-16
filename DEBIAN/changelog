@@ -1,3 +1,17 @@
+pkgsync (2.0) ubuntu; urgency=medium
+
+  * Modificado pkgsync para realizar una actualización previa de paquetes antes de
+    proceder a instalar/desinstalar paquetes de las listas
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 16 Mar 2021 08:50:00 +0100
+
+pkgsync (1.99) ubuntu; urgency=medium
+
+  * Corregido bug en softwareupdate por el que no se comprobaba bien si sinc_puppet
+    ya estaba corriendo
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 15 Mar 2021 13:42:00 +0100
+
 pkgsync (1.98) ubuntu; urgency=medium
 
   * Añadida función killprocess al script softwareupdate

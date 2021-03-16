@@ -12,7 +12,7 @@ killprocess() {
       diference=$(($timestampnow - $timestampupdate))
       minutesfromupdate=$(($diference / 60))
 
-      if [ "$minutesfromupdate" -gt "$2" ]; then
+      if [[ $minutesfromupdate -gt $2 ]]; then
          # Matamos proceso
          pkill -9 $1 2>/dev/null
       fi
