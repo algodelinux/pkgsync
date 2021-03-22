@@ -1,3 +1,13 @@
+pkgsync (2.01) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para permitir el uso de comentarios también 
+    en la misma línea donde se define el nombre de un paquete.
+
+  * Modificado /usr/local/sbin/softwareupdate para realizar una actualización de
+    paquetes de forma desatendida.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 22 Mar 2021 12:15:00 +0100
+
 pkgsync (2.0) ubuntu; urgency=medium
 
   * Modificado pkgsync para realizar una actualización previa de paquetes antes de

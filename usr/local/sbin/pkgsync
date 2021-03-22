@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.0
+export VERSION=2.01
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -224,11 +224,10 @@ merge_files() {
   sort -u -o /etc/pkgsync/maynothave.all $MAYNOTHAVE /etc/pkgsync/maynothave.ies $(find /etc/pkgsync/maynothave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
   sort -u -o /etc/pkgsync/mayhave.all $MAYHAVE /etc/pkgsync/mayhave.ies $(find /etc/pkgsync/mayhave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
 
-  # Remove empty lines, blank spaces, tabs and commented lines
-
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[ \t]*#/d;' /etc/pkgsync/musthave.all
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[ \t]*#/d;' /etc/pkgsync/mayhave.all
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[ \t]*#/d;' /etc/pkgsync/maynothave.all
+  # Remove empty lines, blank spaces, tabs and comments
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d;s/#.*//;' /etc/pkgsync/musthave.all
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d;s/#.*//;' /etc/pkgsync/mayhave.all
+  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d;s/#.*//;' /etc/pkgsync/maynothave.all
 
   # Remove maynothave.all and musthave.orphan packages from musthave.all
   comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all

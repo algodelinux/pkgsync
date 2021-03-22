@@ -77,6 +77,8 @@ NC='\033[0m' # No Color
 
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 
+APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+
 # Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
 [ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && sudo /usr/local/sbin/launchpad-getkeys
 
@@ -84,7 +86,7 @@ TIMEOUT_FOR_DPKG_OR_APT="3m"
 solveapterrors
 
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt update && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt -y upgrade
+[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt update && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt $APT_ARGS upgrade
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
