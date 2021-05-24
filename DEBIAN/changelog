@@ -1,3 +1,17 @@
+pkgsync (2.03) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para que ignore comentarios al realizar 
+    el chequeo de paquetes.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 24 May 2021 13:53:00 +0100
+
+pkgsync (2.02) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/purge-old-kernels para no eliminar directorios de kernels 
+    desinstalados de /lib/modules en máquinas con proxmox.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 09 Abr 2021 11:16:00 +0100
+
 pkgsync (2.01) ubuntu; urgency=medium
 
   * Modificado /usr/local/sbin/pkgsync para permitir el uso de comentarios también 

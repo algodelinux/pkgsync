@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.01
+export VERSION=2.03
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -44,7 +44,7 @@ test_files () {
 
   for fichero in $(find /etc/pkgsync -type f -not -name "*.all" -not -name "*.bak*" -not -name "musthave.[[:digit:]]*"); do
       if [ -s "$fichero" ]; then
-         for linea in $(grep -v -e "^#" -e "^$" $fichero); do
+         for linea in $(sed '/^[[:blank:]]*#/d;s/#.*//;' $fichero); do
             paquete=$(echo $linea | cut -f1 -d" ")
             echo "Checking $fichero: $paquete"
 
