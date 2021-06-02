@@ -13,3 +13,5 @@ systemctl enable getty@tty12.service
 systemctl daemon-reload
 
 sed -i '/pkgsync.*/d' /etc/sudoers
+
+exit 0

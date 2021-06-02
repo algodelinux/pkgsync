@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.03
+export VERSION=2.04
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -451,6 +451,7 @@ TIMEOUT_FOR_DPKG_OR_APT="3m"
 EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
 ABORT_ON_FAILED_REPOS="yes"
 DISABLED_FAILED_REPOS=false
+AUTO_TEST_FILES="no"
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
@@ -588,19 +589,25 @@ fi
 run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 
 if [ $? -ne 0 ]; then
-   test_files; remove_packages_from_lists; merge_files
+   if [ $AUTO_TEST_FILES = "yes" ]; then
 
-   # Find out what parameters to give to aptitude.
-   installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
-   musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
-   maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
-   mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
-   mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
-   if [ "$IGNORE_MUSTHAVE" = "no" ]; then
-    rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+      test_files; remove_packages_from_lists; merge_files
+
+      # Find out what parameters to give to aptitude.
+      installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
+      musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
+      maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
+      mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
+      mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
+      if [ "$IGNORE_MUSTHAVE" = "no" ]; then
+         rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+      fi
+
+      run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+   else
+      echo -e "\n[ERR] aptitude update error" | tee -a /var/log/pkgsync.log
+      echo -e "Check your package lists!\n" | tee -a /var/log/pkgsync.log
    fi
-
-   run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 fi
 
 run_aptitude autoclean

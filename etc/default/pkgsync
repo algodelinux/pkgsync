@@ -83,6 +83,12 @@ TIMEOUT_FOR_DPKG_OR_APT="3m"
 
 # ABORT_ON_FAILED_REPOS nos permite elegir entre abortar la ejecución de pkgsync cuando alguno de 
 # los repositorios falle o continuar la ejecución ignorando los repositorios que fallan.
-# ABORT_ON_FAILED_REPOS="yes": abortar la ejecución si alguno de los repositorios da error (opción por defecto)
-# ABORT_ON_FAILED_REPOS="no": continuar la ejecución ignorando los repositorios que fallan
+# ABORT_ON_FAILED_REPOS="yes": Abortar la ejecución si alguno de los repositorios da error (opción por defecto)
+# ABORT_ON_FAILED_REPOS="no": Continuar la ejecución ignorando los repositorios que fallan
 ABORT_ON_FAILED_REPOS="yes"
+
+# AUTO_TEST_FILES permite elegir si queremos que pkgsync chequee automáticamente los ficheros
+# de listas de paquetes.
+# AUTO_TEST_FILES="yes": Habilitar la revisión automática de las listas de paquetes
+# AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de paquetes (opción por defecto)
+AUTO_TEST_FILES="no"

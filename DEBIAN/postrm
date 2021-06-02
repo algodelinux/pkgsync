@@ -5,3 +5,5 @@ systemctl disable getty@tty12.service
 systemctl daemon-reload
 
 deluser --quiet --system pkgsync
+
+exit 0

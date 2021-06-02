@@ -3,7 +3,7 @@ f937b0c9ac915f1a5a6cd4b8b65c8d56  usr/local/sbin/remove-backup-repositories
 b5d1fde3373e77641a84d63e2882c4cc  usr/local/sbin/disable-pkgsync-terminal
 166f088cd7aa2a839f3931f85a1b1c72  usr/local/sbin/purge-old-kernels
 f0be0a9db5fb918d2a2c0cab5284a4c6  usr/local/sbin/enable-pkgsync-terminal
-c4a004762f7493195c215e9cfdd6eb8d  /usr/local/sbin/pkgsync
+6ccb0927e20cfcb80e575de966e351c4  usr/local/sbin/pkgsync
 652c84517e4fe5d7cff83da0892a9e26  usr/local/sbin/list-disabled-repositories
 4d856cf360810c966c90dbb8fd4bd751  usr/local/sbin/wait_for_apt_or_dpkg
 e90b6eca4b1833dfe0de8c645f9973bf  usr/local/sbin/musthave-minimize
@@ -26,13 +26,13 @@ aa5b6a41bd4418ba0b35d8ad549ac0ff  usr/local/sbin/softwareupdate
 b406a218188209c3f0b53fca3fc4057a  usr/local/sbin/get-package-dependencies
 661750d2ce3844e180c57af65b6157ba  usr/local/sbin/remove-all-repositories
 8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
-e844daa8ac0ca0cc8bcc765d0955d3dc  /usr/share/doc/pkgsync/changelog
-a34e4ad32018e0d9f25f5d8df696c672  /usr/share/doc/pkgsync/copyright
-a16111f16bfbc89cec75e6c9eae02b62  /usr/share/doc/pkgsync/mayhave
-b367055953781fcb4946419c2d815dd7  /usr/share/doc/pkgsync/maynothave
-b6d147664ec87a8e37b9f5e51d169750  /usr/share/doc/pkgsync/musthave
-68fe169df85f5fcecd7ab4d9572ce257  /usr/share/doc/pkgsync/NEWS.Debian.gz
-3359de4f501e7b3156868ca3e4f85101  /usr/share/doc/pkgsync/README.Debian
+a34e4ad32018e0d9f25f5d8df696c672  usr/share/doc/pkgsync/copyright
+b5ae2674dc2623667951e031b4d11241  usr/share/doc/pkgsync/changelog
+3359de4f501e7b3156868ca3e4f85101  usr/share/doc/pkgsync/README.Debian
+b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
+b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
+a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
+68cd3b2e4a2d10d5aee7ffbb3b47e3dc  usr/share/doc/pkgsync/NEWS.Debian.gz
 00c4bf466a77e484de342a183e789399  usr/share/man/man8/remove-failed-repositories.8.gz
 954cf6f0b2c3c12e865c96cf8183960a  usr/share/man/man8/apt-list-expired-keys.8.gz
 df53fee5b7b69cc7396c6fc3312ad119  usr/share/man/man8/launchpad-getkeys.8.gz
@@ -56,7 +56,7 @@ d96348b06906f46a1bc7a2f9da54735a  usr/share/man/man8/softwareupdate.8.gz
 fc391dd3603dddf7f89b7c50530f542f  usr/share/man/man8/purge-old-kernels.8.gz
 a2441c672340702996e9efa4e2e3355c  usr/share/man/man8/wait_for_apt_or_dpkg.8.gz
 59676f511c62986d13c0cb49aa346a01  usr/share/man/man8/remove-all-repositories.8.gz
-eba9e5511b4de781095b983e85cd3cb7  usr/share/man/man8/pkgsync.8.gz
+063467df7f839058cc369bb207dbdbf8  usr/share/man/man8/pkgsync.8.gz
 4ef6b6848f9fd7359d125ce672fad1a7  usr/share/man/man8/solve-apt-errors.8.gz
 6c41fc3a98e843f4358d22a1489dc1e0  usr/share/man/man8/remove-backup-repositories.8.gz
 95315353ddd7db8fe1fcbc11cbcdf965  usr/share/man/man8/enable-disabled-repositories.8.gz
@@ -66,4 +66,4 @@ f3a31393fd39b23f430c071727d62f8a  usr/sbin/pkgsync
 0c290a7ecb7a0a4499136c503a1b6770  etc/sudoers.d/pkgsync
 dfe63f3e4520b08a73e068902dada8d5  etc/cron.daily/nightly-pkgsync
 b3536d486bfda776730a504dcac1dd09  etc/default/launchpad-getkeys
-b32704d5175c9d90fdb861fbf441831f  etc/default/pkgsync
+0677f14443085d8131b5dc6572c0af56  etc/default/pkgsync

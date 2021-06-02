@@ -1,3 +1,14 @@
+pkgsync (2.04) ubuntu; urgency=medium
+
+  * Añadida opción AUTO_TEST_FILES al fichero de configuración /etc/default/pkgsync 
+    que permite elegir si queremos que pkgsync chequee automáticamente los ficheros
+    de listas de paquetes.
+    # AUTO_TEST_FILES="yes": Habilitar la revisión automática de las listas de paquetes
+    # AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de 
+      paquetes (opción por defecto)
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 01 Jun 2021 09:17:00 +0100
+
 pkgsync (2.03) ubuntu; urgency=medium
 
   * Modificado /usr/local/sbin/pkgsync para que ignore comentarios al realizar 
