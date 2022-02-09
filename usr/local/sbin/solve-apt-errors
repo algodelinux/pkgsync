@@ -1,6 +1,6 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
-# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 killprocess() {
@@ -22,10 +22,15 @@ killprocess() {
 idioma=$LC_ALL
 export LC_ALL=C
 
-TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
-TIMEOUT_FOR_SINC_PUPPET=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
-TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
-TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+if [ -f /etc/default/pkgsync ]; then
+   TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
+   TIMEOUT_FOR_SINC_PUPPET=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
+fi
+
+if [ -s "$TIMEOUT_FOR_DPKG_OR_APT" ]; then
+   TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
+   TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+fi
 
 case "$TIMEOUT_UNITS" in
 
@@ -60,17 +65,21 @@ if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; t
 fi
 
 if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && aptitude -yf install && dpkg --configure -a && apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && dpkg --configure -a && aptitude -yf install && apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -rf /var/lib/apt/lists/*;apt update -y; dpkg --configure -a; apt -f install
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && apt-get -yf install && dpkg --configure -a && apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && dpkg --configure -a && apt-get -yf install && apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -rf /var/lib/apt/lists/*;apt-get update -y; dpkg --configure -a; apt-get -f install
 fi
+
+# Desinstalamos paquetes en estado de inconsistencia
+inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
+if [ "$inconsistent_packages" ]; then dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
 
 # Instalamos paquetes a medio instalar
 bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-if [ "$bad_packages" ]; then aptitude -y install $bad_packages; fi
+if [ "$bad_packages" ]; then apt-get -y install $bad_packages; fi
 
 # Aseguramos la actualización de pkgsync
-aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude install -y pkgsync
+apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y pkgsync
 
 export LC_ALL=$idioma
 

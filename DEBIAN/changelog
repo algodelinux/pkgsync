@@ -1,3 +1,31 @@
+pkgsync (2.07) ubuntu; urgency=medium
+
+  * Mejorado el código del script /usr/local/sbin/solve-apt-errors
+  * Mejorado el código del script /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 04 Feb 2022 08:52:00 +0100
+
+pkgsync (2.06) ubuntu; urgency=medium
+
+  * Modificado script /usr/local/sbin/solve-apt-errors para desinstalar paquetes 
+    en estado de inconsistencia
+
+  * Agregada desinstalación de paquetes en estado de inconsistencia al script
+    /usr/local/sbin/pkgsync
+
+  * Añadida opción -i, --ignore-failed-repos que permite ignorar los repositorios
+    que fallen cuando se ejecuta pkgsync en modo interactivo
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 21 Jan 2022 13:57:00 +0100
+
+pkgsync (2.05) ubuntu; urgency=medium
+
+  * Modificado script /usr/local/sbin/download_pkg_and_deps que permite descargar
+    un paquete pasado como parámetro junto a sus dependencias en un directorio
+    con el nombre del paquete.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 17 Nov 2021 10:46:00 +0100
+
 pkgsync (2.04) ubuntu; urgency=medium
 
   * Añadida opción AUTO_TEST_FILES al fichero de configuración /etc/default/pkgsync 

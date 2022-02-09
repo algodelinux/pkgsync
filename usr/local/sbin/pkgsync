@@ -2,13 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# 2013-2021 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.04
+export VERSION=2.07
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -30,6 +30,7 @@ print_help () {
 	echo "  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)"
 	echo "				or the number specified in /etc/default/pkgsync file"
 	echo "  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync"
+	echo "  -i,  --ignore-failed-repos	ignore failed repositories"
 	echo "  -g,  --get-keys		exec launchpad-keys to get repositories keys"
 	echo "  -S,  --shutdown		shutdown machine after pkgsync"
 	echo "  -R,  --reboot			reboot machine after pkgsync"
@@ -100,7 +101,7 @@ enable_repositories () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hvft::dbkscpngSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hvft::dbkscpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -134,6 +135,10 @@ parse_options () {
 				;;
 			-g|--get-keys)
 				LAUNCHPAD_GETKEYS="yes"
+				shift
+				;;
+			-i|--ignore-failed-repos)
+				ABORT_ON_FAILED_REPOS="no"
 				shift
 				;;
 			-S|--shutdown)
@@ -286,8 +291,15 @@ solveapterrors() {
   idioma=$LC_ALL
   export LC_ALL=C
 
-  TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
-  TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+  if [ -f /etc/default/pkgsync ]; then
+     TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
+     TIMEOUT_FOR_SINC_PUPPET=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
+  fi
+
+  if [ -s "$TIMEOUT_FOR_DPKG_OR_APT" ]; then
+     TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
+     TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+  fi
 
   case "$TIMEOUT_UNITS" in
      "s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER
@@ -316,17 +328,21 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -yf install
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
   fi
+
+  # Desinstalamos paquetes en estado de inconsistencia
+  inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
+  if [ "$inconsistent_packages" ]; then dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
 
   # Instalamos paquetes a medio instalar
   bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-  if [ "$bad_packages" ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -y install $bad_packages; fi
+  if [ "$bad_packages" ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y install $bad_packages; fi
 
   # Aseguramos la actualización de pkgsync
-  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
+  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -yf install pkgsync
 
   export LC_ALL=$idioma
 }
@@ -586,7 +602,7 @@ if [ "$IGNORE_MUSTHAVE" = "no" ]; then
  rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 fi
 
-run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+solveapterrors; run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 
 if [ $? -ne 0 ]; then
    if [ $AUTO_TEST_FILES = "yes" ]; then
@@ -603,7 +619,7 @@ if [ $? -ne 0 ]; then
          rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
       fi
 
-      run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+      solveapterrors; run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
    else
       echo -e "\n[ERR] aptitude update error" | tee -a /var/log/pkgsync.log
       echo -e "Check your package lists!\n" | tee -a /var/log/pkgsync.log
