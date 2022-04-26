@@ -2,11 +2,14 @@
 
 # Define a proxy server if you need to bypass a firewall to update keys
 # SERVER=servidor
+SERVER=servidor2
 
 # Define a proxy server port if you need to bypass a firewall to update keys
 # PORT=3128
+PORT=3128
 
 # Remove expired keys:
 # REMOVE_EXPIRED_KEYS=no  : don't remove expired keys (option by default)
 # REMOVE_EXPIRED_KEYS=yes : remove all expired keys
+REMOVE_EXPIRED_KEYS=yes
 

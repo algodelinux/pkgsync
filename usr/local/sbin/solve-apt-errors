@@ -74,9 +74,15 @@ fi
 inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
 if [ "$inconsistent_packages" ]; then dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
 
-# Instalamos paquetes a medio instalar
+# Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
 bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-if [ "$bad_packages" ]; then apt-get -y install $bad_packages; fi
+if [ "$bad_packages" ]; then
+   apt-get -y install $bad_packages
+   bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+   if [ "$bad_packages" ]; then
+      apt-get remove -y $bad_packages
+   fi
+fi
 
 # Aseguramos la actualización de pkgsync
 apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y pkgsync

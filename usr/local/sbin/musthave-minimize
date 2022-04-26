@@ -3,7 +3,7 @@
 # Elimina del fichero /etc/pkgsync/musthave los paquetes listados en los ficheros alojados en
 # /etc/pkgsync/musthave.d/ junto con sus dependencias.
 #
-# 2013-2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 get-package-dependencies () {
@@ -13,16 +13,23 @@ get-package-dependencies () {
 }
 
 [ -f /etc/pkgsync/musthave ] && cp /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d")
+[ -f /var/log/pkgsync/musthave-minimize.log ] && cp /var/log/pkgsync/musthave-minimize.log /var/log/pkgsync/musthave-minimize.log.$(date +"%Y%m%d")
 
-for file in $(ls /etc/pkgsync/musthave.d/); do
-    for package in $(cat /etc/pkgsync/musthave.d/$file); do
-        echo "Borrando paquete $package del fichero /etc/pkgsync/musthave"
-        sed -i "/$package/d" /etc/pkgsync/musthave
-        get-package-dependencies $package > /tmp/dependencies
-        echo "Borrando dependencias del paquete $package del fichero /etc/pkgsync/musthave"
-        cat /tmp/dependencies
-        comm -23 /etc/pkgsync/musthave /tmp/dependencies > /tmp/musthave
-        mv /tmp/musthave /etc/pkgsync/musthave
+for file in $(find /etc/pkgsync/ -path "*musthave.d/*"); do
+    for line in $(sed '/^[[:blank:]]*#/d;s/#.*//;' $file); do
+        package=$(echo $line | cut -f1 -d" ")
+
+        grep $package /etc/pkgsync/musthave
+
+        if [ $? -eq 0 ]; then
+           echo "Borrando paquete $package del fichero /etc/pkgsync/musthave" | tee -a /var/log/pkgsync/musthave-minimize.log
+           sed -i "/$package/d" /etc/pkgsync/musthave
+           get-package-dependencies $package > /tmp/dependencies
+           echo "Borrando dependencias del paquete $package del fichero /etc/pkgsync/musthave" | tee -a /var/log/pkgsync/musthave-minimize.log
+           cat /tmp/dependencies
+           comm -23 /etc/pkgsync/musthave /tmp/dependencies > /tmp/musthave
+           mv /tmp/musthave /etc/pkgsync/musthave
+        fi
     done
 done
 

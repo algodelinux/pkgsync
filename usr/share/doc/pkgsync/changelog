@@ -1,3 +1,19 @@
+pkgsync (2.09) ubuntu; urgency=medium
+
+  * Mejorado el código del script /usr/local/sbin/solve-apt-errors
+  * Modificado el código del script /usr/local/sbin/backup-repositories
+  * Modificado el código del script /usr/local/sbin/restore-backup-repositories
+  * Modificado el código del script /usr/local/sbin/remove-backup-repositories
+  * Modificado el código del script /usr/local/sbin/list-backup-repositories
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 25 Abr 2022 13:29:00 +0100
+
+pkgsync (2.08) ubuntu; urgency=medium
+
+  * Mejorado el código del script /usr/local/sbin/musthave-minimize
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 20 Abr 2022 10:43:00 +0100
+
 pkgsync (2.07) ubuntu; urgency=medium
 
   * Mejorado el código del script /usr/local/sbin/solve-apt-errors

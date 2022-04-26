@@ -1,9 +1,13 @@
 #!/bin/bash
-# restore-backup-repositories - Restaura el backup de los repositorios con extensión .orig
-# alojados en el directorio /etc/apt/sources.list.d/
-# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
-#
+# restore-backup-repositories - Restaura el backup de los repositorios
+# almacenados en el fichero /etc/apt/sources.list y los alojados en el
+# directorio /etc/apt/sources.list.d/
+# 2018-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 
-for file in /etc/apt/sources.list.d/*.orig; do
-    [ -f $file ] && cp -f "$file" "${file%%.orig}"
-done
+BACKUP_DIR="/var/backups"
+
+[ -d $BACKUP_DIR ] || mkdir $BACKUP_DIR
+
+# Restauramos repositorios
+[ -f $BACKUP_DIR/sources.list.tar.gz ] && tar xfzP $BACKUP_DIR/sources.list.tar.gz
+

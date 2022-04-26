@@ -1,8 +1,13 @@
 #!/bin/bash
-# list-backup-repositories - Muestra un listado de los backups de los repositorios
-# alojados en el directorio /etc/apt/ con extensión .save o extensión .orig
-# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
-#
+# list-backup-repositories - Lista el contenido del fichero
+# /var/backups/sources.list.tar.gz que almacena el backup
+# de los repositorios de la máquina
+# 2018-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 
-find /etc/apt/ -type f -iregex '.*\.\(save\|orig\)$'
+BACKUP_DIR="/var/backups"
+
+[ -d $BACKUP_DIR ] || mkdir $BACKUP_DIR
+
+# Listamos el contenido del fichero de backup de los ficheros de fuentes
+[ -f $BACKUP_DIR/sources.list.tar.gz ] && tar tvf $BACKUP_DIR/sources.list.tar.gz
 

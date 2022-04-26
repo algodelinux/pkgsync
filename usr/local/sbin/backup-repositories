@@ -1,7 +1,14 @@
 #!/bin/bash
 # backup-repositories - Realiza un backup de los repositorios
-# alojados en el directorio /etc/apt/ en ficheros con extensión .orig
-# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
-#
+# almacenados en /etc/apt/sources.list y los alojados en el
+# directorio /etc/apt/sources.list.d/ en el directorio definido
+# en la variable $BACKUP_DIR
+# 2018-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 
-find /etc/apt/ -type f -iname "*.list" -exec cp {} {}.orig \;
+BACKUP_DIR="/var/backups"
+
+[ -d $BACKUP_DIR ] || mkdir $BACKUP_DIR
+
+# Realizamos un backup de los ficheros de fuentes
+tar cfzP $BACKUP_DIR/sources.list.tar.gz /etc/apt/sources.list /etc/apt/sources.list.d
+
