@@ -1,3 +1,9 @@
+pkgsync (2.10) ubuntu; urgency=medium
+
+  * Modificada la documentación y mensajes informativos en el código de algunos scripts
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 27 Abr 2022 13:54:00 +0100
+
 pkgsync (2.09) ubuntu; urgency=medium
 
   * Mejorado el código del script /usr/local/sbin/solve-apt-errors

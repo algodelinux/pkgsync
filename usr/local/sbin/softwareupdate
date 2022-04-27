@@ -1,6 +1,6 @@
 #!/bin/bash
 # softwareupdate - Actualiza paquetes instalados mediante apt, flatpak, snap y realiza limpieza
-# 2013-2021 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 killprocess() {

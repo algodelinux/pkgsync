@@ -66,7 +66,7 @@ LAUNCHPAD_GETKEYS="yes"
 # Es posible indicar un proxy a launchpad-getkeys para obtener las claves de repositorios
 # LAUNCHPAD_GETKEYS_PROXY="": no utilizar proxy
 # LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128": utilizar un proxy específico
-LAUNCHPAD_GETKEYS_PROXY="http://servidor2:3128"
+LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 
 # Es posible indicar a launchpad-getkeys que elimine claves públicas de repositorios caducadas
 # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes": indicar a launchpad-getkeys que elimine claves públicas caducadas

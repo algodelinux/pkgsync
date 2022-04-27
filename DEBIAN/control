@@ -1,5 +1,5 @@
 Package: pkgsync
-Version: 2.09
+Version: 2.10
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
 Installed-Size: 64
@@ -16,4 +16,3 @@ Description: automated package list synchronization
  removing everything that is not in the `must' or `may' list and is not
  necessary for their operations (as determined by aptitude).
  .
- (Repackaged on Fri, 22 Apr 2022 14:13:22 +0200 by dpkg-repack.)

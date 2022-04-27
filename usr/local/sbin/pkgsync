@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.09
+export VERSION=2.10
 
 print_help () {
 	echo "pkgsync $VERSION"
