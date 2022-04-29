@@ -1,3 +1,13 @@
+pkgsync (2.11) ubuntu; urgency=medium
+
+  * Establecido el valor por defecto TIMEOUT_FOR_SINC_PUPPET="5" en el código de 
+    /usr/local/sbin/pkgsync para garantizar que la variable TIMEOUT_FOR_SINC_PUPPET
+    tiene un valor aunque se haya eliminado del fichero de configuración
+    /etc/default/pkgsync
+  * Depurado el código de la función solveapterrors() en /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 29 Abr 2022 12:01:00 +0100
+
 pkgsync (2.10) ubuntu; urgency=medium
 
   * Modificada la documentación y mensajes informativos en el código de algunos scripts

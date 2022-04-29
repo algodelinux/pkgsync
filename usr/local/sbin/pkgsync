@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.10
+export VERSION=2.11
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -291,15 +291,8 @@ solveapterrors() {
   idioma=$LC_ALL
   export LC_ALL=C
 
-  if [ -f /etc/default/pkgsync ]; then
-     TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
-     TIMEOUT_FOR_SINC_PUPPET=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
-  fi
-
-  if [ -s "$TIMEOUT_FOR_DPKG_OR_APT" ]; then
-     TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
-     TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
-  fi
+  TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
+  TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
 
   case "$TIMEOUT_UNITS" in
      "s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER
@@ -469,6 +462,7 @@ AUTOMATIC_REBOOT_INTO_WINDOWS=no
 LAUNCHPAD_GETKEYS=yes
 LAUNCHPAD_GETKEYS_PROXY=""
 LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS=no
+TIMEOUT_FOR_SINC_PUPPET="5"
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
 ABORT_ON_FAILED_REPOS="yes"
