@@ -1,3 +1,9 @@
+pkgsync (2.12) ubuntu; urgency=medium
+
+  * Introducida la versión mejorada de /usr/local/sbin/purge-old-kernels
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 18 May 2022 19:29:00 +0100
+
 pkgsync (2.11) ubuntu; urgency=medium
 
   * Establecido el valor por defecto TIMEOUT_FOR_SINC_PUPPET="5" en el código de 
