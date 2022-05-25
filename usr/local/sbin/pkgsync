@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.12
+export VERSION=2.15
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -102,6 +102,9 @@ enable_repositories () {
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
 	TEMP=`getopt -o hvft::dbkscpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+
+        if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
@@ -321,8 +324,8 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a # && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install # && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
   fi
 
@@ -347,12 +350,12 @@ solveapterrors() {
 }
 
 eliminar_kernels() {
-  # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/purge-old-kernels
+  # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
   if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels --keep $KEEP_LAST_KERNELS -qy; fi
 }
 
 launchpad_getkeys() {
-  # Obtener claves de repositorios siempre y cuando se haya elegido esta opción y se encuentre /usr/bin/launchpad-getkeys
+  # Obtener claves de repositorios siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/launchpad-getkeys
   options=""
 
   if [ $LAUNCHPAD_GETKEYS = "yes" ] && [ -x /usr/local/sbin/launchpad-getkeys ]; then
@@ -366,7 +369,7 @@ launchpad_getkeys() {
 eliminar_dependencias() {
   # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
   if [ $CLEAN = "yes" ]; then
-     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
+     # timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
      timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
      timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y clean
   fi

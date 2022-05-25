@@ -1,3 +1,34 @@
+pkgsync (2.15) ubuntu; urgency=medium
+
+  * Modificado /usr/local/sbin/pkgsync para que al ejecutar /usr/local/sbin/purge-old-kernels
+    se haga con las opciones -qy
+  * Eliminado apt-get -y autoremove de /usr/local/sbin/pkgsync para evitar la 
+    eliminación automática de kernels antiguos que deja tan sólo los dos últimos.
+    Con /usr/local/sbin/purge-old-kernels garantizamos que se mantenga el número
+    de kernels que nosotros queramos
+  * Eliminado apt-get -y autoremove de /usr/local/sbin/solve-apt-errors para evitar la 
+    eliminación automática de kernels antiguos que deja tan sólo los dos últimos.
+  * Eliminado apt-get -y autoremove de /usr/local/sbin/softwareupdate para evitar la 
+    eliminación automática de kernels antiguos que deja tan sólo los dos últimos.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 25 May 2022 12:31:00 +0100
+
+pkgsync (2.14) ubuntu; urgency=medium
+
+  * Introducida nueva versión de /usr/local/sbin/purge-old-kernels en la que
+    se han agregado las siguientes opciones para apt-get: -q, -y, -o
+  * Modificada manpage de purge-old-kernels
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 24 May 2022 08:55:00 +0100
+
+pkgsync (2.13) ubuntu; urgency=medium
+
+  * Introducida nueva versión de /usr/local/sbin/purge-old-kernels en la que
+    se han ampliado los parámetros soportados por la herramienta
+  * Modificada manpage de purge-old-kernels
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 20 May 2022 10:42:00 +0100
+
 pkgsync (2.12) ubuntu; urgency=medium
 
   * Introducida la versión mejorada de /usr/local/sbin/purge-old-kernels
