@@ -69,27 +69,24 @@ ENABLE="yes"
 PURGE_OLD_KERNELS="yes"
 
 # Número de kernels que se desea conservar (por defecto deja los dos últimos)
-# Si no existe la variable KEEP_LAST_KERNELS o no tiene valor, es equivalente al 
-# valor '2'.
+# Si no existe la variable KEEP_LAST_KERNELS o no tiene valor, es equivalente al valor '2'.
 # KEEP_LAST_KERNELS="2"
 KEEP_LAST_KERNELS="3"
 
-# Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y
-# limpiar la cache
+# Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
 # CLEAN="no": no hacer limpieza (opción por defecto)
 # CLEAN="yes": hacer limpieza
 CLEAN="no"
 
-# Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de 
-# pkgsync se encuentren actualizados
+# Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de pkgsync 
+# se encuentren actualizados
 # LAUNCH_SINC_PUPPET="no": no iniciar sinc_puppet antes de hacer pkgsync
-# LAUNCH_SINC_PUPPET="yes": iniciar sinc_puppet antes de hacer pkgsync (opción por
-# defecto)
+# LAUNCH_SINC_PUPPET="yes": iniciar sinc_puppet antes de hacer pkgsync (opción por defecto)
 LAUNCH_SINC_PUPPET="yes"
 
 # Nombre o IP del servidor puppet
-# Si optamos por iniciar sinc_puppet antes de hacer pkgsync (LAUNCH_SINC_PUPPET="yes"), 
-# es conveniente indicar en PUPPET_SERVER el nombre o la IP del servidor puppet. 
+# Si optamos por iniciar sinc_puppet antes de hacer pkgsync (LAUNCH_SINC_PUPPET="yes"), es 
+# conveniente indicar en PUPPET_SERVER el nombre o la IP del servidor puppet. 
 # De este modo, si el servidor puppet no responde a un ping, no se iniciará sinc_puppet.
 # PUPPET_SERVER="puppetinstituto"
 PUPPET_SERVER="puppetinstituto"
@@ -97,27 +94,22 @@ PUPPET_SERVER="puppetinstituto"
 # Tiempo máximo en minutos que puede estar corriendo sinc_puppet antes de matarlo
 TIMEOUT_FOR_SINC_PUPPET="5"
 
-# Apagar automáticamente el equipo después de ejecutar pkgsync en el intervalo 
-# especificado
+# Apagar automáticamente el equipo después de ejecutar pkgsync en el intervalo especificado
 # AUTOMATIC_SHUTDOWN_BETWEEN="22:00-06:00"
 AUTOMATIC_SHUTDOWN_BETWEEN=""
 
-# Reiniciar automáticamente el equipo después de ejecutar pkgsync en el intervalo 
-# especificado
+# Reiniciar automáticamente el equipo después de ejecutar pkgsync en el intervalo especificado
 # AUTOMATIC_REBOOT_BETWEEN="06:01-08:00"
 
 # Iniciar Windows al reiniciar el equipo automáticamente en el intervalo especificado
-# AUTOMATIC_REBOOT_INTO_WINDOWS="no": no iniciar windows tras el reinicio en el 
-# intervalo especificado
-# AUTOMATIC_REBOOT_INTO_WINDOWS="yes": iniciar windows tras el reinicio en el intervalo 
-# especificado
+# AUTOMATIC_REBOOT_INTO_WINDOWS="no": no iniciar windows tras el reinicio en el intervalo especificado
+# AUTOMATIC_REBOOT_INTO_WINDOWS="yes": iniciar windows tras el reinicio en el intervalo especificado
 AUTOMATIC_REBOOT_INTO_WINDOWS="no"
 
-# Obtener claves de repositorios mediante launchpad-getkeys si launchpad-getkeys se 
-# encuentra instalado
+# Obtener claves de repositorios mediante launchpad-getkeys si launchpad-getkeys se encuentra
+# instalado
 # LAUNCHPAD_GETKEYS="no": no tratar de obtener claves mediante launchpad-getkeys
-# LAUNCHPAD_GETKEYS="yes": tratar de obtener claves mediante launchpad-getkeys (opción 
-# por defecto)
+# LAUNCHPAD_GETKEYS="yes": tratar de obtener claves mediante launchpad-getkeys (opción por defecto)
 LAUNCHPAD_GETKEYS="yes"
 
 # Es posible indicar un proxy a launchpad-getkeys para obtener las claves de repositorios
@@ -125,73 +117,72 @@ LAUNCHPAD_GETKEYS="yes"
 # LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128": utilizar un proxy específico
 LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 
-# Es posible indicar a launchpad-getkeys que elimine claves públicas de repositorios 
-# caducadas
-# LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes": indicar a launchpad-getkeys que elimine 
-# claves públicas caducadas
-# LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no": no indicar a launchpad-getkeys que elimine 
-# claves públicas caducadas (opción por defecto)
+# Es posible indicar a launchpad-getkeys que elimine claves públicas de repositorios caducadas
+# LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes": indicar a launchpad-getkeys que elimine claves públicas caducadas
+# LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no": no indicar a launchpad-getkeys que elimine claves públicas caducadas (opción por defecto)
 LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes"
 
-# Definimos un tiempo máximo de espera a que dpkg o apt hayan terminado antes de 
-# realizar pkgsync
-# Este parámetro sirve para evitar evitar que pkgsync quede bloqueado por un fallo 
-# anterior de dpkg o apt
-# Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días 
-# (2d).
+# Definimos un tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync
+# Este parámetro sirve para evitar evitar que pkgsync quede bloqueado por un fallo anterior de dpkg o apt
+# Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días (2d).
 # TIMEOUT_FOR_DPKG_OR_APT="3m": Esperar un tiempo máximo de 3 minutos (valor por defecto)
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 
-# ABORT_ON_FAILED_REPOS nos permite elegir entre abortar la ejecución de pkgsync cuando 
-# alguno de los repositorios falle o continuar la ejecución ignorando los repositorios 
-# que fallan.
-# ABORT_ON_FAILED_REPOS="yes": abortar la ejecución si alguno de los repositorios da 
-# error (opción por defecto)
-# ABORT_ON_FAILED_REPOS="no": continuar la ejecución ignorando los repositorios que 
-# fallan
+# ABORT_ON_FAILED_REPOS nos permite elegir entre abortar la ejecución de pkgsync cuando alguno de 
+# los repositorios falle o continuar la ejecución ignorando los repositorios que fallan.
+# ABORT_ON_FAILED_REPOS="yes": abortar la ejecución si alguno de los repositorios da error (opción por defecto)
+# ABORT_ON_FAILED_REPOS="no": continuar la ejecución ignorando los repositorios que fallan
 ABORT_ON_FAILED_REPOS="yes"
 
-# AUTO_TEST_FILES permite elegir si queremos que pkgsync chequee automáticamente los 
-# ficheros de listas de paquetes.
+# AUTO_TEST_FILES permite elegir si queremos que pkgsync chequee automáticamente los ficheros
+# de listas de paquetes.
 # AUTO_TEST_FILES="yes": Habilitar la revisión automática de las listas de paquetes
-# AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de paquetes 
-# (opción por defecto)
+# AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de paquetes (opción por defecto)
 AUTO_TEST_FILES="yes"
+
+# ALERT_EMAIL_RECEIVER permite definir una dirección de email a la que enviar una alerta
+# ALERT_EMAIL_RECEIVER="miusuario@midominio.es"
+# Es necesario tener configurado un servicio como postfix o ssmtp en el equipo
+ALERT_EMAIL_RECEIVER=""
+
+# ALERT_EMAIL_ON_ERROR permite habilitar el envío de un email al destinatario definido en 
+# ALERT_EMAIL_RECEIVER cuando se produzca algún error
+# ALERT_EMAIL_ON_ERROR="yes": Realizar el envío de una alerta por email cuando se produzca un error
+# ALERT_EMAIL_ON_ERROR="no": No realizar el envío de una alerta por email cuando se produzca un error
+# Es necesario tener configurado un servicio como postfix o ssmtp en el equipo
+ALERT_EMAIL_ON_ERROR="no"
 ```
 
 ## Opciones  🚀 
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.09
+pkgsync 2.16
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
 Recognized options:
-  -h,  --help			        display this help and exit
-  -v,  --version		        display pkgsync version and exit
-  -k,  --keep-unused	        don't remove unused packages
-  -s,  --simulate		        don't do anything, just print out what would have 
-                                happened
-  -t,  --test-files	   	        test pkgsync files
-  -tr, --test-files r	        test and remove packages from pkgsync files lists
-  -d,  --delete-files	        delete all pkgsync files
-  -b,  --build-files	        build musthave and create empty mayhave and maynothave 
-                                if they don't exist
-  -f,  --force			        force pkgsync
-  -c,  --clean			        remove uninstalled packages dependencies,
-				                purge uninstalled packages and clean cache
-  -p,  --purge-old-kernels	    remove old kernels keeping the last two (by default)
-				                or the number specified in /etc/default/pkgsync file
-  -n,  --no-sincpuppet		    don't launch sinc_puppet from pkgsync
+  -h,  --help			display this help and exit
+  -v,  --version		display pkgsync version and exit
+  -k,  --keep-unused		don't remove unused packages
+  -s,  --simulate		don't do anything, just print out what would have happened
+  -t,  --test-files		test pkgsync files
+  -tr, --test-files r		test and remove packages from pkgsync files lists
+  -d,  --delete-files		delete all pkgsync files
+  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist
+  -f,  --force			force pkgsync
+  -c,  --clean			remove uninstalled packages dependencies,
+				purge uninstalled packages and clean cache
+  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)
+				or the number specified in /etc/default/pkgsync file
+  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync
   -i,  --ignore-failed-repos	ignore failed repositories
-  -g,  --get-keys		        exec launchpad-keys to get repositories keys
-  -S,  --shutdown		        shutdown machine after pkgsync
-  -R,  --reboot			        reboot machine after pkgsync
-  -Rw, --reboot			        reboot machine and boot into windows on EFI computers
+  -g,  --get-keys		exec launchpad-keys to get repositories keys
+  -S,  --shutdown		shutdown machine after pkgsync
+  -R,  --reboot			reboot machine after pkgsync
+  -Rw, --reboot			reboot machine and boot into windows on EFI computers
 
 Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian.
-
 ```
 
 ## Herramientas adicionales 🛠️
