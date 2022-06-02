@@ -55,9 +55,9 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a # && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install # && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a 
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install 
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt update -y; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install
   fi
 
 
@@ -76,15 +76,19 @@ solveapterrors() {
   fi
 
   # Aseguramos la actualización de pkgsync
-  timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
+  [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
 
   export LC_ALL=$idioma
 }
 
+RED='\e[0;31m'
+GREEN='\e[0;32m'
+NC='\e[0m' # No Color
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+if (( $EUID != 0 )); then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
+fi
 
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 
@@ -97,7 +101,7 @@ APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-co
 solveapterrors
 
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt update && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt $APT_ARGS upgrade
+[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt update && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt $APT_ARGS upgrade
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
@@ -107,11 +111,11 @@ solveapterrors
 
 # Realizamos limpieza de paquetes
 echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
-timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -fy install &&
-timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo dpkg --configure -a &&
-timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-# timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y autoremove &&
-timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y clean
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -fy install &&
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo dpkg --configure -a &&
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+# [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y autoremove &&
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y clean
 
 [ $(which flatpak) ] && sudo flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |

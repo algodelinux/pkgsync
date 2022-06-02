@@ -1,12 +1,12 @@
 #! /bin/bash
 # Modified version by Esteban M. Navas <algodelinux@gmail.com>
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-WHITE='\033[1;37m'
-NC='\033[0m' # No Color
+RED='\e[0;31m'
+GREEN='\e[0;32m'
+WHITE='\e[1;37m'
+NC='\e[0m' # No Color
 
-if [ "`whoami`" != "root" ]; then
+if (( $EUID != 0 )); then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
    exit 1
 fi

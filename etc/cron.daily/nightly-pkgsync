@@ -1,15 +1,13 @@
 #! /bin/sh
 
-# Run pkgsync, logging to /var/log/pkgsync.log. If there is an error, we cat
-# the entire file to stdout, so cron will complain to the admin. We don't
-# rotate pkgsync.log (yet?) but it will be overwritten every night.
+# Run pkgsync. It inhibit shutdown or reboot if systemd-inhibit is installed.
 
 export PATH=/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin
 
 if [ -x /usr/local/sbin/pkgsync ]; then
    if [ -x /bin/systemd-inhibit ]; then
-	( /bin/systemd-inhibit --what="idle:sleep:shutdown:handle-power-key:handle-suspend-key:handle-hibernate-key:handle-lid-switch" --why="Doing pkgsync" bash /usr/local/sbin/pkgsync >/var/log/pkgsync.log 2>&1 ) || cat /var/log/pkgsync.log
+      /bin/systemd-inhibit --what="idle:sleep:shutdown:handle-power-key:handle-suspend-key:handle-hibernate-key:handle-lid-switch" --why="Doing pkgsync" bash /usr/local/sbin/pkgsync
    else
-	( /usr/local/sbin/pkgsync >/var/log/pkgsync.log 2>&1 ) || cat /var/log/pkgsync.log
+      bash /usr/local/sbin/pkgsync
    fi
 fi

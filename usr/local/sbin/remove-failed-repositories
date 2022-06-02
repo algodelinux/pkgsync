@@ -1,8 +1,16 @@
 #!/bin/bash
 # remove-failed-repositories - Elimina de /etc/apt/sources.list.d/ los repositorios que fallan
-# 2013-2020 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+if (( $EUID != 0 )); then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
+fi
 
 # Buscamos los repositorios que fallan
 LC_ALL=C apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories

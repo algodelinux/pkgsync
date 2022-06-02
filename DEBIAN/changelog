@@ -1,3 +1,28 @@
+pkgsync (2.16) ubuntu; urgency=medium
+
+  * Eliminado apt-get -y autoremove de /usr/local/sbin/limpiapaquetes para evitar la 
+    eliminación automática de kernels antiguos que deja tan sólo los dos últimos.
+  * Agregegada la comprobación de que existe el ejecutable /usr/local/sbin/wait_for_apt_or_dpkg
+    a los scripts /usr/local/sbin/pkgsync, /usr/local/sbin/softwareupdate,
+    /usr/local/sbin/solve-apt-errors y /usr/local/sbin/limpiapaquetes.
+  * Agregada la comprobación de que los scripts que lo requieran se ejecutan con
+    permisos de root.
+  * Modificado el código de /usr/local/sbin/clean-pkgsync-files para que ignore las
+    los comentarios en los ficheros de listas de paquetes. 
+  * Agregada variable ALERT_EMAIL_RECEIVER al fichero de configuración /etc/default/pkgsync
+    para permitir definir un destinatatio de alertas. Por defecto, no se define ningún 
+    email.
+  * Agregada variable ALERT_EMAIL_ON_ERROR al fichero de configuración /etc/default/pkgsync
+    para permitir habilitar el envío de un email al destinatario definido en la variable
+    ALERT_EMAIL_RECEIVER cuando se produzca algún error.
+    Para que se envíe el email, es necesario tener configurado un servicio como postfix o 
+    ssmtp en el equipo.
+  * Eliminado el volcado al fichero /var/log/pkgsync.log de la tarea cron que lo inicia.
+    A partir de ahora la redirección de la salida al fichero /var/log/pkgsync.log
+    se realiza desde el propio script /usr/local/sbin/pkgsync  
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 01 Jun 2022 17:00:00 +0100
+
 pkgsync (2.15) ubuntu; urgency=medium
 
   * Modificado /usr/local/sbin/pkgsync para que al ejecutar /usr/local/sbin/purge-old-kernels
@@ -5,7 +30,7 @@ pkgsync (2.15) ubuntu; urgency=medium
   * Eliminado apt-get -y autoremove de /usr/local/sbin/pkgsync para evitar la 
     eliminación automática de kernels antiguos que deja tan sólo los dos últimos.
     Con /usr/local/sbin/purge-old-kernels garantizamos que se mantenga el número
-    de kernels que nosotros queramos
+    de kernels que nosotros queramos.
   * Eliminado apt-get -y autoremove de /usr/local/sbin/solve-apt-errors para evitar la 
     eliminación automática de kernels antiguos que deja tan sólo los dos últimos.
   * Eliminado apt-get -y autoremove de /usr/local/sbin/softwareupdate para evitar la 

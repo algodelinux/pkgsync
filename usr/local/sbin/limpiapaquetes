@@ -1,14 +1,24 @@
 #!/bin/bash
 # limpiapaquetes - Hace limpieza purgando paquetes desinstalados y limpia la cache de apt
 #
-# 2013-2020 Esteban M. Navas Martín
+# 2013-2022 Esteban M. Navas Martín
 #
 
-sudo apt-get -fy install &&
-sudo dpkg --configure -a &&
-sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-sudo apt-get -y autoremove &&
-sudo apt-get -y clean
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+if (( $EUID != 0 )); then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
+fi
+
+TIMEOUT_FOR_DPKG_OR_APT="3m"
+
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -fy install &&
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo dpkg --configure -a &&
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y clean
 [ $(which flatpak) ] && sudo flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
   while read snapname revision; do

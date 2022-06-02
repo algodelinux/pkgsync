@@ -9,7 +9,7 @@
 # instalación         : Guardar en  /usr/local/sbin/
 
 #
-# Copyright 2020, Esteban M. Navas Martín <algodelinux@gmail.com>
+# Copyright 2020-2022, Esteban M. Navas Martín <algodelinux@gmail.com>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -22,6 +22,15 @@
 # GNU General Public License at <http://www.gnu.org/licenses/> for
 # more details.
 #
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+if (( $EUID != 0 )); then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
+fi
 
 APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 LC_ALL=C apt-key list |grep -E pub.*expired -A 1 | grep -v -e pub -e -- | sed 's/ //g' > /tmp/removeaptkeys
 

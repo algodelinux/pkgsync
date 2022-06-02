@@ -8,7 +8,12 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.15
+export VERSION=2.16
+
+RED='\e[0;31m'
+GREEN='\e[0;32m'
+YELLOW='\e[0;33m'
+NC='\e[0m' # No Color
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -52,8 +57,7 @@ test_files () {
             LC_ALL=C apt-cache --quiet=0 policy $paquete 2>&1 | tr -d " " | grep -e 'Candidate:(none)' -e 'N:Unabletolocatepackage' 2>&1>/dev/null
 
             if [ $? -eq 0 ]; then
-               echo "Package $paquete in file $fichero isn't in repositories"
-               echo "Package $paquete in file $fichero isn't in repositories" >> /var/log/pkgsync/removefromlists.log
+               echo -e "${RED}Package $paquete in file $fichero isn't in repositories${NC}" | tee -a /var/log/pkgsync/removefromlists.log
             fi
          done
       fi
@@ -74,13 +78,12 @@ remove_packages_from_lists () {
         paquete=$(echo $linea | cut -f2 -d" ")
         fichero=$(echo $linea | cut -f5 -d" ")
 
-        echo "Removed package $paquete from file $fichero"
-        echo "Removed package $paquete from file $fichero" >> /var/log/pkgsync/removedfromlists.log
+        echo -e "${RED}Removed package $paquete from file $fichero${NC}" | tee -a /var/log/pkgsync/removedfromlists.log
 
         # Comentamos la línea que contiene el nombre del paquete
         sed -i "s|^$paquete|#$paquete|" $fichero
      done < /var/log/pkgsync/removefromlists.log
-     echo "See /var/log/pkgsync/removedfromlists.log"
+     echo -e "${GREEN}See /var/log/pkgsync/removedfromlists.log${NC}"
   fi
 }
 
@@ -103,7 +106,7 @@ enable_repositories () {
 parse_options () {
 	TEMP=`getopt -o hvft::dbkscpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 
-        if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+        if [ $? != 0 ] ; then echo -e "${RED}Terminating...${NC}" >&2 ; exit 1 ; fi
 
 	eval set -- "$TEMP"
 
@@ -182,7 +185,7 @@ parse_options () {
 				break
 				;;
 			*)
-				echo "Internal error: doesn't recognize argument '$1'"
+				echo -e "${RED}Internal error: doesn't recognize argument '$1'${NC}"
 				exit 1
 				;;
 		esac
@@ -211,12 +214,12 @@ getpkgs () {
 			# for the currently running kernel, if it exists
 			if [ "$pkg" = "meta:current-kernel" ]; then
 				KVERS=$( uname -r )
-				timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
+				[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
 			else
 				# if there's a wildcard in this, push it through aptitude
 				# to glob. if not, just print it out.
 				if echo "$pkg" | grep -Eq '[][*?()|~]'; then
-					timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
+					[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
 				else
 					echo "$pkg"
 				fi
@@ -245,7 +248,7 @@ merge_files() {
 wait_for_apt_or_dpkg() {
   # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
   if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; then
-     echo "Esperando mientras se actualizan índices o paquetes..."
+     echo -e "${YELLOW}Esperando mientras se actualizan índices o paquetes...${NC}"
   fi
   while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; do
      sleep 1
@@ -254,7 +257,7 @@ wait_for_apt_or_dpkg() {
 
 run_aptitude () {
   echo RUNNING: aptitude $APTITUDE_ARGS "$@"
-  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude $APTITUDE_ARGS "$@"
+  [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude $APTITUDE_ARGS "$@"
   return $?
 }
 
@@ -324,9 +327,9 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a # && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install # && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get update -y; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a 
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get update -y; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
   fi
 
   # Desinstalamos paquetes en estado de inconsistencia
@@ -336,22 +339,24 @@ solveapterrors() {
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
   bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
   if [ "$bad_packages" ]; then
-     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y install $bad_packages
+     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y install $bad_packages
      bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
      if [ "$bad_packages" ]; then
-        timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get remove -y $bad_packages
+        [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get remove -y $bad_packages
      fi
   fi
 
   # Aseguramos la actualización de pkgsync
-  timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -yf install pkgsync
+  [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -yf install pkgsync
 
   export LC_ALL=$idioma
 }
 
 eliminar_kernels() {
   # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
-  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels --keep $KEEP_LAST_KERNELS -qy; fi
+  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then
+     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels --keep $KEEP_LAST_KERNELS -qy
+  fi
 }
 
 launchpad_getkeys() {
@@ -369,20 +374,19 @@ launchpad_getkeys() {
 eliminar_dependencias() {
   # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
   if [ $CLEAN = "yes" ]; then
-     # timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y autoremove
-     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
-     timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y clean
+     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
+     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y clean
   fi
 }
 
 apagar_equipo() {
   # Apagar el equipo si el usuario pasó el parámetro -S
-  if [ $SHUTDOWN = true ] || [ $AUTOSHUTDOWN = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/poweroff; fi
+  if [ $SHUTDOWN = true ] || [ $AUTOSHUTDOWN = true ]; then [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/poweroff; fi
 }
 
 reiniciar_equipo() {
   # Reiniciar el equipo si el usuario pasó el parámetro -R
-  if [ $REBOOT = true ] || [ $AUTOREBOOT = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/reboot; fi
+  if [ $REBOOT = true ] || [ $AUTOREBOOT = true ]; then [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/reboot; fi
 }
 
 check_auto_shutdown() {
@@ -443,6 +447,13 @@ check_auto_reboot() {
 }
 
 
+if (( $EUID != 0 )); then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
+fi
+
+:>/var/log/pkgsync.log
+
 # Matamos procesos detenidos
 stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
 if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
@@ -471,6 +482,8 @@ EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Di
 ABORT_ON_FAILED_REPOS="yes"
 DISABLED_FAILED_REPOS=false
 AUTO_TEST_FILES="no"
+ALERT_EMAIL_RECEIVER=""
+ALERT_EMAIL_ON_ERROR="no"
 
 # Controlamos la ejecución manual o automática de pkgsync
 ENABLE=yes
@@ -501,7 +514,7 @@ fi
 if [ ! -r /etc/pkgsync/musthave -a ! "$IGNORE_MUSTHAVE" = "yes" -o \
      ! -r /etc/pkgsync/mayhave -o \
      ! -r /etc/pkgsync/maynothave ]; then
-	echo "Error: Missing files in /etc/pkgsync. Aborting."
+	echo -e "${RED}Error: Missing files in /etc/pkgsync. Aborting.${NC}"
 	echo
 	echo "Please see /usr/share/doc/pkgsync/README.Debian for information on"
 	echo "configuring pkgsync."
@@ -519,15 +532,15 @@ check_auto_shutdown
 check_auto_reboot
 
 # Descargar claves de repositorios
-launchpad_getkeys
+launchpad_getkeys | tee -a /var/log/pkgsync.log
 
 # Aseguramos el estado de los paquetes y eliminamos kernels antiguos
-solveapterrors;eliminar_kernels
+solveapterrors;eliminar_kernels | tee -a /var/log/pkgsync.log
 
 runned_sinc_puppet=false
 # Si está corriendo sinc_puppet, esperamos hasta que termine
 if [[ $(pgrep sinc_puppet) ]]; then
-   echo "Esperando a que termine sinc_puppet..."
+   echo -e "${YELLOW}Esperando a que termine sinc_puppet...${NC}"
    runned_sinc_puppet=true
 fi
 
@@ -542,23 +555,23 @@ if [ $? -eq 0 ]; then
    if [ $runned_sinc_puppet = false ]; then
       installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
       if version_ge $installed_version "2.7"; then
-         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now; fi
+         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now | tee -a /var/log/pkgsync.log; fi
       else
-         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f; fi
+         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f | tee -a /var/log/pkgsync.log; fi
       fi
    fi
 fi
 
 # Update the package lists
-timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; LC_ALL=C apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; LC_ALL=C apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
 
 if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
    # Abortamos pkgsync si algún repositorio no se encuentra accesible
    if [ -s /tmp/failedrepositories ]; then
-      echo -e "\n[ERR] aptitude update error" | tee -a /var/log/pkgsync.log
+      echo -e "${RED}\n[ERR] aptitude update error${NC}" | tee -a /var/log/pkgsync.log
       echo "The following repositories fail:" | tee -a /var/log/pkgsync.log
       cat /tmp/failedrepositories | tee -a /var/log/pkgsync.log
-      echo "      Aborting" | tee -a /var/log/pkgsync.log
+      echo -e "${RED}      Aborting${NC}" | tee -a /var/log/pkgsync.log
       exit 1
    fi
 elif [ $ABORT_ON_FAILED_REPOS = "no" ]; then
@@ -605,7 +618,7 @@ if [ "$IGNORE_MUSTHAVE" = "no" ]; then
  rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 fi
 
-solveapterrors; run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+solveapterrors; run_aptitude upgrade | tee -a /var/log/pkgsync.log; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
 
 if [ $? -ne 0 ]; then
    if [ $AUTO_TEST_FILES = "yes" ]; then
@@ -622,9 +635,9 @@ if [ $? -ne 0 ]; then
          rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
       fi
 
-      solveapterrors; run_aptitude upgrade; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
+      solveapterrors; run_aptitude upgrade | tee -a /var/log/pkgsync.log; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
    else
-      echo -e "\n[ERR] aptitude update error" | tee -a /var/log/pkgsync.log
+      echo -e "${RED}\n[ERR] aptitude update error${NC}" | tee -a /var/log/pkgsync.log
       echo -e "Check your package lists!\n" | tee -a /var/log/pkgsync.log
    fi
 fi
@@ -634,5 +647,13 @@ run_aptitude autoclean
 eliminar_kernels;eliminar_dependencias
 
 if [ $ABORT_ON_FAILED_REPOS = "no" ] && [ $DISABLED_FAILED_REPOS = true ]; then enable_repositories; fi
+
+if [ $ALERT_EMAIL_ON_ERROR = "yes" ] && [ -n "$ALERT_EMAIL_RECEIVER" ]; then
+   grep -e ERR -e Err /var/log/pkgsync.log > /dev/null 2>&1
+
+   if [ $? -eq 0 ]; then
+      mail -s "Error al ejecutar pkgsync en el equipo $(hostname)" "$ALERT_EMAIL_RECEIVER" < /var/log/pkgsync.log
+   fi
+fi
 
 apagar_equipo;reiniciar_equipo

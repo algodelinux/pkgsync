@@ -91,3 +91,14 @@ ABORT_ON_FAILED_REPOS="yes"
 # AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de paquetes (opción por defecto)
 AUTO_TEST_FILES="yes"
 
+# ALERT_EMAIL_RECEIVER permite definir una dirección de email a la que enviar una alerta
+# ALERT_EMAIL_RECEIVER="miusuario@midominio.es"
+# Es necesario tener configurado un servicio como postfix o ssmtp en el equipo
+ALERT_EMAIL_RECEIVER=""
+
+# ALERT_EMAIL_ON_ERROR permite habilitar el envío de un email al destinatario definido en 
+# ALERT_EMAIL_RECEIVER cuando se produzca algún error
+# ALERT_EMAIL_ON_ERROR="yes": Realizar el envío de una alerta por email cuando se produzca un error
+# ALERT_EMAIL_ON_ERROR="no": No realizar el envío de una alerta por email cuando se produzca un error
+# Es necesario tener configurado un servicio como postfix o ssmtp en el equipo
+ALERT_EMAIL_ON_ERROR="no"

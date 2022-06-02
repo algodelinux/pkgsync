@@ -6,8 +6,17 @@
 # mediante pkgsync, aunque también podríamos usarlo para clonar los paquetes instalados en otra
 # máquina con dpkg --set-selections.
 #
-# 2013-2018 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+if (( $EUID != 0 )); then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
+fi
 
 test -d /etc/pkgsync || mkdir /etc/pkgsync
 test -f /etc/pkgsync/mayhave || touch /etc/pkgsync/mayhave
