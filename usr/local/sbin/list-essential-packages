@@ -1,0 +1,14 @@
+#!/bin/bash
+# list-essential-packages - Lista los paquetes esenciales (required, important y standard) instalados en el
+# sistema
+# Required: Paquetes necesarios para el propio funcionamiento del sistema.
+# Important: Paquetes que deben encontrarse en cualquier sistema tipo Unix.
+# Standard: Paquetes que son estándar en cualquier sistema Linux
+# 2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
+
+
+priorities=(required important standard)
+
+for priority in "${priorities[@]}"; do
+  dpkg-query -W --showformat='${Package}\t${Priority}\n' | grep "$priority$" | sed "s/\t$priority//g" | sort
+done

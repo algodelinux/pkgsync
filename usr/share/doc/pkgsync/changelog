@@ -1,3 +1,17 @@
+pkgsync (2.17) ubuntu; urgency=medium
+
+  * Añadida opción -e, --ensure-essential que permite asegurar que no se desinstalen los paquetes
+    esenciales instalados en el sistema agregándolos a la mezcla de ficheros musthave.
+    Consideramos paquetes esenciales del sistema aquellos cuya prioridad es required, important 
+    y standard.
+  * Añadida opción ENSURE_ESSENTIAL al fichero /etc/default/pkgsync para permitir definir el
+    comportamiento por defecto de pkgsync a la hora de garantizar que no se desinstalen paquetes 
+    con prioridad required, important y standard
+    # ENSURE_ESSENTIAL="yes": Garantizar que no se desinstalan paquetes esenciales
+    # ENSURE_ESSENTIAL="no": No controlar la desinstalación de paquetes esenciales (opción por defecto)
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 08 Jun 2022 09:19:00 +0100
+
 pkgsync (2.16) ubuntu; urgency=medium
 
   * Eliminado apt-get -y autoremove de /usr/local/sbin/limpiapaquetes para evitar la 

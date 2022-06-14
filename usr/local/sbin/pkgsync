@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.16
+export VERSION=2.17
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -24,6 +24,7 @@ print_help () {
 	echo "  -h,  --help			display this help and exit"
 	echo "  -v,  --version		display pkgsync version and exit"
 	echo "  -k,  --keep-unused		don't remove unused packages"
+	echo "  -e,  --ensure-essential		don't remove required, important and standard packages"
 	echo "  -s,  --simulate		don't do anything, just print out what would have happened"
 	echo "  -t,  --test-files		test pkgsync files"
 	echo "  -tr, --test-files r		test and remove packages from pkgsync files lists"
@@ -104,7 +105,7 @@ enable_repositories () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hvft::dbkscpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hvft::dbkescpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 
         if [ $? != 0 ] ; then echo -e "${RED}Terminating...${NC}" >&2 ; exit 1 ; fi
 
@@ -121,6 +122,10 @@ parse_options () {
 				;;
 			-k|--keep-unused)
 				APTITUDE_ARGS="$APTITUDE_ARGS -o Aptitude::Delete-Unused=false"
+				shift
+				;;
+			-e|--ensure-essential)
+				ENSURE_ESSENTIAL="yes"
 				shift
 				;;
 			-f|--force)
@@ -228,10 +233,24 @@ getpkgs () {
 	done
 }
 
+list_essential_packages() {
+  # Priorities for build a list of essential packages
+  priorities=(required important standard)
+
+  for priority in "${priorities[@]}"; do
+    dpkg-query -W --showformat='${Package}\t${Priority}\n' | grep "$priority$" | sed "s/\t$priority//g" | sort
+  done
+}
+
 merge_files() {
+  if [ $ENSURE_ESSENTIAL = "yes" ]; then
+     list_essential_packages >> /tmp/essential_packages
+  else
+     :> /tmp/essential_packages
+  fi
 
   # Merge files
-  sort -u -o /etc/pkgsync/musthave.all $MUSTHAVE /etc/pkgsync/musthave.ies $(find /etc/pkgsync/musthave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
+  sort -u -o /etc/pkgsync/musthave.all $MUSTHAVE /etc/pkgsync/musthave.ies $(find /etc/pkgsync/musthave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null) /tmp/essential_packages
   sort -u -o /etc/pkgsync/maynothave.all $MAYNOTHAVE /etc/pkgsync/maynothave.ies $(find /etc/pkgsync/maynothave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
   sort -u -o /etc/pkgsync/mayhave.all $MAYHAVE /etc/pkgsync/mayhave.ies $(find /etc/pkgsync/mayhave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
 
@@ -484,9 +503,9 @@ DISABLED_FAILED_REPOS=false
 AUTO_TEST_FILES="no"
 ALERT_EMAIL_RECEIVER=""
 ALERT_EMAIL_ON_ERROR="no"
+ENSURE_ESSENTIAL="no"
+ENABLE=yes # Controlamos la ejecución manual o automática de pkgsync
 
-# Controlamos la ejecución manual o automática de pkgsync
-ENABLE=yes
 [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
 
 parse_options "$@"
