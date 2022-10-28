@@ -1,3 +1,10 @@
+pkgsync (2.18-1) ubuntu; urgency=medium
+
+  * Agregada la versión actualizada de /usr/local/sbin/apt-remove-expired-keys que 
+    no había sido agregada por error en la versión anterior
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 28 Oct 2022 12:33:00 +0100
+
 pkgsync (2.18) ubuntu; urgency=medium
 
   * Agregada la versión actualizada de /usr/local/sbin/apt-list-expired-keys que 
