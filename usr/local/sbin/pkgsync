@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.17
+export VERSION=2.18
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'

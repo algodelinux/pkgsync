@@ -1,3 +1,16 @@
+pkgsync (2.18) ubuntu; urgency=medium
+
+  * Agregada la versión actualizada de /usr/local/sbin/apt-list-expired-keys que 
+    permite listar claves caducadas de repositorios sin usar apt-key que se encuentra 
+    marcado como DEPRECATED
+  * Agregada la versión actualizada de /usr/local/sbin/apt-remove-expired-keys que 
+    permite eliminar claves caducadas de repositorios sin usar apt-key que se encuentra 
+    marcado como DEPRECATED
+  * Agregada la versión actualizada de /usr/local/sbin/launchpad-getkeys que incorpora
+    las nuevas versiones de apt-list-expired-keys y apt-remove-expired-keys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 28 Oct 2022 11:15:00 +0100
+
 pkgsync (2.17) ubuntu; urgency=medium
 
   * Añadida opción -e, --ensure-essential que permite asegurar que no se desinstalen los paquetes

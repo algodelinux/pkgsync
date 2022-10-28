@@ -1,12 +1,12 @@
 #! /bin/bash
 # Modified version by Esteban M. Navas <algodelinux@gmail.com>
 
-RED='\e[0;31m'
-GREEN='\e[0;32m'
-WHITE='\e[1;37m'
-NC='\e[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+WHITE='\033[1;37m'
+NC='\033[0m' # No Color
 
-if (( $EUID != 0 )); then
+if [ "`whoami`" != "root" ]; then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
    exit 1
 fi
@@ -23,10 +23,31 @@ exit 0
 }
 
 function remove_expired_keys () {
-   APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1 LC_ALL=C apt-key list |grep -E pub.*expired -A 1 | grep -v -e pub -e -- | sed 's/ //g' > /tmp/removeaptkeys
-   for key in $(cat /tmp/removeaptkeys); do
-       apt-key del $key && echo -e "${GREEN}Removed expired key ID: $key${NC}"
-   done
+if [ -f $OLDKEYFILE ]; then
+   LC_ALL=C gpg --no-default-keyring --keyring=$OLDKEYFILE --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
+
+   if [ -s /tmp/expiredkeys ]; then
+      for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
+          echo -e "${GREEN}Deleting KEY $keyid from $OLDKEYFILE${NC}"
+          gpg --no-default-keyring --keyring=$OLDKEYFILE --batch --yes --delete-keys $keyid
+      done
+   fi
+fi
+
+for KEYPATH in $KEYPATHS; do
+    if [ -d $KEYPATH ] && [ "$(ls -A $KEYPATH)" ]; then
+       for keyfile in $(find $KEYPATH/* -not -name "*~"); do
+           LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
+
+           if [ -s /tmp/expiredkeys ]; then
+              for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
+                  echo -e "${GREEN}Deleting KEY $keyid from $keyfile${NC}"
+                  gpg --no-default-keyring --keyring=$keyfile --batch --yes --delete-keys $keyid
+              done
+          fi
+       done
+    fi
+done
 }
 
 REMOVE_EXPIRED_KEYS="no"
