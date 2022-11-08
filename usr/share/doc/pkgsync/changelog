@@ -1,3 +1,17 @@
+pkgsync (2.19) ubuntu; urgency=medium
+
+  * Agregada una nueva opción para la variable ENABLE en el fichero de configuración
+    /etc/default/pkgsync:
+
+    # Activar o desactivar pkgsync:
+    #  ENABLE="yes": activa pkgsync (opción por defecto)
+    #  ENABLE="no": desactiva pkgsync
+    #  ENABLE="onlyupgrade": no instala ni desinstala paquetes. Tan sólo actualiza los ya instalados
+    #  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'yes'.
+    ENABLE="yes"
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 08 Nov 2022 13:14:00 +0100
+
 pkgsync (2.18-1) ubuntu; urgency=medium
 
   * Agregada la versión actualizada de /usr/local/sbin/apt-remove-expired-keys que 
@@ -838,11 +852,11 @@ pkgsync (1.26-2) unstable; urgency=low
    /usr/local/sbin/pkgsync
 
    # Comprobamos que está activada
-   ENABLE=yes
+   
    [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
    if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
      echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
-     echo "           Para activarla poner el valor ENABLE=yes."
+     echo "           Para activarla poner el valor ."
      exit 0
    fi
 

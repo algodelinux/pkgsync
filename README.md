@@ -60,6 +60,7 @@ IGNORE_MAYNOTHAVE="no"
 # Activar o desactivar pkgsync:
 #  ENABLE="yes": activa pkgsync (opción por defecto)
 #  ENABLE="no" : desactiva pkgsync
+#  ENABLE="onlyupgrade": no instala ni desinstala paquetes. Tan sólo actualiza los ya instalados
 #  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'yes'.
 ENABLE="yes"
 
