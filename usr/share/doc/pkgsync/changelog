@@ -1,3 +1,10 @@
+pkgsync (2.20) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/musthave-build to generate musthave list for ubuntu jammy, backing musthave
+    file if exists
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 12 Ene 2023 16:58:00 +0100
+
 pkgsync (2.19) ubuntu; urgency=medium
 
   * Agregada una nueva opción para la variable ENABLE en el fichero de configuración

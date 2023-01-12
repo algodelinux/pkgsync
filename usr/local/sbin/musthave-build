@@ -6,7 +6,7 @@
 # mediante pkgsync, aunque también podríamos usarlo para clonar los paquetes instalados en otra
 # máquina con dpkg --set-selections.
 #
-# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 RED='\033[0;31m'
@@ -48,7 +48,7 @@ case $codename in
   done
   sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
   ;;
-"trusty"|"bionic")
+"trusty"|"bionic"|"jammy")
   test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
 
   echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
