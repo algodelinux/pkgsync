@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.20
+export VERSION=2.21
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -626,7 +626,7 @@ fi
 
 # Si el valor de ENABLE es onlyupgrade, entonces tratamos de resolver errores de apt, actualizamos paquetes y finalizamos
 if [ "$ENABLE" == "onlyupgrade" ]; then
-   solveapterrors; run_aptitude upgrade
+   solveapterrors; run_aptitude upgrade; apagar_equipo; reiniciar_equipo
    exit 0
 fi
 

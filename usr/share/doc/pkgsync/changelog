@@ -1,3 +1,10 @@
+pkgsync (2.21) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to let reboot or shutdown computer when  ENABLE="onlyupgrade"
+   on /etc/default/pkgsync config file
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 23 Jan 2023 13:51:00 +0100
+
 pkgsync (2.20) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/musthave-build to generate musthave list for ubuntu jammy, backing musthave
