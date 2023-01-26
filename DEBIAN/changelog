@@ -1,3 +1,10 @@
+pkgsync (2.22) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/purge-old-kernels v3
+  * Modified /usr/local/sbin/pkgsync to show the list of installed kernels
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 26 Jan 2023 11:47:00 +0100
+
 pkgsync (2.21) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to let reboot or shutdown computer when  ENABLE="onlyupgrade"

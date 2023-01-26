@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.21
+export VERSION=2.22
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -374,7 +374,7 @@ solveapterrors() {
 eliminar_kernels() {
   # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
   if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then
-     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels --keep $KEEP_LAST_KERNELS -qy
+     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
   fi
 }
 
