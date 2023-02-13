@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.22
+export VERSION=2.24
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -40,7 +40,7 @@ print_help () {
 	echo "  -g,  --get-keys		exec launchpad-keys to get repositories keys"
 	echo "  -S,  --shutdown		shutdown machine after pkgsync"
 	echo "  -R,  --reboot			reboot machine after pkgsync"
-	echo "  -Rw, --reboot			reboot machine and boot into windows on EFI computers"
+	echo "  -Rw, --reboot w			reboot machine and boot into windows on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -101,6 +101,10 @@ enable_repositories () {
   for file in $(find /etc/apt/sources.list.d/ -iname "*.disabled"); do
     [ -f $file ] && mv -f "$file" "${file%%.disabled}"
   done
+}
+
+wait_while_locked () {
+   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
 # Largely adapted from /usr/lib/getopt/parse.bash
@@ -219,14 +223,14 @@ getpkgs () {
 			# for the currently running kernel, if it exists
 			if [ "$pkg" = "meta:current-kernel" ]; then
 				KVERS=$( uname -r )
-				[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
+				wait_while_locked; aptitude -F '%p' search ".*-image-$KVERS$" | sed "s/ \+$//" 2>/dev/null || true
 			else
 				# if there's a wildcard in this, push it through aptitude
 				# to glob. if not, just print it out.
 				if echo "$pkg" | grep -Eq '[][*?()|~]'; then
-					[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
+				   wait_while_locked; aptitude -F '%p' search "$pkg" | sed "s/ \+$//" 2>/dev/null || true
 				else
-					echo "$pkg"
+	  			   echo "$pkg"
 				fi
 			fi
 		fi
@@ -276,7 +280,7 @@ wait_for_apt_or_dpkg() {
 
 run_aptitude () {
   echo RUNNING: aptitude $APTITUDE_ARGS "$@"
-  [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; aptitude $APTITUDE_ARGS "$@"
+  wait_while_locked; aptitude $APTITUDE_ARGS "$@"
   return $?
 }
 
@@ -339,16 +343,16 @@ solveapterrors() {
 
   apt-get check 1>/dev/null 2>/tmp/apterrors
 
-  if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-     if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
-     if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
-     if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
-  fi
-
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a 
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get update -y; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; dpkg --configure -a; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -yf install
+     if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
+        if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
+        if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
+        if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+     fi
+
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && run_aptitude -yf install && wait_while_locked; dpkg --configure -a
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && run_aptitude -yf install
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; run_aptitude update; wait_while_locked; dpkg --configure -a; run_aptitude -yf install
   fi
 
   # Desinstalamos paquetes en estado de inconsistencia
@@ -358,15 +362,15 @@ solveapterrors() {
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
   bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
   if [ "$bad_packages" ]; then
-     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y install $bad_packages
+     run_aptitude -y install $bad_packages
      bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
      if [ "$bad_packages" ]; then
-        [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get remove -y $bad_packages
+        run_aptitude remove -y $bad_packages
      fi
   fi
 
   # Aseguramos la actualización de pkgsync
-  [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -yf install pkgsync
+  wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && run_aptitude -yf install pkgsync
 
   export LC_ALL=$idioma
 }
@@ -374,7 +378,7 @@ solveapterrors() {
 eliminar_kernels() {
   # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
   if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then
-     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
+     wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
   fi
 }
 
@@ -393,19 +397,20 @@ launchpad_getkeys() {
 eliminar_dependencias() {
   # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
   if [ $CLEAN = "yes" ]; then
-     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}')
-     [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; apt-get -y clean
+     uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
+     [ -n "$uninstalled_packages" ] && run_aptitude -y remove --purge $uninstalled_packages
+     run_aptitude -y clean
   fi
 }
 
 apagar_equipo() {
   # Apagar el equipo si el usuario pasó el parámetro -S
-  if [ $SHUTDOWN = true ] || [ $AUTOSHUTDOWN = true ]; then [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/poweroff; fi
+  if [ $SHUTDOWN = true ] || [ $AUTOSHUTDOWN = true ]; then wait_while_locked;/sbin/poweroff; fi
 }
 
 reiniciar_equipo() {
   # Reiniciar el equipo si el usuario pasó el parámetro -R
-  if [ $REBOOT = true ] || [ $AUTOREBOOT = true ]; then [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg;/sbin/reboot; fi
+  if [ $REBOOT = true ] || [ $AUTOREBOOT = true ]; then wait_while_locked;/sbin/reboot; fi
 }
 
 check_auto_shutdown() {
@@ -553,36 +558,39 @@ check_auto_reboot
 # Descargar claves de repositorios
 launchpad_getkeys | tee -a /var/log/pkgsync.log
 
-# Aseguramos el estado de los paquetes y eliminamos kernels antiguos
-solveapterrors;eliminar_kernels | tee -a /var/log/pkgsync.log
+# Actualizamos los paquetes instalados
+solveapterrors; disable_failed_repositories; run_aptitude update; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
 
-runned_sinc_puppet=false
-# Si está corriendo sinc_puppet, esperamos hasta que termine
-if [[ $(pgrep sinc_puppet) ]]; then
-   echo -e "${YELLOW}Esperando a que termine sinc_puppet...${NC}"
-   runned_sinc_puppet=true
-fi
+if [ -x /usr/sbin/sinc_puppet ]; then
 
-while [[ $(pgrep sinc_puppet) ]]; do
-   sleep 1
-done
+   runned_sinc_puppet=false
+   # Si está corriendo sinc_puppet, esperamos hasta que termine
+   if [[ $(pgrep sinc_puppet) ]]; then
+      echo -e "${YELLOW}Esperando a que termine sinc_puppet...${NC}"
+      runned_sinc_puppet=true
+   fi
 
-# Si el servidor puppet responde, se encuentra el ejecutable de sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
-[ -n "$PUPPET_SERVER" ] && ping -c1 $PUPPET_SERVER > /dev/null 2>&1
+   while [[ $(pgrep sinc_puppet) ]]; do
+      sleep 1
+   done
 
-if [ $? -eq 0 ]; then
-   if [ $runned_sinc_puppet = false ]; then
-      installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
-      if version_ge $installed_version "2.7"; then
-         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now | tee -a /var/log/pkgsync.log; fi
-      else
-         if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f | tee -a /var/log/pkgsync.log; fi
+   # Si el servidor puppet responde, se encuentra el ejecutable de sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
+   [ -n "$PUPPET_SERVER" ] && ping -c1 $PUPPET_SERVER > /dev/null 2>&1
+
+   if [ $? -eq 0 ]; then
+      if [ $runned_sinc_puppet = false ]; then
+         installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
+         if version_ge $installed_version "2.7"; then
+            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now | tee -a /var/log/pkgsync.log; fi
+         else
+            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f | tee -a /var/log/pkgsync.log; fi
+         fi
       fi
    fi
 fi
 
 # Update the package lists
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT wait_for_apt_or_dpkg; LC_ALL=C apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+wait_while_locked; LC_ALL=C run_aptitude update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
 
 if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
    # Abortamos pkgsync si algún repositorio no se encuentra accesible
@@ -626,7 +634,6 @@ fi
 
 # Si el valor de ENABLE es onlyupgrade, entonces tratamos de resolver errores de apt, actualizamos paquetes y finalizamos
 if [ "$ENABLE" == "onlyupgrade" ]; then
-   solveapterrors; run_aptitude upgrade; apagar_equipo; reiniciar_equipo
    exit 0
 fi
 
@@ -643,7 +650,7 @@ if [ "$IGNORE_MUSTHAVE" = "no" ]; then
  rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 fi
 
-solveapterrors; run_aptitude upgrade | tee -a /var/log/pkgsync.log; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
 
 if [ $? -ne 0 ]; then
    if [ $AUTO_TEST_FILES = "yes" ]; then
@@ -660,7 +667,7 @@ if [ $? -ne 0 ]; then
          rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
       fi
 
-      solveapterrors; run_aptitude upgrade | tee -a /var/log/pkgsync.log; run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+      run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
    else
       echo -e "${RED}\n[ERR] aptitude update error${NC}" | tee -a /var/log/pkgsync.log
       echo -e "Check your package lists!\n" | tee -a /var/log/pkgsync.log

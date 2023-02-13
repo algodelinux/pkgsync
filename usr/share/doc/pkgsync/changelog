@@ -1,3 +1,21 @@
+pkgsync (2.24) ubuntu; urgency=medium
+
+  * Removed eliminar_kernels call from beginning on /usr/local/sbin/pkgsync
+  * Moved upgrade packages call to beginning on /usr/local/sbin/pkgsync
+  * Ensured aptitude update at beginning
+  * It is possible force pkgsync from command line using -f --force option 
+    when ENABLE="onlyupgrade" on /etc/default/pkgsync
+  * Improved code
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 11 Feb 2023 07:14:00 +0100
+
+pkgsync (2.23) ubuntu; urgency=medium
+
+  * Modified DEBIAN/postinst to create pkgsync primary group if doesn't exists
+  * and set group permissions for /var/home/pkgsync 
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 28 Jan 2023 08:42:00 +0100
+
 pkgsync (2.22) ubuntu; urgency=medium
 
   * Added /usr/local/sbin/purge-old-kernels v3

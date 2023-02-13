@@ -6,7 +6,13 @@ fi
 
 [ -d /var/log/pkgsync ] || mkdir -p /var/log/pkgsync
 
-adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync pkgsync
+id pkgsync >/dev/null 2>&1 || adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync pkgsync
+
+if [ -z "$(grep pkgsync /etc/group)" ]; then
+   addgroup --system pkgsync
+   usermod -g pkgsync pkgsync
+   chown -R pkgsync:pkgsync /var/home/pkgsync
+fi
 
 systemctl start getty@tty12.service
 systemctl enable getty@tty12.service
