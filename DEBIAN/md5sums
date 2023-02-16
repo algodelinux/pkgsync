@@ -28,14 +28,14 @@ b09bde611e6fd47a26a86888b98785ff  usr/share/man/man8/softwareupdate.8.gz
 829586f4d67a7cc0fc4a58dbaf5930b7  usr/share/man/man8/remove-backup-repositories.8.gz
 50be1a30c91546e7e53d9506bb6b9c46  usr/share/pixmaps/softwareupdate.png
 8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
-aab2aa6cb0f3ede489e2687485ee736d  usr/share/doc/pkgsync/changelog
+88d7b988e41cbb61fc78938f662f5968  usr/share/doc/pkgsync/changelog
 e99096f6a423bf4a413afdc2527faf5a  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-c9250bf1f6e2ebc31a57783a2f78d400  usr/share/doc/pkgsync/NEWS.Debian.gz
+0422409b98cebb23d5d6e7855dbeb7b8  usr/share/doc/pkgsync/NEWS.Debian.gz
 3359de4f501e7b3156868ca3e4f85101  usr/share/doc/pkgsync/README.Debian
-f3a31393fd39b23f430c071727d62f8a  usr/sbin/pkgsync
+8941623b676a37bf8d1e2dab3f350708  usr/local/sbin/pkgsync
 4d856cf360810c966c90dbb8fd4bd751  usr/local/sbin/wait_for_apt_or_dpkg
 652c84517e4fe5d7cff83da0892a9e26  usr/local/sbin/list-disabled-repositories
 314e68186d0edc0fa2a2d8b2746c207a  usr/local/sbin/enable-disabled-repositories

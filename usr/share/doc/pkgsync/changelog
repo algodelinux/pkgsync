@@ -1,3 +1,9 @@
+pkgsync (2.24-1) ubuntu; urgency=medium
+
+  * Applied small corrections in the code
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 16 Feb 2023 09:18:00 +0100
+
 pkgsync (2.24) ubuntu; urgency=medium
 
   * Removed eliminar_kernels call from beginning on /usr/local/sbin/pkgsync

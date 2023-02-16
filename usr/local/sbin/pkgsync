@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.24
+export VERSION=2.24-1
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -90,10 +90,12 @@ remove_packages_from_lists () {
 
 disable_failed_repositories () {
   # Deshabilitamos los repositorios que fallan de /etc/apt/sources.list.d
-  while read repository; do
-    failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
-    mv $failedfilerepository $failedfilerepository.disabled
-  done </tmp/failedrepositories
+  if [ -s /tmp/failedrepositories ]; then
+     while read repository; do
+       failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
+       mv $failedfilerepository $failedfilerepository.disabled
+     done </tmp/failedrepositories
+  fi
 }
 
 enable_repositories () {
@@ -398,7 +400,7 @@ eliminar_dependencias() {
   # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
   if [ $CLEAN = "yes" ]; then
      uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
-     [ -n "$uninstalled_packages" ] && run_aptitude -y remove --purge $uninstalled_packages
+     [ -n "$uninstalled_packages" ] && run_aptitude -y remove --purge-unused $uninstalled_packages
      run_aptitude -y clean
   fi
 }
@@ -559,7 +561,8 @@ check_auto_reboot
 launchpad_getkeys | tee -a /var/log/pkgsync.log
 
 # Actualizamos los paquetes instalados
-solveapterrors; disable_failed_repositories; run_aptitude update; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
+echo -e "${GREEN}Actualizando paquetes instalados...${NC}"
+solveapterrors; run_aptitude update; disable_failed_repositories; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 
