@@ -1,6 +1,6 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
-# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 killprocess() {
@@ -30,6 +30,7 @@ fi
 
 idioma=$LC_ALL
 export LC_ALL=C
+export DEBIAN_FRONTEND=noninteractive
 
 if [ -f /etc/default/pkgsync ]; then
    TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
@@ -74,7 +75,7 @@ if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; t
 fi
 
 if [ -s /tmp/apterrors ]; then
-   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a 
+   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a
    grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install 
    grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt update -y; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install
 fi
@@ -90,6 +91,9 @@ if [ "$bad_packages" ]; then
    bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
    if [ "$bad_packages" ]; then
       apt-get remove -y $bad_packages
+      if [ $? -ne 0]; then
+         dpkg --purge --force-all $bad_packages
+      fi
    fi
 fi
 
@@ -97,4 +101,3 @@ fi
 apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y pkgsync
 
 export LC_ALL=$idioma
-
