@@ -1,3 +1,21 @@
+pkgsync (2.27) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to generate /etc/pkgsync/musthave if it doesn't
+    exist
+  * Modified /usr/local/sbin/pkgsync to create empty /etc/pkgsync/mayhave if it doesn't
+    exist
+  * Modified /usr/local/sbin/pkgsync to create empty /etc/pkgsync/maynothave if it doesn't
+    exist
+  * Modified /usr/local/sbin/musthave-build to show colored messages
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 22 Feb 2023 13:40:00 +0100
+
+pkgsync (2.26) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/musthave-minimize
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 17 Feb 2023 16:33:00 +0100
+
 pkgsync (2.25) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/solve-apt-errors

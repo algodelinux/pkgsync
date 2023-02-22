@@ -3,7 +3,7 @@
 # Elimina del fichero /etc/pkgsync/musthave los paquetes listados en los ficheros alojados en
 # /etc/pkgsync/musthave.d/ junto con sus dependencias.
 #
-# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 RED='\033[0;31m'
@@ -24,6 +24,12 @@ get-package-dependencies () {
 [ -f /etc/pkgsync/musthave ] && cp /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d")
 [ -f /var/log/pkgsync/musthave-minimize.log ] && cp /var/log/pkgsync/musthave-minimize.log /var/log/pkgsync/musthave-minimize.log.$(date +"%Y%m%d")
 
+echo "Minimizando el fichero /etc/pkgsync/musthave.ies"
+
+[ -f /etc/pkgsync/musthave.ies ] && comm -23 /etc/pkgsync/musthave.ies /etc/pkgsync/musthave | tee /etc/pkgsync/musthave.ies > /dev/null
+
+echo "Minimizando el fichero /etc/pkgsync/musthave"
+
 for file in $(find /etc/pkgsync/ -path "*musthave.d/*"); do
     for line in $(sed '/^[[:blank:]]*#/d;s/#.*//;' $file); do
         package=$(echo $line | cut -f1 -d" ")
@@ -42,3 +48,4 @@ for file in $(find /etc/pkgsync/ -path "*musthave.d/*"); do
     done
 done
 
+echo "Proceso concluido."

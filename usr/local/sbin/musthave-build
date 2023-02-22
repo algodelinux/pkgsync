@@ -26,21 +26,21 @@ codename=`lsb_release --codename | cut -f2`
 
 case $codename in
 "squeeze")
-  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
+  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo -e "${GREEN}Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')${NC}"
 
-  echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
+  echo -e "${GREEN}Generando lista de paquetes instalados en /etc/pkgsync/musthave...${NC}"
   aptitude show "?installed ?not(?priority(required)) ?not(?essential) ?not(?automatic)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " | sort > /etc/pkgsync/musthave
   ;;
 "wheezy"|"jessie")
-  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
+  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo -e "${GREEN}Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')${NC}"
 
-  echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
+  echo -e "${GREEN}Generando lista de paquetes instalados en /etc/pkgsync/musthave...${NC}"
   aptitude show "?installed ?not(?priority(required)) ?not(?essential) ?not(?automatic)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " | sort > /etc/pkgsync/musthave
-  echo "Obteniendo lista de paquetes multiarch..."
+  echo -e "${GREEN}Obteniendo lista de paquetes multiarch...${NC}"
   aptitude show "?installed ?multiarch(same)" | grep -e ^Package -e ^Paquete | cut -f 2 -d " " > /tmp/same
   sort -u -o /tmp/same /tmp/same
 
-  echo "Procesando lista de paquetes multiarch..."
+  echo -e "${GREEN}Procesando lista de paquetes multiarch...${NC}"
   for paquete in `cat /tmp/same`; do
       sed -i 's|$paquete||' /etc/pkgsync/musthave
       dpkg -l|grep "$paquete:i386" 1>/dev/null && echo "$paquete:i386" >> /etc/pkgsync/musthave
@@ -49,12 +49,12 @@ case $codename in
   sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
   ;;
 "trusty"|"bionic"|"jammy")
-  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo "Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')"
+  test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo -e "${GREEN}Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')${NC}"
 
-  echo "Generando lista de paquetes instalados en /etc/pkgsync/musthave..."
+  echo -e "${GREEN}Generando lista de paquetes instalados en /etc/pkgsync/musthave...${NC}"
   aptitude search '~i !~M' -F '%p' --disable-columns | sort -u > /etc/pkgsync/musthave
   sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
   ;;
 esac
 
-echo "Proceso concluido."
+echo -e "${GREEN}Proceso concluido.${NC}"
