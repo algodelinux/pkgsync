@@ -91,7 +91,7 @@ if [ "$bad_packages" ]; then
    bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
    if [ "$bad_packages" ]; then
       apt-get remove -y $bad_packages
-      if [ $? -ne 0]; then
+      if [ $? -ne 0 ]; then
          dpkg --purge --force-all $bad_packages
       fi
    fi

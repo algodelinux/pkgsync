@@ -1,3 +1,9 @@
+pkgsync (2.27-1) ubuntu; urgency=medium
+
+  * Fixed bug on /usr/local/sbin/solve-apt-errors
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 24 Feb 2023 11:20:00 +0100
+
 pkgsync (2.27) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to generate /etc/pkgsync/musthave if it doesn't
