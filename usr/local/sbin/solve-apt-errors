@@ -19,6 +19,11 @@ killprocess() {
    fi
 }
 
+wait_while_locked() {
+   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
+}
+
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
@@ -31,6 +36,12 @@ fi
 idioma=$LC_ALL
 export LC_ALL=C
 export DEBIAN_FRONTEND=noninteractive
+
+# Tiempo máximo en minutos que puede estar corriendo sinc_puppet antes de matarlo
+TIMEOUT_FOR_SINC_PUPPET="5"
+# Tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync 
+# Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días (2d).
+TIMEOUT_FOR_DPKG_OR_APT="3m"
 
 if [ -f /etc/default/pkgsync ]; then
    TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
@@ -66,38 +77,38 @@ if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
 if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
 
-apt-get check 1>/dev/null 2>/tmp/apterrors
-
-if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-   if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
-   if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
-   if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
-fi
+wait_while_locked; apt-get check 1>/dev/null 2>/tmp/apterrors
 
 if [ -s /tmp/apterrors ]; then
-   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a
-   grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install 
-   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt update -y; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install
+   if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
+      if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
+      if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
+      if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+   fi
+   
+   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install; wait_while_locked; dpkg --configure -a
+   grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
+   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
 fi
 
 # Desinstalamos paquetes en estado de inconsistencia
-inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
-if [ "$inconsistent_packages" ]; then dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
+wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
+if [ "$inconsistent_packages" ]; then wait_while_locked; dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
 
 # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
-bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
 if [ "$bad_packages" ]; then
-   apt-get -y install $bad_packages
-   bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+   wait_while_locked; apt-get -y install $bad_packages
+   wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
    if [ "$bad_packages" ]; then
-      apt-get remove -y $bad_packages
+      wait_while_locked; apt-get remove -y $bad_packages
       if [ $? -ne 0 ]; then
-         dpkg --purge --force-all $bad_packages
+         wait_while_locked; dpkg --purge --force-all $bad_packages
       fi
    fi
 fi
 
 # Aseguramos la actualización de pkgsync
-apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y pkgsync
+wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y pkgsync
 
 export LC_ALL=$idioma

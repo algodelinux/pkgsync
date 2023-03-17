@@ -1,3 +1,13 @@
+pkgsync (2.28) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/solve-apt-errors script and solveapterrors funcion in 
+    /usr/local/sbin/pkgsync to introduce wait times before some operation with system
+    package manager
+  * Defined default values for TIMEOUT_FOR_DPKG_OR_APT and TIMEOUT_FOR_SINC_PUPPET
+    in /usr/local/sbin/solve-apt-errors script
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 09 Mar 2023 12:34:00 +0100
+
 pkgsync (2.27-1) ubuntu; urgency=medium
 
   * Fixed bug on /usr/local/sbin/solve-apt-errors
