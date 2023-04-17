@@ -1,4 +1,9 @@
-#!/bin/sh -e
+#!/bin/sh
+
+set -e
+set -u
+
+USER="pkgsync"
 
 if [ -f /etc/cron.d/pkgsync ]; then
 	rm -f /etc/cron.d/pkgsync
@@ -6,13 +11,14 @@ fi
 
 [ -d /var/log/pkgsync ] || mkdir -p /var/log/pkgsync
 
-id pkgsync >/dev/null 2>&1 || adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync pkgsync
+addgroup --quiet --system $USER
+adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync $USER
+usermod -g $USER $USER
 
-if [ -z "$(grep pkgsync /etc/group)" ]; then
-   addgroup --system pkgsync
-   usermod -g pkgsync pkgsync
-   chown -R pkgsync:pkgsync /var/home/pkgsync
-fi
+# default password is username
+echo "${USER}:${USER}" | chpasswd
+
+adduser "$USER" sudo
 
 systemctl start getty@tty12.service
 systemctl enable getty@tty12.service

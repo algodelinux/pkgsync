@@ -1,7 +1,25 @@
 #!/bin/bash
 # softwareupdate - Actualiza paquetes instalados mediante apt, flatpak, snap y realiza limpieza
-# 2013-2022 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
+
+export VERSION=1.1
+
+print_help() {
+        echo "$(basename $0) $VERSION"
+        echo "Actualizar el software del equipo"
+        echo ""
+        echo "Uso: $0 [OPTIONS]"
+        echo "Opciones reconocidas:"
+        echo "  -h               mostrar esta ayuda y salir."
+        echo "  -S               apagar el equipo al finalizar el proceso de actualización."
+        echo "  -R               reiniciar el equipo al finalizar el proceso de actualización."
+        echo ""
+}
+
+wait_while_locked() {
+   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
+}
 
 killprocess() {
 
@@ -55,9 +73,9 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a 
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install 
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; apt update -y; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; dpkg --configure -a; [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude -yf install
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install && wait_while_locked; dpkg --configure -a 
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; aptitude -yf install 
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
   fi
 
 
@@ -76,10 +94,25 @@ solveapterrors() {
   fi
 
   # Aseguramos la actualización de pkgsync
-  [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
+  wait_while_locked; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
 
   export LC_ALL=$idioma
 }
+
+apagar_equipo() {
+  # Apagar el equipo si el usuario pasó el parámetro -S
+  if [ $SHUTDOWN = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT sudo wait_for_apt_or_dpkg;sudo /sbin/poweroff; fi
+}
+
+reiniciar_equipo() {
+  # Reiniciar el equipo si el usuario pasó el parámetro -R
+  if [ $REBOOT = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT sudo wait_for_apt_or_dpkg;sudo /sbin/reboot; fi
+}
+
+
+SHUTDOWN=false # No apagar
+REBOOT=false   # No reiniciar
+
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -94,6 +127,22 @@ TIMEOUT_FOR_DPKG_OR_APT="3m"
 
 APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
 
+##Leer y procesar argumentos
+while getopts "hSR" opt
+do
+    case $opt in
+        h ) print_help
+            exit ;;
+        S ) SHUTDOWN=true ;;
+        R ) REBOOT=true ;;
+        \? ) echo "Opcion invalida -$OPTARG"
+          exit 1 ;;
+        : ) echo "Opcion -$OPTARG requiere un argumento"
+          exit 1 ;;
+    esac
+done
+shift $((OPTIND-1))
+
 # Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
 [ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && sudo /usr/local/sbin/launchpad-getkeys
 
@@ -101,7 +150,7 @@ APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-co
 solveapterrors
 
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt update && [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo /usr/bin/apt $APT_ARGS upgrade
+[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; sudo /usr/bin/apt update && wait_while_locked; sudo /usr/bin/apt $APT_ARGS upgrade
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
@@ -111,14 +160,18 @@ solveapterrors
 
 # Realizamos limpieza de paquetes
 echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -fy install &&
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo dpkg --configure -a &&
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-# [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y autoremove &&
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y clean
+wait_while_locked; sudo apt-get -fy install &&
+wait_while_locked; sudo dpkg --configure -a &&
+wait_while_locked; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+# wait_while_locked; sudo apt-get -y autoremove &&
+wait_while_locked; sudo apt-get -y clean
 
 [ $(which flatpak) ] && sudo flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
   while read snapname revision; do
      sudo snap remove "$snapname" --revision="$revision"
   done
+
+[ -f /tmp/apterrors ] && rm -f /tmp/apterrors
+
+apagar_equipo && reiniciar_equipo

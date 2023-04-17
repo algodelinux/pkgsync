@@ -1,3 +1,9 @@
+pkgsync (2.29) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/softwareupdate version
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 31 Mar 2023 09:37:00 +0100
+
 pkgsync (2.28) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/solve-apt-errors script and solveapterrors funcion in 
