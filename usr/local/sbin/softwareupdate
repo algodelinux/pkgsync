@@ -3,7 +3,7 @@
 # 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.1
+export VERSION=1.2
 
 print_help() {
         echo "$(basename $0) $VERSION"
@@ -73,7 +73,7 @@ solveapterrors() {
   fi
 
   if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install && wait_while_locked; dpkg --configure -a 
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install && wait_while_locked; dpkg --configure -a
      grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; aptitude -yf install 
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
   fi
@@ -150,7 +150,7 @@ shift $((OPTIND-1))
 solveapterrors
 
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; sudo /usr/bin/apt update && wait_while_locked; sudo /usr/bin/apt $APT_ARGS upgrade
+[ -x /usr/bin/apt-get ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; sudo /usr/bin/apt-get update && wait_while_locked; sudo /usr/bin/apt-get $APT_ARGS upgrade
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y

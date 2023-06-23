@@ -1,3 +1,21 @@
+pkgsync (2.32) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/solve-apt-errors to improve removing of inconsistent packages
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 14 Jun 2023 13:48:00 +0100
+
+pkgsync (2.31) ubuntu; urgency=medium
+
+  * Modified DEBIAN/postinst and DEBIAN/postrm to work without systemd
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 13 Jun 2023 14:01:00 +0100
+
+pkgsync (2.30) ubuntu; urgency=medium
+
+  * Replaced apt with apt-get on /usr/local/sbin/softwareupdate
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 24 May 2023 12:18:00 +0100
+
 pkgsync (2.29) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/softwareupdate version

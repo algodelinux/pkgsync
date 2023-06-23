@@ -1,9 +1,7 @@
-#!/bin/sh
-
+#!/bin/bash
 set -e
-set -u
 
-USER="pkgsync"
+USERID="pkgsync"
 
 if [ -f /etc/cron.d/pkgsync ]; then
 	rm -f /etc/cron.d/pkgsync
@@ -11,18 +9,29 @@ fi
 
 [ -d /var/log/pkgsync ] || mkdir -p /var/log/pkgsync
 
-addgroup --quiet --system $USER
-adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync $USER
-usermod -g $USER $USER
+addgroup --quiet --system $USERID
+adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync $USERID
+usermod -g $USERID $USERID
 
 # default password is username
-echo "${USER}:${USER}" | chpasswd
+echo "${USERID}:${USERID}" | chpasswd
 
-adduser "$USER" sudo
+# Verifica si el usuario es miembro del grupo sudo
+if id -nG "$USERID" | grep -qw "sudo"; then
+  echo "El usuario $USERID ya es miembro del grupo sudo."
+else
+  # Agrega el usuario al grupo sudo
+  echo "Agregando al usuario $USERID al grupo sudo..."
+  usermod -aG sudo "$USERID"
+fi
 
-systemctl start getty@tty12.service
-systemctl enable getty@tty12.service
-systemctl daemon-reload
+pidof systemd 2>&1>/dev/null
+
+if [ $? -eq "0" ]; then
+   systemctl is-active getty@tty12.service>/dev/null || systemctl start getty@tty12.service
+   systemctl is-enabled getty@tty12.service>/dev/null || systemctl enable getty@tty12.service
+   systemctl daemon-reload
+fi
 
 sed -i '/pkgsync.*/d' /etc/sudoers
 

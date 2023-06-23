@@ -93,7 +93,12 @@ fi
 
 # Desinstalamos paquetes en estado de inconsistencia
 wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
-if [ "$inconsistent_packages" ]; then wait_while_locked; dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
+if [ "$inconsistent_packages" ]; then
+   for packagename in $inconsistent_packages; do
+       mv /var/lib/dpkg/info/$packagename.* /tmp/
+       wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename;
+   done 
+fi
 
 # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
 wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')

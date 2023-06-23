@@ -1,9 +1,23 @@
-#!/bin/sh -e
+#!/bin/bash
+set -e
 
-systemctl stop getty@tty12.service
-systemctl disable getty@tty12.service
-systemctl daemon-reload
+USERID="pkgsync"
 
-deluser --quiet --system pkgsync
+pidof systemd 2>&1>/dev/null
+
+if [ $? -eq "0" ]; then
+   systemctl is-active getty@tty12.service 2>&1>/dev/null && systemctl stop getty@tty12.service
+   systemctl is-enabled getty@tty12.service 2>&1>/dev/null && systemctl disable getty@tty12.service
+   systemctl daemon-reload
+fi
+
+if id -nG "$USERID" | grep -qw "sudo"; then
+  echo "El usuario $username es miembro del grupo sudo. Eliminándolo..."
+  deluser "$USERID" sudo
+else
+  echo "El usuario $username no es miembro del grupo sudo."
+fi
+
+deluser --quiet --system $USERID
 
 exit 0
