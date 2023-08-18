@@ -226,7 +226,7 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 ## Autores ✒️
 
 * 2004-2007 **Steinar H. Gunderson** <sgunderson@bigfoot.com>.
-* 2013-2022 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
+* 2013-2023 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
 
 
 ## Licencia 📄
