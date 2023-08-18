@@ -59,7 +59,7 @@ IGNORE_MAYNOTHAVE="no"
 
 # Activar o desactivar pkgsync:
 #  ENABLE="yes": activa pkgsync (opción por defecto)
-#  ENABLE="no" : desactiva pkgsync
+#  ENABLE="no": desactiva pkgsync
 #  ENABLE="onlyupgrade": no instala ni desinstala paquetes. Tan sólo actualiza los ya instalados
 #  Si no existe la variable ENABLE o no tiene valor, es equivalente al valor 'yes'.
 ENABLE="yes"
@@ -152,6 +152,12 @@ ALERT_EMAIL_RECEIVER=""
 # ALERT_EMAIL_ON_ERROR="no": No realizar el envío de una alerta por email cuando se produzca un error
 # Es necesario tener configurado un servicio como postfix o ssmtp en el equipo
 ALERT_EMAIL_ON_ERROR="no"
+
+# ENSURE_ESSENTIAL permite asegurar que no se desinstalen paquetes con prioridad required,
+# important y standard
+# ENSURE_ESSENTIAL="yes": Garantizar que no se desinstalan paquetes esenciales
+# ENSURE_ESSENTIAL="no": No controlar la desinstalación de paquetes esenciales (opción por defecto)
+ENSURE_ESSENTIAL="no"
 ```
 
 ## Opciones  🚀 
