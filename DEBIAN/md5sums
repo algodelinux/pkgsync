@@ -28,12 +28,12 @@ b09bde611e6fd47a26a86888b98785ff  usr/share/man/man8/softwareupdate.8.gz
 829586f4d67a7cc0fc4a58dbaf5930b7  usr/share/man/man8/remove-backup-repositories.8.gz
 50be1a30c91546e7e53d9506bb6b9c46  usr/share/pixmaps/softwareupdate.png
 8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
-73b07420fb4fff30504aabffe77c9304  usr/share/doc/pkgsync/changelog
+b6b4f0e02a39655951c26669928779aa  usr/share/doc/pkgsync/changelog
 e99096f6a423bf4a413afdc2527faf5a  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-f221972a15a7d5e1768ea827ca36ee58  usr/share/doc/pkgsync/NEWS.Debian.gz
+32283c2a16843117312de88507686a02  usr/share/doc/pkgsync/NEWS.Debian.gz
 3359de4f501e7b3156868ca3e4f85101  usr/share/doc/pkgsync/README.Debian
 b06437046e361c65559e8ba0a51c886a  usr/local/sbin/apt-list-expired-keys
 f4544ff9b166726f513ae9882d1fa31c  usr/local/sbin/apt-remove-expired-keys
@@ -54,7 +54,7 @@ c3f520ffb093b349fbed6be1879138ef  usr/local/sbin/list-backup-repositories
 ddeee804d6c91009cff5b8157c601fe8  usr/local/sbin/list-failed-repositories
 7ab2cd9613ee52df2f6203709fd09ec8  usr/local/sbin/musthave-build
 574c247100cca1f8500d2b0d120b853a  usr/local/sbin/musthave-minimize
-343281eeacb69003d7d861c977dcead3  usr/local/sbin/pkgsync
+31e75bbc418b03fea3401f5bbc0e0ef2  usr/local/sbin/pkgsync
 c9c0919cca9f08c433311e3c8f162bd3  usr/local/sbin/purge-old-kernels
 060091a4d416bec8e9417bad8be32973  usr/local/sbin/remove-all-repositories
 a8dfe6978b92bbfb13d965b79b8f8788  usr/local/sbin/remove-backup-repositories

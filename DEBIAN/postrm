@@ -18,6 +18,11 @@ else
   echo "El usuario $username no es miembro del grupo sudo."
 fi
 
-deluser --quiet --system $USERID
+getent passwd $USERID
+
+if [ $? -eq "0" ]; then
+   killall -u $USERID
+   deluser --quiet --system --remove-home $USERID
+fi
 
 exit 0

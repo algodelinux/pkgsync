@@ -9,8 +9,8 @@ fi
 
 [ -d /var/log/pkgsync ] || mkdir -p /var/log/pkgsync
 
-addgroup --quiet --system $USERID
 adduser --quiet --system --shell /bin/bash --home /var/home/pkgsync $USERID
+addgroup --quiet --system $USERID
 usermod -g $USERID $USERID
 
 # default password is username
@@ -33,6 +33,6 @@ if [ $? -eq "0" ]; then
    systemctl daemon-reload
 fi
 
-sed -i '/pkgsync.*/d' /etc/sudoers
+sed -i '/pkgsync.*/d' /etc/sudoers 2>&1>/dev/null
 
 exit 0
