@@ -16,22 +16,12 @@ usermod -g $USERID $USERID
 # default password is username
 echo "${USERID}:${USERID}" | chpasswd
 
-# Verifica si el usuario es miembro del grupo sudo
 if id -nG "$USERID" | grep -qw "sudo"; then
-  echo "El usuario $USERID ya es miembro del grupo sudo."
-else
-  # Agrega el usuario al grupo sudo
-  echo "Agregando al usuario $USERID al grupo sudo..."
-  usermod -aG sudo "$USERID"
+  echo "El usuario $USERID es miembro del grupo sudo. Eliminándolo..."
+  deluser "$USERID" sudo
 fi
 
-pidof systemd 2>&1>/dev/null
-
-if [ $? -eq "0" ]; then
-   systemctl is-active getty@tty12.service>/dev/null || systemctl start getty@tty12.service
-   systemctl is-enabled getty@tty12.service>/dev/null || systemctl enable getty@tty12.service
-   systemctl daemon-reload
-fi
+[ -x /bin/systemctl ] && systemctl is-active getty@tty12.service>/dev/null || systemctl start getty@tty12.service; systemctl is-enabled getty@tty12.service>/dev/null || systemctl enable getty@tty12.service; systemctl daemon-reload
 
 sed -i '/pkgsync.*/d' /etc/sudoers 2>&1>/dev/null
 

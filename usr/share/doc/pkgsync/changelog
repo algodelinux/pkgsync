@@ -1,3 +1,9 @@
+pkgsync (2.32-3) ubuntu; urgency=medium
+
+  * Remove user pkgsync from sudo group if is member of this group
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Oct 2023 8:30:00 +0100
+
 pkgsync (2.32-2) ubuntu; urgency=medium
 
   * Upgraded DEBIAN/postinst and DEBIAN/postrm

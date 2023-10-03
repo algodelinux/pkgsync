@@ -3,26 +3,10 @@ set -e
 
 USERID="pkgsync"
 
-pidof systemd 2>&1>/dev/null
+[ -x /bin/systemctl ] && systemctl is-active getty@tty12.service 2>&1>/dev/null && systemctl stop getty@tty12.service; systemctl is-enabled getty@tty12.service 2>&1>/dev/null && systemctl disable getty@tty12.service; systemctl daemon-reload
 
-if [ $? -eq "0" ]; then
-   systemctl is-active getty@tty12.service 2>&1>/dev/null && systemctl stop getty@tty12.service
-   systemctl is-enabled getty@tty12.service 2>&1>/dev/null && systemctl disable getty@tty12.service
-   systemctl daemon-reload
-fi
+deluser --quiet --system $USERID
 
-if id -nG "$USERID" | grep -qw "sudo"; then
-  echo "El usuario $username es miembro del grupo sudo. Eliminándolo..."
-  deluser "$USERID" sudo
-else
-  echo "El usuario $username no es miembro del grupo sudo."
-fi
-
-getent passwd $USERID
-
-if [ $? -eq "0" ]; then
-   killall -u $USERID
-   deluser --quiet --system --remove-home $USERID
-fi
+[ -d /var/home/pkgsync ] || rm -r /var/home/pkgsync
 
 exit 0
