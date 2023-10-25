@@ -28,12 +28,12 @@ b09bde611e6fd47a26a86888b98785ff  usr/share/man/man8/softwareupdate.8.gz
 829586f4d67a7cc0fc4a58dbaf5930b7  usr/share/man/man8/remove-backup-repositories.8.gz
 50be1a30c91546e7e53d9506bb6b9c46  usr/share/pixmaps/softwareupdate.png
 8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
-02ba02405f5fbcdd553d5645ca75a4c7  usr/share/doc/pkgsync/changelog
+02e40926c44a7a264601a087a32fbfa7  usr/share/doc/pkgsync/changelog
 e99096f6a423bf4a413afdc2527faf5a  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-ad5c2d2d0bd5341a1fae924ab9dd7be5  usr/share/doc/pkgsync/NEWS.Debian.gz
+4933b7fe3e0d59c77bfcdf64d301b8ad  usr/share/doc/pkgsync/NEWS.Debian.gz
 3359de4f501e7b3156868ca3e4f85101  usr/share/doc/pkgsync/README.Debian
 b06437046e361c65559e8ba0a51c886a  usr/local/sbin/apt-list-expired-keys
 f4544ff9b166726f513ae9882d1fa31c  usr/local/sbin/apt-remove-expired-keys
@@ -41,7 +41,7 @@ f4544ff9b166726f513ae9882d1fa31c  usr/local/sbin/apt-remove-expired-keys
 4f5cab665a453bc33ddb3bd8985ba22d  usr/local/sbin/clean-pkgsync-files
 d30c6464456554d2840ee7a4222c11ff  usr/local/sbin/disable-failed-repositories
 6837f67d8411385b996e56b55dea9f8a  usr/local/sbin/disable-pkgsync-terminal
-2f256fd06e9601fa4bda95005f1677ce  usr/local/sbin/download_pkg_and_deps
+58399bd95fa85e6c1daff86fb267df9b  usr/local/sbin/download_pkg_and_deps
 314e68186d0edc0fa2a2d8b2746c207a  usr/local/sbin/enable-disabled-repositories
 f3c42bc4cb0fc091f65c86197ed602fe  usr/local/sbin/enable-non-failed-repositories
 c31a699a7ebaffefd639b7310bcaf506  usr/local/sbin/enable-pkgsync-terminal
@@ -54,7 +54,7 @@ c3f520ffb093b349fbed6be1879138ef  usr/local/sbin/list-backup-repositories
 ddeee804d6c91009cff5b8157c601fe8  usr/local/sbin/list-failed-repositories
 7ab2cd9613ee52df2f6203709fd09ec8  usr/local/sbin/musthave-build
 574c247100cca1f8500d2b0d120b853a  usr/local/sbin/musthave-minimize
-5de6fb1a553ef107a9114af284b93042  usr/local/sbin/pkgsync
+bc5161f24f9e570446117e012770dcf3  usr/local/sbin/pkgsync
 c9c0919cca9f08c433311e3c8f162bd3  usr/local/sbin/purge-old-kernels
 060091a4d416bec8e9417bad8be32973  usr/local/sbin/remove-all-repositories
 a8dfe6978b92bbfb13d965b79b8f8788  usr/local/sbin/remove-backup-repositories
