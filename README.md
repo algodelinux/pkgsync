@@ -164,7 +164,7 @@ ENSURE_ESSENTIAL="no"
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.16
+pkgsync 2.33
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
@@ -172,6 +172,7 @@ Recognized options:
   -h,  --help			display this help and exit
   -v,  --version		display pkgsync version and exit
   -k,  --keep-unused		don't remove unused packages
+  -e,  --ensure-essential	don't remove required, important and standard packages
   -s,  --simulate		don't do anything, just print out what would have happened
   -t,  --test-files		test pkgsync files
   -tr, --test-files r		test and remove packages from pkgsync files lists
@@ -187,7 +188,7 @@ Recognized options:
   -g,  --get-keys		exec launchpad-keys to get repositories keys
   -S,  --shutdown		shutdown machine after pkgsync
   -R,  --reboot			reboot machine after pkgsync
-  -Rw, --reboot			reboot machine and boot into windows on EFI computers
+  -Rw, --reboot w		reboot machine and boot into windows on EFI computers
 
 Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian.
 ```
