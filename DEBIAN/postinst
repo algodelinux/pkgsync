@@ -14,7 +14,9 @@ addgroup --quiet --system $USERID
 usermod -g $USERID $USERID
 
 # default password is username
-echo "${USERID}:${USERID}" | chpasswd
+#echo "${USERID}:${USERID}" | chpasswd
+# modified to let short password
+echo "${USERID}:${USERID}" | chpasswd -c SHA256
 
 if id -nG "$USERID" | grep -qw "sudo"; then
   echo "El usuario $USERID es miembro del grupo sudo. Eliminándolo..."

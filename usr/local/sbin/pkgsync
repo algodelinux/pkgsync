@@ -2,13 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2024 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.33
+export VERSION=2.34
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -357,9 +357,26 @@ solveapterrors() {
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; run_aptitude update; wait_while_locked; dpkg --configure -a; wait_while_locked; run_aptitude -yf install
   fi
 
+  # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
+  wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
+  if [ "$very_bad_state_packages" ]; then
+     for packagename in $very_bad_state_packages; do
+         mv /var/lib/dpkg/info/$packagename.* /tmp/
+         wait_while_locked; run_aptitude -y --force-confold install $packagename
+         if [ $? -ne 0 ]; then
+            wait_while_locked; dpkg --purge --force-all $packagename
+         fi
+     done
+  fi
+
   # Desinstalamos paquetes en estado de inconsistencia
   wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
-  if [ "$inconsistent_packages" ]; then wait_while_locked; dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
+  if [ "$inconsistent_packages" ]; then
+     for packagename in $inconsistent_packages; do
+         mv /var/lib/dpkg/info/$packagename.* /tmp/
+         wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename
+     done 
+  fi
 
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
   wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
@@ -368,6 +385,9 @@ solveapterrors() {
      wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
      if [ "$bad_packages" ]; then
         wait_while_locked; run_aptitude remove -y $bad_packages
+        if [ $? -ne 0 ]; then
+           wait_while_locked; dpkg --purge --force-all $bad_packages
+        fi
      fi
   fi
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
-# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2024 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 killprocess() {
@@ -85,10 +85,22 @@ if [ -s /tmp/apterrors ]; then
       if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
       if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
    fi
-   
+
    grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install; wait_while_locked; dpkg --configure -a
    grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
    grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
+fi
+
+# Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
+wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
+if [ "$very_bad_state_packages" ]; then
+   for packagename in $very_bad_state_packages; do
+       mv /var/lib/dpkg/info/$packagename.* /tmp/
+       wait_while_locked; apt-get install -y --force-confold $packagename
+       if [ $? -ne 0 ]; then
+          wait_while_locked; dpkg --purge --force-all $packagename
+       fi
+   done
 fi
 
 # Desinstalamos paquetes en estado de inconsistencia
@@ -96,8 +108,8 @@ wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
 if [ "$inconsistent_packages" ]; then
    for packagename in $inconsistent_packages; do
        mv /var/lib/dpkg/info/$packagename.* /tmp/
-       wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename;
-   done 
+       wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename
+   done
 fi
 
 # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
@@ -114,6 +126,6 @@ if [ "$bad_packages" ]; then
 fi
 
 # Aseguramos la actualización de pkgsync
-wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y pkgsync
+wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y --force-confold pkgsync
 
 export LC_ALL=$idioma

@@ -11,6 +11,9 @@ if [ "`whoami`" != "root" ]; then
    exit 1
 fi
 
+OLDKEYFILE="/etc/apt/trusted.gpg"
+KEYPATHS="/usr/share/keyrings /etc/apt/keyrings /etc/apt/trusted.gpg.d"
+
 function HELP () {
 echo -e "${WHITE}\nlaunchpad-getkeys${NC} is an utility to automatically import all Lunchpad PPAs missing GPG keys.
 

@@ -1,3 +1,17 @@
+pkgsync (2.34) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/solve-apt-errors to enhance error correction
+  * Modified /usr/local/sbin/pkgsync to enhance error correction
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 16 Jan 2024 13:41:00 +0100
+
+pkgsync (2.33-1) ubuntu; urgency=medium
+
+  * Modified DEBIAN/postinst to use short password for user pkgsync
+  * Upgraded /usr/local/sbin/launchpad-getkeys script to last version
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 16 Jan 2024 10:32:00 +0100
+
 pkgsync (2.33) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/download_pkg_and_deps script to last version
