@@ -77,26 +77,13 @@ if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
 if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
 
-wait_while_locked; apt-get check 1>/dev/null 2>/tmp/apterrors
-
-if [ -s /tmp/apterrors ]; then
-   if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-      if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
-      if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
-      if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
-   fi
-
-   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install; wait_while_locked; dpkg --configure -a
-   grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
-   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
-fi
-
 # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
 wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
 if [ "$very_bad_state_packages" ]; then
    for packagename in $very_bad_state_packages; do
        mv /var/lib/dpkg/info/$packagename.* /tmp/
-       wait_while_locked; apt-get install -y --force-confold $packagename
+       wait_while_locked; dpkg --purge --force-all $packagename
+       wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $packagename
        if [ $? -ne 0 ]; then
           wait_while_locked; dpkg --purge --force-all $packagename
        fi
@@ -115,7 +102,7 @@ fi
 # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
 wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
 if [ "$bad_packages" ]; then
-   wait_while_locked; apt-get -y install $bad_packages
+   wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $bad_packages
    wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
    if [ "$bad_packages" ]; then
       wait_while_locked; apt-get remove -y $bad_packages
@@ -125,7 +112,21 @@ if [ "$bad_packages" ]; then
    fi
 fi
 
+wait_while_locked; apt-get check 1>/dev/null 2>/tmp/apterrors
+
+if [ -s /tmp/apterrors ]; then
+   if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
+      if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
+      if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
+      if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+   fi
+
+   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install; wait_while_locked; dpkg --configure -a
+   grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
+   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
+fi
+
 # Aseguramos la actualización de pkgsync
-wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get install -y --force-confold pkgsync
+wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -y install -o Dpkg::Options::="--force-confold" pkgsync
 
 export LC_ALL=$idioma
