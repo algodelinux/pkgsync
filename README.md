@@ -164,7 +164,7 @@ ENSURE_ESSENTIAL="no"
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.33
+pkgsync 2.34-2
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
@@ -227,7 +227,7 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 ## Autores ✒️
 
 * 2004-2007 **Steinar H. Gunderson** <sgunderson@bigfoot.com>.
-* 2013-2023 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
+* 2013-2024 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
 
 
 ## Licencia 📄
