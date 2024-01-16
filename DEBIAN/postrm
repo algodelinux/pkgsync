@@ -4,21 +4,22 @@ set -e
 USERID="pkgsync"
 SERVICE_NAME="getty@tty12.service"
 
-# Función para detener y deshabilitar el servicio
-stop_and_disable_service() {
-    if systemctl is-active --quiet "$SERVICE_NAME"; then
-        systemctl stop "$SERVICE_NAME"
-    fi
-
-    if systemctl is-enabled --quiet "$SERVICE_NAME"; then
-        systemctl disable "$SERVICE_NAME"
-    fi
-    systemctl daemon-reload
-}
-
 # Verificar si systemd está disponible
-if command -v systemctl >/dev/null 2>&1; then
-   stop_and_disable_service; pkill -9 -u $USERID; deluser --quiet --system $USERID; [ -d /var/home/pkgsync ] || rm -r /var/home/pkgsync
+if [ -x /bin/systemctl ]; then
+   if systemctl is-active --quiet "$SERVICE_NAME"; then
+      systemctl stop "$SERVICE_NAME"
+   fi
+
+   if systemctl is-enabled --quiet "$SERVICE_NAME"; then
+      systemctl disable "$SERVICE_NAME"
+   fi
+   systemctl daemon-reload
+fi
+
+pkill -9 -u $USERID || true; deluser --quiet --system $USERID
+
+if [ -d "/var/home/pkgsync" ]; then
+   rm -rf "/var/home/pkgsync"
 fi
 
 exit 0
