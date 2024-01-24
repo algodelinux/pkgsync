@@ -1,3 +1,16 @@
+pkgsync (2.35-1) ubuntu; urgency=medium
+
+  * Added gpg dependency to pkgsync package
+  * Removed sudo from all scripts
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 23 Jan 2024 14:25:00 +0100
+
+pkgsync (2.35) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/softwareupdate version
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 23 Jan 2024 10:19:00 +0100
+
 pkgsync (2.34-2) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/solve-apt-errors to improve error correction

@@ -1,8 +1,12 @@
 #!/bin/bash
 # limpiapaquetes - Hace limpieza purgando paquetes desinstalados y limpia la cache de apt
 #
-# 2013-2022 Esteban M. Navas Martín
+# 2013-2024 Esteban M. Navas Martín
 #
+
+wait_while_locked () {
+   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
+}
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -15,12 +19,12 @@ fi
 
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -fy install &&
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo dpkg --configure -a &&
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-[ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg; sudo apt-get -y clean
-[ $(which flatpak) ] && sudo flatpak uninstall --unused -y
+wait_while_locked; apt-get -fy install &&
+wait_while_locked; dpkg --configure -a &&
+wait_while_locked; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+wait_while_locked; apt-get -y clean
+[ $(which flatpak) ] && flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
   while read snapname revision; do
-     sudo snap remove "$snapname" --revision="$revision"
+     snap remove "$snapname" --revision="$revision"
   done

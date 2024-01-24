@@ -1,9 +1,16 @@
 #!/bin/bash
-# softwareupdate - Actualiza paquetes instalados mediante apt, flatpak, snap y realiza limpieza
-# 2013-2023 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# softwareupdate - Actualiza paquetes instalados mediante aptitude o apt-get, flatpak, snap y realiza limpieza
+# 2013-2024 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.2
+export VERSION=1.6
+
+# Usar preferentemente aptitude y, si no se encuentra instalado, usar apt-get
+APT_COMMAND=$(command -v aptitude)
+[ -z "$APT_COMMAND" ] && APT_COMMAND=$(command -v apt-get)
+
+APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
+
 
 print_help() {
         echo "$(basename $0) $VERSION"
@@ -15,10 +22,6 @@ print_help() {
         echo "  -S               apagar el equipo al finalizar el proceso de actualización."
         echo "  -R               reiniciar el equipo al finalizar el proceso de actualización."
         echo ""
-}
-
-wait_while_locked() {
-   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
 killprocess() {
@@ -35,6 +38,27 @@ killprocess() {
          pkill -9 $1 2>/dev/null
       fi
    fi
+}
+
+disable_failed_repositories () {
+  # Deshabilitamos los repositorios que fallan de /etc/apt/sources.list.d
+  if [ -s /tmp/failedrepositories ]; then
+     while read repository; do
+       failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
+       mv $failedfilerepository $failedfilerepository.disabled
+     done </tmp/failedrepositories
+  fi
+}
+
+enable_repositories () {
+  # Habilitamos los repositorios deshabilitados en /etc/apt/sources.list.d
+  for file in $(find /etc/apt/sources.list.d/ -iname "*.disabled"); do
+    [ -f $file ] && mv -f "$file" "${file%%.disabled}"
+  done
+}
+
+wait_while_locked () {
+   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
 solveapterrors() {
@@ -64,49 +88,66 @@ solveapterrors() {
   # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
   if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
 
-  apt-get check 1>/dev/null 2>/tmp/apterrors
-
-  if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-     if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
-     if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
-     if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+  # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
+  wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
+  if [ "$very_bad_state_packages" ]; then
+     for packagename in $very_bad_state_packages; do
+         mv /var/lib/dpkg/info/$packagename.* /tmp/
+         wait_while_locked; dpkg --purge --force-all $packagename
+         wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $packagename
+         if [ $? -ne 0 ]; then
+            wait_while_locked; dpkg --purge --force-all $packagename
+         fi
+     done
   fi
-
-  if [ -s /tmp/apterrors ]; then
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install && wait_while_locked; dpkg --configure -a
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; aptitude -yf install 
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
-  fi
-
 
   # Desinstalamos paquetes en estado de inconsistencia
-  inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
-  if [ "$inconsistent_packages" ]; then dpkg --remove --force-remove-reinstreq $inconsistent_packages; fi
+  wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
+  if [ "$inconsistent_packages" ]; then
+     for packagename in $inconsistent_packages; do
+         mv /var/lib/dpkg/info/$packagename.* /tmp/
+         wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename
+     done 
+  fi
 
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
-  bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+  wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
   if [ "$bad_packages" ]; then
-     apt-get -y install $bad_packages
-     bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
+     wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $bad_packages
+     wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
      if [ "$bad_packages" ]; then
-        apt-get remove -y $bad_packages
+        wait_while_locked; run_aptitude remove -y $bad_packages
+        if [ $? -ne 0 ]; then
+           wait_while_locked; dpkg --purge --force-all $bad_packages
+        fi
      fi
   fi
 
-  # Aseguramos la actualización de pkgsync
-  wait_while_locked; aptitude search '~U' | grep -oE pkgsync >/dev/null 2>&1 && aptitude -yf install pkgsync
+  wait_while_locked; apt-get check 1>/dev/null 2>/tmp/apterrors
+
+  if [ -s /tmp/apterrors ]; then
+     if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
+        if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
+        if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
+        if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+     fi
+
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; apt-get -yf install && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -y autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -yf install && wait_while_locked; apt-get -y autoremove
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; $APT_COMMAND $APT_ARGS update; wait_while_locked; dpkg --configure -a; wait_while_locked; apt-get -yf install
+  fi
 
   export LC_ALL=$idioma
 }
 
 apagar_equipo() {
   # Apagar el equipo si el usuario pasó el parámetro -S
-  if [ $SHUTDOWN = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT sudo wait_for_apt_or_dpkg;sudo /sbin/poweroff; fi
+  if [ $SHUTDOWN = true ]; then wait_while_locked; /sbin/poweroff; fi
 }
 
 reiniciar_equipo() {
   # Reiniciar el equipo si el usuario pasó el parámetro -R
-  if [ $REBOOT = true ]; then timeout $TIMEOUT_FOR_DPKG_OR_APT sudo wait_for_apt_or_dpkg;sudo /sbin/reboot; fi
+  if [ $REBOOT = true ]; then wait_while_locked; /sbin/reboot; fi
 }
 
 
@@ -114,9 +155,9 @@ SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
 
 
-RED='\e[0;31m'
-GREEN='\e[0;32m'
-NC='\e[0m' # No Color
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
 
 if (( $EUID != 0 )); then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
@@ -125,9 +166,7 @@ fi
 
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 
-APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
-
-##Leer y procesar argumentos
+# Leer y procesar argumentos
 while getopts "hSR" opt
 do
     case $opt in
@@ -144,32 +183,38 @@ done
 shift $((OPTIND-1))
 
 # Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
-[ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && sudo /usr/local/sbin/launchpad-getkeys
+[ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && /usr/local/sbin/launchpad-getkeys
 
-# Resolvemos errores de apt
-solveapterrors
+# Resolvemos errores de apt, si los hay
+wait_while_locked; solveapterrors
+
+# Instalamos el paquete linux-headers-generic-hwe-22.04 si el paquete linux-image-generic-hwe-22.04 se encuentra instalado
+#if dpkg -l | grep -q "^ii  linux-image-generic-hwe-22.04 " && ! dpkg -l | grep -q "ii  linux-headers-generic-hwe-22.04 "; then
+#   $APT_COMMAND $APT_ARGS install linux-headers-generic-hwe-22.04
+#fi
 
 # Actualizamos paquetes deb
-[ -x /usr/bin/apt-get ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; sudo /usr/bin/apt-get update && wait_while_locked; sudo /usr/bin/apt-get $APT_ARGS upgrade
+[ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; solveapterrors; $APT_COMMAND $APT_ARGS update; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
-[ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && sudo /usr/bin/flatpak update -y
+[ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && /usr/bin/flatpak update -y
 
 # Si se encuentra instalado snap, actualizamos el software instalado mediante snap
-[ -x /usr/bin/snap ] && echo -e "${GREEN}\nActualizando software instalado via snap...\n${NC}"  && sudo /usr/bin/snap refresh
+[ -x /usr/bin/snap ] && echo -e "${GREEN}\nActualizando software instalado via snap...\n${NC}"  && /usr/bin/snap refresh
 
 # Realizamos limpieza de paquetes
 echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
-wait_while_locked; sudo apt-get -fy install &&
-wait_while_locked; sudo dpkg --configure -a &&
-wait_while_locked; sudo apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-# wait_while_locked; sudo apt-get -y autoremove &&
-wait_while_locked; sudo apt-get -y clean
 
-[ $(which flatpak) ] && sudo flatpak uninstall --unused -y
+wait_while_locked; apt-get -fy install &&
+wait_while_locked; dpkg --configure -a &&
+wait_while_locked; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+wait_while_locked; apt-get -y autoremove &&
+wait_while_locked; $APT_COMMAND -y clean
+
+[ $(which flatpak) ] && flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |
   while read snapname revision; do
-     sudo snap remove "$snapname" --revision="$revision"
+     snap remove "$snapname" --revision="$revision"
   done
 
 [ -f /tmp/apterrors ] && rm -f /tmp/apterrors

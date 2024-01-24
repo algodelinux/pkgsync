@@ -25,6 +25,6 @@ fi
 
 [ -x /bin/systemctl ] && systemctl is-active getty@tty12.service>/dev/null || systemctl start getty@tty12.service; systemctl is-enabled getty@tty12.service>/dev/null || systemctl enable getty@tty12.service; systemctl daemon-reload
 
-sed -i '/pkgsync.*/d' /etc/sudoers 2>&1>/dev/null
+[ -f /etc/sudoers ] && sed -i '/pkgsync.*/d' /etc/sudoers 2>&1>/dev/null
 
 exit 0
