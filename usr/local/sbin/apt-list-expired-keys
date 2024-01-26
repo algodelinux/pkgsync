@@ -46,8 +46,11 @@ for KEYPATH in $KEYPATHS; do
     if [ -d $KEYPATH ] && [ "$(ls -A $KEYPATH)" ]; then
        echo -e "\n${ORANGE}[$KEYPATH]${NC}"
        for keyfile in $(find $KEYPATH/* -not -name "*~"); do
-           echo -e "Checking $keyfile"
-           echo -ne "${RED}"; LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1; echo -ne "${NC}"
+           file $keyfile | grep -i --quiet "Encrypt"
+           if [ $? -eq 0 ]; then
+              echo -e "Checking $keyfile"
+              echo -ne "${RED}"; LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1; echo -ne "${NC}"
+           fi
        done
     fi
 done

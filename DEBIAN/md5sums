@@ -1,71 +1,71 @@
-etc/cron.daily/nightly-pkgsync
-etc/default/launchpad-getkeys
-etc/default/pkgsync
-etc/sudoers.d/pkgsync
-lib/systemd/system/getty@tty12.service
-usr/local/sbin/apt-list-expired-keys
-usr/local/sbin/apt-remove-expired-keys
-usr/local/sbin/backup-repositories
-usr/local/sbin/clean-pkgsync-files
-usr/local/sbin/disable-failed-repositories
-usr/local/sbin/disable-pkgsync-terminal
-usr/local/sbin/download_pkg_and_deps
-usr/local/sbin/enable-disabled-repositories
-usr/local/sbin/enable-non-failed-repositories
-usr/local/sbin/enable-pkgsync-terminal
-usr/local/sbin/get-package-dependencies
-usr/local/sbin/launchpad-getkeys
-usr/local/sbin/limpiapaquetes
-usr/local/sbin/list-backup-repositories
-usr/local/sbin/list-disabled-repositories
-usr/local/sbin/list-essential-packages
-usr/local/sbin/list-failed-repositories
-usr/local/sbin/musthave-build
-usr/local/sbin/musthave-minimize
-usr/local/sbin/pkgsync
-usr/local/sbin/purge-old-kernels
-usr/local/sbin/remove-all-repositories
-usr/local/sbin/remove-backup-repositories
-usr/local/sbin/remove-failed-repositories
-usr/local/sbin/restore-backup-repositories
-usr/local/sbin/softwareupdate
-usr/local/sbin/solve-apt-errors
-usr/local/sbin/wait_for_apt_or_dpkg
-usr/sbin/pkgsync
-usr/share/applications/Software_Update.desktop
-usr/share/doc/pkgsync/changelog
-usr/share/doc/pkgsync/copyright
-usr/share/doc/pkgsync/mayhave
-usr/share/doc/pkgsync/maynothave
-usr/share/doc/pkgsync/musthave
-usr/share/doc/pkgsync/NEWS.Debian.gz
-usr/share/doc/pkgsync/README.Debian
-usr/share/man/man8/apt-list-expired-keys.8.gz
-usr/share/man/man8/apt-remove-expired-keys.8.gz
-usr/share/man/man8/backup-repositories.8.gz
-usr/share/man/man8/clean-pkgsync-files.8.gz
-usr/share/man/man8/disable-failed-repositories.8.gz
-usr/share/man/man8/disable-pkgsync-terminal.8.gz
-usr/share/man/man8/download_dpkg_and_deps.8.gz
-usr/share/man/man8/enable-disabled-repositories.8.gz
-usr/share/man/man8/enable-non-failed-repositories.8.gz
-usr/share/man/man8/enable-pkgsync-terminal.8.gz
-usr/share/man/man8/get-packages-dependencies.8.gz
-usr/share/man/man8/launchpad-getkeys.8.gz
-usr/share/man/man8/limpia-paquetes.8.gz
-usr/share/man/man8/list-backup-repositories.8.gz
-usr/share/man/man8/list-disabled-repositories.8.gz
-usr/share/man/man8/list-essential-packages.8.gz
-usr/share/man/man8/list-failed-repositories.8.gz
-usr/share/man/man8/musthave-build.8.gz
-usr/share/man/man8/musthave-minimize.8.gz
-usr/share/man/man8/pkgsync.8.gz
-usr/share/man/man8/purge-old-kernels.8.gz
-usr/share/man/man8/remove-all-repositories.8.gz
-usr/share/man/man8/remove-backup-repositories.8.gz
-usr/share/man/man8/remove-failed-repositories.8.gz
-usr/share/man/man8/restore-backup-repositories.8.gz
-usr/share/man/man8/softwareupdate.8.gz
-usr/share/man/man8/solve-apt-errors.8.gz
-usr/share/man/man8/wait_for_apt_or_dpkg.8.gz
-usr/share/pixmaps/softwareupdate.png
+334b9a415ca538f37b9811279f3cb9e4  usr/share/man/man8/apt-list-expired-keys.8.gz
+cfbfa67abeed9c8eda732c6d87e3044c  usr/share/man/man8/list-essential-packages.8.gz
+3e3d680eb640ea8cdb3f9f37bab91c4d  usr/share/man/man8/enable-non-failed-repositories.8.gz
+834e2e2b9cb156a15910bac050820b3f  usr/share/man/man8/clean-pkgsync-files.8.gz
+1090bd8719fa91cb164aa03b0635b2e5  usr/share/man/man8/restore-backup-repositories.8.gz
+d188280164e852eb22635bcafc276df6  usr/share/man/man8/disable-failed-repositories.8.gz
+1a519e3ef7693f4cabd0109e4882e1db  usr/share/man/man8/download_dpkg_and_deps.8.gz
+16eaf694f8fd4d14a8a843b4471e8b88  usr/share/man/man8/musthave-build.8.gz
+8577d2d8912ec28d8bb7afd5452cb287  usr/share/man/man8/enable-disabled-repositories.8.gz
+8ed4e404220a540d5bbba5300c3daff9  usr/share/man/man8/get-packages-dependencies.8.gz
+1057b3f63e0d72e29f8c5f2fc7086246  usr/share/man/man8/wait_for_apt_or_dpkg.8.gz
+2691fc42174302cc89218b34bfd4aca9  usr/share/man/man8/launchpad-getkeys.8.gz
+387e98aa9fd6ee6c740c438ebc98e056  usr/share/man/man8/apt-remove-expired-keys.8.gz
+fb720cd458dad5b0ea5bbf2998547dc8  usr/share/man/man8/remove-failed-repositories.8.gz
+60060aee8036293b4970e155814e9510  usr/share/man/man8/enable-pkgsync-terminal.8.gz
+554fee1c1c7ef2873ad21ffc305e643f  usr/share/man/man8/list-disabled-repositories.8.gz
+f1a6d13e9617e8e642174857bd774c67  usr/share/man/man8/limpia-paquetes.8.gz
+5ca5693d0b5d57c84c063cd052d3ac1a  usr/share/man/man8/pkgsync.8.gz
+411ea3a5ba8dc753a7231bdcc5f5b9a3  usr/share/man/man8/remove-all-repositories.8.gz
+744262d1fa10a7f232d006c0542d6ec1  usr/share/man/man8/purge-old-kernels.8.gz
+a26dd45527d7ea3c8fcba1cc74b583fe  usr/share/man/man8/list-failed-repositories.8.gz
+d0178d4c1cc600fc6fab025b5336a870  usr/share/man/man8/musthave-minimize.8.gz
+4e9b9e1be002f1bfd85fd98c3c17d138  usr/share/man/man8/solve-apt-errors.8.gz
+a7a5fe82d15afafad6b0a4a0350e6567  usr/share/man/man8/disable-pkgsync-terminal.8.gz
+b09bde611e6fd47a26a86888b98785ff  usr/share/man/man8/softwareupdate.8.gz
+9d5ca7610d4a1a1944666376a6656ce0  usr/share/man/man8/list-backup-repositories.8.gz
+3951fd47c7e3f4d37cf1c174405eebed  usr/share/man/man8/backup-repositories.8.gz
+829586f4d67a7cc0fc4a58dbaf5930b7  usr/share/man/man8/remove-backup-repositories.8.gz
+50be1a30c91546e7e53d9506bb6b9c46  usr/share/pixmaps/softwareupdate.png
+8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
+3359de4f501e7b3156868ca3e4f85101  usr/share/doc/pkgsync/README.Debian
+b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
+0cc76ed14277d72155a5d0ac1c36be2a  usr/share/doc/pkgsync/NEWS.Debian.gz
+b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
+e99096f6a423bf4a413afdc2527faf5a  usr/share/doc/pkgsync/copyright
+a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
+9bb74fddbe98917180055092dc033e54  usr/share/doc/pkgsync/changelog
+f3a31393fd39b23f430c071727d62f8a  usr/sbin/pkgsync
+4d856cf360810c966c90dbb8fd4bd751  usr/local/sbin/wait_for_apt_or_dpkg
+652c84517e4fe5d7cff83da0892a9e26  usr/local/sbin/list-disabled-repositories
+314e68186d0edc0fa2a2d8b2746c207a  usr/local/sbin/enable-disabled-repositories
+6b7882ed72d95e991fbda554381cf72a  usr/local/sbin/launchpad-getkeys
+46d44e0ff919fc2173e6254f1f65eb7a  usr/local/sbin/solve-apt-errors
+513154e5ba12d68c64012f17712bf4a5  usr/local/sbin/pkgsync
+d30c6464456554d2840ee7a4222c11ff  usr/local/sbin/disable-failed-repositories
+e0ceba5e542646ca961104966120e834  usr/local/sbin/remove-failed-repositories
+a8dfe6978b92bbfb13d965b79b8f8788  usr/local/sbin/remove-backup-repositories
+f3c42bc4cb0fc091f65c86197ed602fe  usr/local/sbin/enable-non-failed-repositories
+c31a699a7ebaffefd639b7310bcaf506  usr/local/sbin/enable-pkgsync-terminal
+ddeee804d6c91009cff5b8157c601fe8  usr/local/sbin/list-failed-repositories
+ac3ea91ff16fee19dbf95b7be4ee8545  usr/local/sbin/apt-list-expired-keys
+574c247100cca1f8500d2b0d120b853a  usr/local/sbin/musthave-minimize
+8b827dcdcaf775476b598cf36b62a1ab  usr/local/sbin/list-essential-packages
+b406a218188209c3f0b53fca3fc4057a  usr/local/sbin/get-package-dependencies
+c3f520ffb093b349fbed6be1879138ef  usr/local/sbin/list-backup-repositories
+6c1933e56e1393934d1a9aa897bc5b85  usr/local/sbin/backup-repositories
+7ab2cd9613ee52df2f6203709fd09ec8  usr/local/sbin/musthave-build
+060091a4d416bec8e9417bad8be32973  usr/local/sbin/remove-all-repositories
+c9c0919cca9f08c433311e3c8f162bd3  usr/local/sbin/purge-old-kernels
+2187dedee8b77f4bfea8f46705c632cc  usr/local/sbin/apt-remove-expired-keys
+3a5a3da48f6d754665594fab1f2eeeab  usr/local/sbin/limpiapaquetes
+358ac528e33be348c1cc00c9d540bc47  usr/local/sbin/restore-backup-repositories
+58399bd95fa85e6c1daff86fb267df9b  usr/local/sbin/download_pkg_and_deps
+6837f67d8411385b996e56b55dea9f8a  usr/local/sbin/disable-pkgsync-terminal
+07401adec90bfe55ee9480909a1a0efc  usr/local/sbin/softwareupdate
+4f5cab665a453bc33ddb3bd8985ba22d  usr/local/sbin/clean-pkgsync-files
+221edf90c401d269ec2e4c502d465afa  lib/systemd/system/getty@tty12.service
+1004da34ccea981cbed46ef2c0ac8e5b  etc/default/launchpad-getkeys
+4926af35793321338a4932631a059aae  etc/default/pkgsync
+a974164c643d35a6c2a68a9853fc7c02  etc/sudoers.d/pkgsync
+581974c5a73b34b7ead84a3f121f4d63  etc/cron.daily/nightly-pkgsync

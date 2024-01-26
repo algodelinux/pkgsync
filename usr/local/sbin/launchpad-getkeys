@@ -40,13 +40,16 @@ fi
 for KEYPATH in $KEYPATHS; do
     if [ -d $KEYPATH ] && [ "$(ls -A $KEYPATH)" ]; then
        for keyfile in $(find $KEYPATH/* -not -name "*~"); do
-           LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
+           file $keyfile | grep -i --quiet "Encrypt"
+           if [ $? -eq 0 ]; then
+              LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
 
-           if [ -s /tmp/expiredkeys ]; then
-              for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
-                  echo -e "${GREEN}Deleting KEY $keyid from $keyfile${NC}"
-                  gpg --no-default-keyring --keyring=$keyfile --batch --yes --delete-keys $keyid
-              done
+              if [ -s /tmp/expiredkeys ]; then
+                 for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
+                     echo -e "${GREEN}Deleting KEY $keyid from $keyfile${NC}"
+                     gpg --no-default-keyring --keyring=$keyfile --batch --yes --delete-keys $keyid
+                 done
+             fi
           fi
        done
     fi
