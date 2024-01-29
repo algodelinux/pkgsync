@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.35-2
+export VERSION=2.35-3
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -571,18 +571,19 @@ if [ ! -r /etc/pkgsync/maynothave ]; then
    echo -e "${GREEN}Creando el fichero /etc/pkgsync/maynothave ...${NC}"
    touch /etc/pkgsync/maynothave
 fi
-# Generar /etc/pkgsync/musthave si no existe con la lista de paquetes instalados en el sistema
-if [ ! -r /etc/pkgsync/musthave -a ! "$IGNORE_MUSTHAVE" = "yes" ]; then
+
+# Generar /etc/pkgsync/musthave si no existe el fichero con la lista de paquetes instalados en el sistema o está vacío
+if [ ! -r /etc/pkgsync/musthave -o ! -s /etc/pkgsync/musthave ]; then
    timeout $TIMEOUT_FOR_MUSTHAVE_BUILD /usr/local/sbin/musthave-build
 
    # Si no se ha creado un fichero musthave, mostramos un error
    if [ ! -r /etc/pkgsync/musthave ]; then
-   	echo -e "${RED}Error: Fichero musthave no encontrado en /etc/pkgsync. Abortando.${NC}"
-   	echo
-   	echo "Please see /usr/share/doc/pkgsync/README.Debian for information on"
-   	echo "configuring pkgsync."
+      echo -e "${RED}Error: Fichero musthave no encontrado en /etc/pkgsync. Abortando.${NC}"
+      echo
+      echo "Please see /usr/share/doc/pkgsync/README.Debian for information on"
+      echo "configuring pkgsync."
 
-   	exit 1
+      exit 1
    fi
 fi
 
