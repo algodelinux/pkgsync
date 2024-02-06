@@ -1,3 +1,11 @@
+pkgsync (2.36) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to create /etc/pkgsync/mayhave.d, 
+    /etc/pkgsync/maynothave.d and /etc/pkgsync/musthave.d if they don't exist
+  * Added option -C, --clean-and-purge option
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 05 Feb 2024 19:19:00 +0100
+
 pkgsync (2.35-3) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to generate /etc/pkgsync/musthave if the file 

@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.35-3
+export VERSION=2.36
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -31,8 +31,8 @@ print_help () {
 	echo "  -d,  --delete-files		delete all pkgsync files"
 	echo "  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist"
 	echo "  -f,  --force			force pkgsync"
-	echo "  -c,  --clean			remove uninstalled packages dependencies,"
-	echo "				purge uninstalled packages and clean cache"
+	echo "  -c,  --clean			remove uninstalled packages and clean cache"
+	echo "  -C,  --clean-and-purge	remove uninstalled packages, delete their config files and clean cache"
 	echo "  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)"
 	echo "				or the number specified in /etc/default/pkgsync file"
 	echo "  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync"
@@ -111,7 +111,7 @@ wait_while_locked () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hvft::dbkescpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hvft::dbkescCpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,clean-and-purge,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 
         if [ $? != 0 ] ; then echo -e "${RED}Terminating...${NC}" >&2 ; exit 1 ; fi
 
@@ -140,6 +140,10 @@ parse_options () {
 				;;
 			-c|--clean)
 				CLEAN="yes"
+				shift
+				;;
+			-C|--clean-and-purge)
+				CLEAN="purge"
 				shift
 				;;
 			-p|--purge-old-kernels)
@@ -280,13 +284,13 @@ wait_for_apt_or_dpkg() {
   done
 }
 
-run_aptitude () {
+run_aptitude() {
   echo RUNNING: aptitude $APTITUDE_ARGS "$@"
   wait_while_locked; aptitude $APTITUDE_ARGS "$@"
   return $?
 }
 
-run_debtags () {
+run_debtags() {
   if [ "$USE_DEBTAGS" ]; then
      echo RUNNING: debtags "$@"
      debtags "$@"
@@ -294,7 +298,7 @@ run_debtags () {
 }
 
 # The beautiful look of hacks in the morning...
-filter () {
+filter() {
 	echo "$@" | tr " " "\n" | sort | uniq -c | grep "     2" | cut -c9-
 }
 
@@ -418,12 +422,19 @@ launchpad_getkeys() {
 }
 
 eliminar_dependencias() {
-  # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
-  if [ $CLEAN = "yes" ]; then
-     uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
-     [ -n "$uninstalled_packages" ] && run_aptitude -y remove --purge-unused $uninstalled_packages
-     run_aptitude -y clean
+  uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
+
+  if [ -n "$uninstalled_packages" ]; then
+     if [ $CLEAN = "yes" ]; then
+        # Eliminar paquetes desinstalados
+        run_aptitude -y remove --purge-unused $uninstalled_packages
+     elif [ $CLEAN = "purge" ]; then
+        # Eliminar paquetes desinstalados y eliminar sus ficheros de configuración
+        run_aptitude -y purge $uninstalled_packages
+     fi
   fi
+  # Limpiar la cache de paquetes
+  run_aptitude -y clean
 }
 
 apagar_equipo() {
@@ -512,9 +523,9 @@ SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
 AUTOSHUTDOWN=false # No apagar
 AUTOREBOOT=false   # No reiniciar
-PURGE_OLD_KERNELS=no
+PURGE_OLD_KERNELS="no"
 KEEP_LAST_KERNELS="2"
-CLEAN=no
+CLEAN="no"
 LAUNCH_SINC_PUPPET=yes
 PUPPET_SERVER=puppetinstituto
 AUTOMATIC_SHUTDOWN_BETWEEN=""
@@ -554,10 +565,25 @@ BADGER="$!"
 
 trap "kill "${BADGER}" 2>/dev/null || true; lockfile-remove $lockfile; exit" QUIT INT TERM EXIT
 
-# Crear el directorio /etc/pkgsync si no existe
+# Crear el directorio /etc/pkgsync y sus subdirectorios si no existen
 if [ ! -d /etc/pkgsync ]; then
    echo -e "${GREEN}Creando el directorio /etc/pkgsync ...${NC}"
    mkdir /etc/pkgsync
+fi
+
+if [ ! -d /etc/pkgsync/mayhave.d ]; then
+   echo -e "${GREEN}Creando el directorio /etc/pkgsync/mayhave.d/ ...${NC}"
+   mkdir -p /etc/pkgsync/mayhave.d
+fi
+
+if [ ! -d /etc/pkgsync/maynothave.d ]; then
+   echo -e "${GREEN}Creando el directorio /etc/pkgsync/maynothave.d/ ...${NC}"
+   mkdir -p /etc/pkgsync/maynothave.d
+fi
+
+if [ ! -d /etc/pkgsync/musthave.d ]; then
+   echo -e "${GREEN}Creando el directorio /etc/pkgsync/musthave.d/ ...${NC}"
+   mkdir -p /etc/pkgsync/musthave.d
 fi
 
 # Crear un fichero /etc/pkgsync/mayhave vacío si no existe
