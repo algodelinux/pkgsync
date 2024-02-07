@@ -25,9 +25,10 @@ PURGE_OLD_KERNELS="yes"
 # KEEP_LAST_KERNELS="2"
 KEEP_LAST_KERNELS="3"
 
-# Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
-# CLEAN="no": no hacer limpieza (opción por defecto)
-# CLEAN="yes": hacer limpieza
+# Eliminar paquetes desinstalados, eliminar sus ficheros de configuración y limpiar la cache
+# CLEAN="no": No hacer limpieza (opción por defecto)
+# CLEAN="yes": Elimina paquetes desinstalados y limpia la cache
+# CLEAN="purge": Elimina paquetes desinstalados, sus ficheros de configuración y limpia la cache
 CLEAN="no"
 
 # Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de pkgsync 

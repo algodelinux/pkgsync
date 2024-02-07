@@ -1,3 +1,14 @@
+pkgsync (2.37) ubuntu; urgency=medium
+
+  * Modified package to create /etc/pkgsync/mayhave.d, 
+    /etc/pkgsync/maynothave.d and /etc/pkgsync/musthave.d at install
+  * Modified /usr/local/sbin/softwareupdate to create /tmp/failedrepositories
+  * Modified /usr/local/sbin/musthave-build to create musthave on bullseye
+    and bookworm
+  * Added lsb-release dependency to pkgsync package
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 07 Feb 2024 07:40:00 +0100
+
 pkgsync (2.36) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to create /etc/pkgsync/mayhave.d, 

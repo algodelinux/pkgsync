@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.36
+export VERSION=2.37
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -25,7 +25,7 @@ print_help () {
 	echo "  -v,  --version		display pkgsync version and exit"
 	echo "  -k,  --keep-unused		don't remove unused packages"
 	echo "  -e,  --ensure-essential	don't remove required, important and standard packages"
-	echo "  -s,  --simulate		don't do anything, just print out what would have happened"
+	echo "  -s,  --simulate		simulate and print out which packages would be installed/uninstalled or updated"
 	echo "  -t,  --test-files		test pkgsync files"
 	echo "  -tr, --test-files r		test and remove packages from pkgsync files lists"
 	echo "  -d,  --delete-files		delete all pkgsync files"

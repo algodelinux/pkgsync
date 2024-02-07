@@ -74,9 +74,10 @@ PURGE_OLD_KERNELS="yes"
 # KEEP_LAST_KERNELS="2"
 KEEP_LAST_KERNELS="3"
 
-# Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
-# CLEAN="no": no hacer limpieza (opción por defecto)
-# CLEAN="yes": hacer limpieza
+# Eliminar paquetes desinstalados, eliminar sus ficheros de configuración y limpiar la cache
+# CLEAN="no": No hacer limpieza (opción por defecto)
+# CLEAN="yes": Elimina paquetes desinstalados y limpia la cache
+# CLEAN="purge": Elimina paquetes desinstalados, sus ficheros de configuración y limpia la cache
 CLEAN="no"
 
 # Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de pkgsync 
@@ -121,7 +122,7 @@ LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 # Es posible indicar a launchpad-getkeys que elimine claves públicas de repositorios caducadas
 # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes": indicar a launchpad-getkeys que elimine claves públicas caducadas
 # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no": no indicar a launchpad-getkeys que elimine claves públicas caducadas (opción por defecto)
-LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes"
+LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no"
 
 # Definimos un tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync
 # Este parámetro sirve para evitar evitar que pkgsync quede bloqueado por un fallo anterior de dpkg o apt
@@ -164,7 +165,7 @@ ENSURE_ESSENTIAL="no"
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.34-2
+pkgsync 2.37
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
@@ -173,14 +174,14 @@ Recognized options:
   -v,  --version		display pkgsync version and exit
   -k,  --keep-unused		don't remove unused packages
   -e,  --ensure-essential	don't remove required, important and standard packages
-  -s,  --simulate		don't do anything, just print out what would have happened
+  -s,  --simulate		simulate and print out which packages would be installed/uninstalled or updated
   -t,  --test-files		test pkgsync files
   -tr, --test-files r		test and remove packages from pkgsync files lists
   -d,  --delete-files		delete all pkgsync files
   -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist
   -f,  --force			force pkgsync
-  -c,  --clean			remove uninstalled packages dependencies,
-				purge uninstalled packages and clean cache
+  -c,  --clean			remove uninstalled packages and clean cache
+  -C,  --clean-and-purge	remove uninstalled packages, delete their config files and clean cache
   -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)
 				or the number specified in /etc/default/pkgsync file
   -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync
