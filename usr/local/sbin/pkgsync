@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.37
+export VERSION=2.38
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -627,7 +627,16 @@ launchpad_getkeys | tee -a /var/log/pkgsync.log
 
 # Actualizamos los paquetes instalados
 echo -e "${GREEN}Actualizando paquetes instalados...${NC}"
-solveapterrors; run_aptitude update; disable_failed_repositories; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
+solveapterrors; wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
+
+# Abort if repository downloads fail (possible mirror failure).
+grep -w '^W: Failed to fetch' /tmp/apterrors 2>&1 >/dev/null
+if [ $? -eq 0 ]; then
+   echo -e "${RED}\n[ERR] aptitude update error. Mirror sync in progress?${NC}" | tee -a /var/log/pkgsync.log
+   exit 1
+fi
+
+disable_failed_repositories; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 
@@ -658,7 +667,10 @@ if [ -x /usr/sbin/sinc_puppet ]; then
 fi
 
 # Update the package lists
-wait_while_locked; LC_ALL=C run_aptitude update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
+
+# Get failed repositories
+cat /tmp/apterrors | grep '^Err' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
 
 if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
    # Abortamos pkgsync si algún repositorio no se encuentra accesible

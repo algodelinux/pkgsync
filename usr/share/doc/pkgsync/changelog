@@ -1,3 +1,9 @@
+pkgsync (2.38) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to abort on mirror sync fail
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 10 Mar 2024 09:57:00 +0100
+
 pkgsync (2.37) ubuntu; urgency=medium
 
   * Modified package to create /etc/pkgsync/mayhave.d, 
