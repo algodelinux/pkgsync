@@ -139,7 +139,7 @@ ABORT_ON_FAILED_REPOS="yes"
 # de listas de paquetes.
 # AUTO_TEST_FILES="yes": Habilitar la revisión automática de las listas de paquetes
 # AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de paquetes (opción por defecto)
-AUTO_TEST_FILES="yes"
+AUTO_TEST_FILES="no"
 
 # ALERT_EMAIL_RECEIVER permite definir una dirección de email a la que enviar una alerta
 # ALERT_EMAIL_RECEIVER="miusuario@midominio.es"

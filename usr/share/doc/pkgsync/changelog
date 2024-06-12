@@ -1,3 +1,42 @@
+pkgsync (2.39) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to prevent aptitude abort process
+  * Modified /usr/local/sbin/pkgsync to let use it on a system without puppet
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 12 Jun 2024 18:03:00 +0100
+
+pkgsync (2.38) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to abort on mirror sync fail
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 10 Mar 2024 09:57:00 +0100
+
+pkgsync (2.37) ubuntu; urgency=medium
+
+  * Modified package to create /etc/pkgsync/mayhave.d, 
+    /etc/pkgsync/maynothave.d and /etc/pkgsync/musthave.d at install
+  * Modified /usr/local/sbin/softwareupdate to create /tmp/failedrepositories
+  * Modified /usr/local/sbin/musthave-build to create musthave on bullseye
+    and bookworm
+  * Added lsb-release dependency to pkgsync package
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 07 Feb 2024 07:40:00 +0100
+
+pkgsync (2.36) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to create /etc/pkgsync/mayhave.d, 
+    /etc/pkgsync/maynothave.d and /etc/pkgsync/musthave.d if they don't exist
+  * Added option -C, --clean-and-purge option
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 05 Feb 2024 19:19:00 +0100
+
+pkgsync (2.35-3) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to generate /etc/pkgsync/musthave if the file 
+    is empty
+ 
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 29 Jan 2024 18:32:00 +0100
+
 pkgsync (2.35-2) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to enhance the removal of expired keys

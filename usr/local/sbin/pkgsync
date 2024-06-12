@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.35-2
+export VERSION=2.39
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -25,14 +25,14 @@ print_help () {
 	echo "  -v,  --version		display pkgsync version and exit"
 	echo "  -k,  --keep-unused		don't remove unused packages"
 	echo "  -e,  --ensure-essential	don't remove required, important and standard packages"
-	echo "  -s,  --simulate		don't do anything, just print out what would have happened"
+	echo "  -s,  --simulate		simulate and print out which packages would be installed/uninstalled or updated"
 	echo "  -t,  --test-files		test pkgsync files"
 	echo "  -tr, --test-files r		test and remove packages from pkgsync files lists"
 	echo "  -d,  --delete-files		delete all pkgsync files"
 	echo "  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist"
 	echo "  -f,  --force			force pkgsync"
-	echo "  -c,  --clean			remove uninstalled packages dependencies,"
-	echo "				purge uninstalled packages and clean cache"
+	echo "  -c,  --clean			remove uninstalled packages and clean cache"
+	echo "  -C,  --clean-and-purge	remove uninstalled packages, delete their config files and clean cache"
 	echo "  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)"
 	echo "				or the number specified in /etc/default/pkgsync file"
 	echo "  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync"
@@ -58,7 +58,7 @@ test_files () {
             LC_ALL=C apt-cache --quiet=0 policy $paquete 2>&1 | tr -d " " | grep -e 'Candidate:(none)' -e 'N:Unabletolocatepackage' 2>&1>/dev/null
 
             if [ $? -eq 0 ]; then
-               echo -e "${RED}Package $paquete in file $fichero isn't in repositories${NC}" | tee -a /var/log/pkgsync/removefromlists.log
+               echo -e "Package $paquete in file $fichero isn't in repositories" | tee -a /var/log/pkgsync/removefromlists.log
             fi
          done
       fi
@@ -79,7 +79,7 @@ remove_packages_from_lists () {
         paquete=$(echo $linea | cut -f2 -d" ")
         fichero=$(echo $linea | cut -f5 -d" ")
 
-        echo -e "${RED}Removed package $paquete from file $fichero${NC}" | tee -a /var/log/pkgsync/removedfromlists.log
+        echo -e "Removed package $paquete from file $fichero" | tee -a /var/log/pkgsync/removedfromlists.log
 
         # Comentamos la línea que contiene el nombre del paquete
         sed -i "s|^$paquete|#$paquete|" $fichero
@@ -111,7 +111,7 @@ wait_while_locked () {
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hvft::dbkescpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=`getopt -o hvft::dbkescCpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,clean-and-purge,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
 
         if [ $? != 0 ] ; then echo -e "${RED}Terminating...${NC}" >&2 ; exit 1 ; fi
 
@@ -140,6 +140,10 @@ parse_options () {
 				;;
 			-c|--clean)
 				CLEAN="yes"
+				shift
+				;;
+			-C|--clean-and-purge)
+				CLEAN="purge"
 				shift
 				;;
 			-p|--purge-old-kernels)
@@ -280,13 +284,37 @@ wait_for_apt_or_dpkg() {
   done
 }
 
-run_aptitude () {
-  echo RUNNING: aptitude $APTITUDE_ARGS "$@"
-  wait_while_locked; aptitude $APTITUDE_ARGS "$@"
+run_aptitude() {
+
+  if [[ $@ == *full-upgrade* ]]; then
+     :> /var/log/pkgsync/removefromlists.log
+
+     COMMAND="aptitude $APTITUDE_ARGS $@"
+
+     # Bucle para reintentar el comando mientras haya errores
+     retry=1
+     while [ $retry -eq 1 ]; do
+         echo RUNNING: $COMMAND
+         wait_while_locked; LC_ALL=C $COMMAND | tee /tmp/apterrors
+
+         problematic_package=$(grep 'Couldn'\''t find any package' /tmp/apterrors | cut -d'"' -f2)
+
+         if [ -n "$problematic_package" ]; then
+            echo -e "Package $problematic_package isn't in repositories" | tee -a /var/log/pkgsync/removefromlists.log
+            COMMAND=$(echo "$COMMAND" | sed "s/${problematic_package}[^[:space:]]*//" | tr -s ' ')
+         else
+            retry=0
+         fi
+     done
+  else
+     echo RUNNING: aptitude $APTITUDE_ARGS "$@"
+     wait_while_locked; aptitude $APTITUDE_ARGS "$@"
+  fi
+
   return $?
 }
 
-run_debtags () {
+run_debtags() {
   if [ "$USE_DEBTAGS" ]; then
      echo RUNNING: debtags "$@"
      debtags "$@"
@@ -294,7 +322,7 @@ run_debtags () {
 }
 
 # The beautiful look of hacks in the morning...
-filter () {
+filter() {
 	echo "$@" | tr " " "\n" | sort | uniq -c | grep "     2" | cut -c9-
 }
 
@@ -418,12 +446,19 @@ launchpad_getkeys() {
 }
 
 eliminar_dependencias() {
-  # Eliminar dependencias innecesarias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
-  if [ $CLEAN = "yes" ]; then
-     uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
-     [ -n "$uninstalled_packages" ] && run_aptitude -y remove --purge-unused $uninstalled_packages
-     run_aptitude -y clean
+  uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
+
+  if [ -n "$uninstalled_packages" ]; then
+     if [ $CLEAN = "yes" ]; then
+        # Eliminar paquetes desinstalados
+        run_aptitude -y remove --purge-unused $uninstalled_packages
+     elif [ $CLEAN = "purge" ]; then
+        # Eliminar paquetes desinstalados y eliminar sus ficheros de configuración
+        run_aptitude -y purge $uninstalled_packages
+     fi
   fi
+  # Limpiar la cache de paquetes
+  run_aptitude clean
 }
 
 apagar_equipo() {
@@ -506,16 +541,16 @@ stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
 if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 
 # Establecemos valores por defecto
+ENABLE=yes # Controlamos la ejecución manual o automática de pkgsync
 HELP=false
 FORCE=false
 SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
 AUTOSHUTDOWN=false # No apagar
 AUTOREBOOT=false   # No reiniciar
-PURGE_OLD_KERNELS=no
+PURGE_OLD_KERNELS="no"
 KEEP_LAST_KERNELS="2"
-CLEAN=no
-LAUNCH_SINC_PUPPET=yes
+CLEAN="no"
 PUPPET_SERVER=puppetinstituto
 AUTOMATIC_SHUTDOWN_BETWEEN=""
 AUTOMATIC_REBOOT_BETWEEN=""
@@ -533,9 +568,12 @@ AUTO_TEST_FILES="no"
 ALERT_EMAIL_RECEIVER=""
 ALERT_EMAIL_ON_ERROR="no"
 ENSURE_ESSENTIAL="no"
-ENABLE=yes # Controlamos la ejecución manual o automática de pkgsync
+
+LAUNCH_SINC_PUPPET=yes
 
 [ -r /etc/default/pkgsync ] && . /etc/default/pkgsync
+
+[ -x /usr/sbin/sinc_puppet ] || LAUNCH_SINC_PUPPET="no"
 
 parse_options "$@"
 
@@ -554,10 +592,25 @@ BADGER="$!"
 
 trap "kill "${BADGER}" 2>/dev/null || true; lockfile-remove $lockfile; exit" QUIT INT TERM EXIT
 
-# Crear el directorio /etc/pkgsync si no existe
+# Crear el directorio /etc/pkgsync y sus subdirectorios si no existen
 if [ ! -d /etc/pkgsync ]; then
    echo -e "${GREEN}Creando el directorio /etc/pkgsync ...${NC}"
    mkdir /etc/pkgsync
+fi
+
+if [ ! -d /etc/pkgsync/mayhave.d ]; then
+   echo -e "${GREEN}Creando el directorio /etc/pkgsync/mayhave.d/ ...${NC}"
+   mkdir -p /etc/pkgsync/mayhave.d
+fi
+
+if [ ! -d /etc/pkgsync/maynothave.d ]; then
+   echo -e "${GREEN}Creando el directorio /etc/pkgsync/maynothave.d/ ...${NC}"
+   mkdir -p /etc/pkgsync/maynothave.d
+fi
+
+if [ ! -d /etc/pkgsync/musthave.d ]; then
+   echo -e "${GREEN}Creando el directorio /etc/pkgsync/musthave.d/ ...${NC}"
+   mkdir -p /etc/pkgsync/musthave.d
 fi
 
 # Crear un fichero /etc/pkgsync/mayhave vacío si no existe
@@ -571,18 +624,19 @@ if [ ! -r /etc/pkgsync/maynothave ]; then
    echo -e "${GREEN}Creando el fichero /etc/pkgsync/maynothave ...${NC}"
    touch /etc/pkgsync/maynothave
 fi
-# Generar /etc/pkgsync/musthave si no existe con la lista de paquetes instalados en el sistema
-if [ ! -r /etc/pkgsync/musthave -a ! "$IGNORE_MUSTHAVE" = "yes" ]; then
+
+# Generar /etc/pkgsync/musthave si no existe el fichero con la lista de paquetes instalados en el sistema o está vacío
+if [ ! -r /etc/pkgsync/musthave -o ! -s /etc/pkgsync/musthave ]; then
    timeout $TIMEOUT_FOR_MUSTHAVE_BUILD /usr/local/sbin/musthave-build
 
    # Si no se ha creado un fichero musthave, mostramos un error
    if [ ! -r /etc/pkgsync/musthave ]; then
-   	echo -e "${RED}Error: Fichero musthave no encontrado en /etc/pkgsync. Abortando.${NC}"
-   	echo
-   	echo "Please see /usr/share/doc/pkgsync/README.Debian for information on"
-   	echo "configuring pkgsync."
+      echo -e "${RED}Error: Fichero musthave no encontrado en /etc/pkgsync. Abortando.${NC}"
+      echo
+      echo "Please see /usr/share/doc/pkgsync/README.Debian for information on"
+      echo "configuring pkgsync."
 
-   	exit 1
+      exit 1
    fi
 fi
 
@@ -600,7 +654,17 @@ launchpad_getkeys | tee -a /var/log/pkgsync.log
 
 # Actualizamos los paquetes instalados
 echo -e "${GREEN}Actualizando paquetes instalados...${NC}"
-solveapterrors; run_aptitude update; disable_failed_repositories; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
+#solveapterrors; wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
+solveapterrors; wait_while_locked; LC_ALL=C run_aptitude update | tee /tmp/apterrors
+
+# Abort if repository downloads fail (possible mirror failure).
+grep -w '^W: Failed to fetch' /tmp/apterrors 2>&1 >/dev/null
+if [ $? -eq 0 ]; then
+   echo -e "${RED}\n[ERR] aptitude update error. Mirror sync in progress?${NC}" | tee -a /var/log/pkgsync.log
+   exit 1
+fi
+
+disable_failed_repositories; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 
@@ -631,7 +695,10 @@ if [ -x /usr/sbin/sinc_puppet ]; then
 fi
 
 # Update the package lists
-wait_while_locked; LC_ALL=C run_aptitude update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
+
+# Get failed repositories
+cat /tmp/apterrors | grep '^Err' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
 
 if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
    # Abortamos pkgsync si algún repositorio no se encuentra accesible
@@ -687,36 +754,17 @@ musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
 maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
 mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
+
 if [ "$IGNORE_MUSTHAVE" = "no" ]; then
  rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 fi
 
-run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
-
-if [ $? -ne 0 ]; then
-   if [ $AUTO_TEST_FILES = "yes" ]; then
-
-      test_files; remove_packages_from_lists; merge_files
-
-      # Find out what parameters to give to aptitude.
-      installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
-      musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
-      maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
-      mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
-      mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
-      if [ "$IGNORE_MUSTHAVE" = "no" ]; then
-         rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
-      fi
-
-      run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
-   else
-      echo -e "${RED}\n[ERR] aptitude update error${NC}" | tee -a /var/log/pkgsync.log
-      echo -e "Check your package lists!\n" | tee -a /var/log/pkgsync.log
-   fi
+if [ $AUTO_TEST_FILES = "yes" ]; then
+   test_files; remove_packages_from_lists; merge_files
 fi
 
+run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
 run_aptitude autoclean
-
 eliminar_kernels;eliminar_dependencias
 
 if [ $ABORT_ON_FAILED_REPOS = "no" ] && [ $DISABLED_FAILED_REPOS = true ]; then enable_repositories; fi

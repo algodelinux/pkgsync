@@ -3,7 +3,7 @@
 # 2013-2024 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.6
+export VERSION=1.7
 
 # Usar preferentemente aptitude y, si no se encuentra instalado, usar apt-get
 APT_COMMAND=$(command -v aptitude)
@@ -132,8 +132,8 @@ solveapterrors() {
         if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
      fi
 
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; apt-get -yf install && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -y autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -yf install && wait_while_locked; apt-get -y autoremove
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; apt-get -yf install && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -y --no-install-recommends autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -yf install && wait_while_locked; apt-get -y --no-install-recommends autoremove
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; $APT_COMMAND $APT_ARGS update; wait_while_locked; dpkg --configure -a; wait_while_locked; apt-get -yf install
   fi
 
@@ -194,7 +194,7 @@ wait_while_locked; solveapterrors
 #fi
 
 # Actualizamos paquetes deb
-[ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; solveapterrors; $APT_COMMAND $APT_ARGS update; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
+[ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; solveapterrors; $APT_COMMAND $APT_ARGS update | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && /usr/bin/flatpak update -y
@@ -208,7 +208,7 @@ echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
 wait_while_locked; apt-get -fy install &&
 wait_while_locked; dpkg --configure -a &&
 wait_while_locked; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-wait_while_locked; apt-get -y autoremove &&
+wait_while_locked; apt-get -y --no-install-recommends autoremove &&
 wait_while_locked; $APT_COMMAND -y clean
 
 [ $(which flatpak) ] && flatpak uninstall --unused -y
