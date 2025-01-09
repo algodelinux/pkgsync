@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Obtener la ruta del facter más reciente
+latest_facter=$(whereis facter | awk '{for (i=2; i<=NF; i++) print $i}' | grep '/bin/facter' \
+  | xargs -I {} sh -c '[ -x "{}" ] && echo "$({} --version 2>/dev/null) {}"' \
+  | sort -V | tail -n 1 | awk '{print $2}')
+
+# Verificar si se encontró una versión válida
+if [ -z "$latest_facter" ]; then
+  echo "No se pudo determinar la versión más reciente de facter."
+  exit 1
+fi
+
+# Ejecutar la versión más reciente
+# echo "Ejecutando facter desde: $latest_facter"
+exec "$latest_facter" "$@"

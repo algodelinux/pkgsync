@@ -158,13 +158,19 @@ ALERT_EMAIL_ON_ERROR="no"
 # ENSURE_ESSENTIAL="yes": Garantizar que no se desinstalan paquetes esenciales
 # ENSURE_ESSENTIAL="no": No controlar la desinstalación de paquetes esenciales (opción por defecto)
 ENSURE_ESSENTIAL="no"
+
+# Definimos un tiempo mínimo en segundos entre operaciones de aptitude update
+# Si no existe la variable THRESHOLD_FOR_APT_UPDATE o no tiene valor, es equivalente al valor '1800',
+# es decir, 30 minutos
+# THRESHOLD_FOR_APT_UPDATE="1800"
+THRESHOLD_FOR_APT_UPDATE="900"
 ```
 
 ## Opciones  🚀 
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.34-2
+pkgsync 2.42
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
@@ -227,7 +233,7 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 ## Autores ✒️
 
 * 2004-2007 **Steinar H. Gunderson** <sgunderson@bigfoot.com>.
-* 2013-2024 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
+* 2013-2025 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
 
 
 ## Licencia 📄

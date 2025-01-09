@@ -8,12 +8,40 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.39
+export VERSION=2.42
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
 YELLOW='\e[0;33m'
 NC='\e[0m' # No Color
+
+convert_seconds() {
+    local SEGUNDOS=$1
+
+    # Validar que el parámetro sea un número positivo
+    if ! [[ $SEGUNDOS =~ ^[0-9]+$ ]]; then
+        echo "Error: El parámetro debe ser un número entero positivo."
+        return 1
+    fi
+
+    # Calcular los valores
+    local DIAS=$(( SEGUNDOS / 86400 ))
+    local HORAS=$(( (SEGUNDOS % 86400) / 3600 ))
+    local MINUTOS=$(( (SEGUNDOS % 3600) / 60 ))
+    local SEGUNDOS_RESTANTES=$(( SEGUNDOS % 60 ))
+
+    # Construir el resultado dinámicamente
+    local RESULTADO=""
+    [ $DIAS -gt 0 ] && RESULTADO="$RESULTADO$DIAS días, "
+    [ $HORAS -gt 0 ] && RESULTADO="$RESULTADO$HORAS horas, "
+    [ $MINUTOS -gt 0 ] && RESULTADO="$RESULTADO$MINUTOS minutos, "
+    [ $SEGUNDOS_RESTANTES -gt 0 ] && RESULTADO="$RESULTADO$SEGUNDOS_RESTANTES segundos, "
+
+    # Eliminar la última coma y espacio
+    RESULTADO=${RESULTADO%, }
+
+    echo "$RESULTADO"
+}
 
 print_help () {
 	echo "pkgsync $VERSION"
@@ -417,7 +445,7 @@ solveapterrors() {
 
      grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; run_aptitude -yf install; wait_while_locked; dpkg --configure -a
      grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; run_aptitude -yf install
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; run_aptitude update; wait_while_locked; dpkg --configure -a; wait_while_locked; run_aptitude -yf install
+     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; check_apt_update; wait_while_locked; dpkg --configure -a; wait_while_locked; run_aptitude -yf install
   fi
 
   # Aseguramos la actualización de pkgsync
@@ -528,6 +556,47 @@ check_auto_reboot() {
   fi
 }
 
+check_apt_update() {
+  # Archivo de caché que registra la última ejecución de `apt update`
+  local CACHE_FILE="/var/lib/apt/periodic/update-success-stamp"
+
+  # Verificar si el archivo de caché existe
+  if [ ! -f "$CACHE_FILE" ]; then
+    echo -e "${GREEN}El archivo de caché no existe. Ejecutando 'aptitude update'...${NC}"
+    run_aptitude update
+    return 0
+  fi
+
+  # Calcular la antigüedad del archivo
+  local LAST_UPDATE=$(stat -c %Y "$CACHE_FILE")
+  local CURRENT_TIME=$(date +%s)
+  local AGE=$((CURRENT_TIME - LAST_UPDATE))
+  local LIMIT=$(convert_seconds $THRESHOLD_FOR_APT_UPDATE)
+
+  # Comprobar si ha pasado más tiempo que el umbral
+  if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
+    echo -e "${GREEN}Han pasado más de $LIMIT desde la última ejecución de 'aptitude update'. Ejecutándolo ahora...${NC}"
+    run_aptitude update
+  else
+    echo -e "${GREEN}No es necesario ejecutar 'aptitude update'. Última ejecución hace menos de $LIMIT.${NC}"
+  fi
+}
+
+
+upgrade_packages() {
+  # Comprobar si hay paquetes para actualizar
+  local UPGRADABLE=$(aptitude search '~U')
+
+  if [ -n "$UPGRADABLE" ]; then
+    echo -e "${GREEN}Se encontraron paquetes para actualizar:${NC}"
+    echo -e "${GREEN}$UPGRADABLE"
+    echo -e "${GREEN}Ejecutando 'aptitude upgrade'...${NC}"
+    run_aptitude upgrade
+  else
+    echo -e "${GREEN}No hay paquetes para actualizar.${NC}"
+  fi
+}
+
 
 if (( $EUID != 0 )); then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
@@ -561,6 +630,7 @@ LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS=no
 TIMEOUT_FOR_SINC_PUPPET="5"
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 TIMEOUT_FOR_MUSTHAVE_BUILD="2m"
+THRESHOLD_FOR_APT_UPDATE=$((30 * 60)) # Definir el umbral de tiempo en segundos (por defecto 30 minutos = 1800 segundos)
 EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
 ABORT_ON_FAILED_REPOS="yes"
 DISABLED_FAILED_REPOS=false
@@ -653,9 +723,9 @@ check_auto_reboot
 launchpad_getkeys | tee -a /var/log/pkgsync.log
 
 # Actualizamos los paquetes instalados
-echo -e "${GREEN}Actualizando paquetes instalados...${NC}"
-#solveapterrors; wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
-solveapterrors; wait_while_locked; LC_ALL=C run_aptitude update | tee /tmp/apterrors
+echo
+echo -e "${GREEN}Comprobando si existen actualizaciones de paquetes instalados...${NC}"
+solveapterrors; wait_while_locked; LC_ALL=C check_apt_update | tee /tmp/apterrors
 
 # Abort if repository downloads fail (possible mirror failure).
 grep -w '^W: Failed to fetch' /tmp/apterrors 2>&1 >/dev/null
@@ -664,7 +734,7 @@ if [ $? -eq 0 ]; then
    exit 1
 fi
 
-disable_failed_repositories; run_aptitude upgrade | tee -a /var/log/pkgsync.log; enable_repositories
+disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; enable_repositories
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 

@@ -111,3 +111,8 @@ ALERT_EMAIL_ON_ERROR="no"
 # ENSURE_ESSENTIAL="no": No controlar la desinstalación de paquetes esenciales (opción por defecto)
 ENSURE_ESSENTIAL="no"
 
+# Definimos un tiempo mínimo en segundos entre operaciones de aptitude update
+# Si no existe la variable THRESHOLD_FOR_APT_UPDATE o no tiene valor, es equivalente al valor '1800',
+# es decir, 30 minutos
+# THRESHOLD_FOR_APT_UPDATE="1800"
+THRESHOLD_FOR_APT_UPDATE="900"
