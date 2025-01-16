@@ -1,0 +1,50 @@
+#!/bin/bash
+# ------------------------------------------------------------
+# script:  /usr/local/sbin/list-installed-kernels
+# Author:  Esteban M. Navas Martín
+# Date:    06-07-2022
+# Ver:     15-01-2025
+#
+# Purpose: List installed kernels ordered by version
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Obtener los nombres completos de los kernels instalados
+kernel_list=$(dpkg --list | grep -E "^ii\s+(linux-image|proxmox-kernel)-[0-9]" | awk '{print $2}')
+
+# Filtrar los paquetes que representan kernels con versiones completas
+filtered_kernel_list=$(echo "$kernel_list" | grep -E '([0-9]+\.[0-9]+\.[0-9]+)')
+
+# Extraer las series, contar cuántos kernels hay de cada una, listar sus versiones e indicar el tipo
+echo "Detalles de los kernels instalados por serie:"
+echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort | uniq | while read -r series; do
+    # Contar cuántos kernels hay de esta serie
+    count=$(echo "$filtered_kernel_list" | grep -c "$series")
+    # Listar las versiones y tipos de esta serie
+    versions=$(echo "$filtered_kernel_list" | grep "$series")
+    echo -e "${GREEN}Serie $series: $count kernel(s)${NC}"
+    echo "    Detalles de las versiones instaladas:"
+    echo "$versions" | while read -r kernel; do
+        if [[ $kernel == *generic* ]]; then
+            type="generic"
+        elif [[ $kernel == *proxmox* ]]; then
+            type="proxmox"
+        else
+            type="desconocido"
+        fi
+        version=$(echo "$kernel" | sed -E 's/(linux-image|proxmox-kernel)-//')
+        echo -e "${GREEN}    - $version ($type)${NC}"
+    done
+done
+
+# Contar el número total de series diferentes
+series_count=$(echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort -u | wc -l)
+
+# Mostrar el total de series detectadas
+if [ "$series_count" -gt 1 ]; then
+    echo "Se detectaron $series_count series de kernel instaladas."
+else
+    echo "Solo se detectó una serie de kernel instalada."
+fi

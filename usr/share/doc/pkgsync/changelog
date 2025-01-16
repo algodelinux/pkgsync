@@ -1,10 +1,17 @@
+pkgsync (2.43) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/list-installed-kernels script
+  * Upgraded /usr/local/sbin/purge-old-kernels script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 16 Ene 2025 17:31:00 +0100
+
 pkgsync (2.42) ubuntu; urgency=medium
 
   * Added THRESHOLD_FOR_APT_UPDATE var.
     Default value for THRESHOLD_FOR_APT_UPDATE is 1800 seconds. Now this
     value is configurable by user at /etc/default/pkgsync config file
 
- -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 99 Ene 2025 13:13:00 +0100
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 09 Ene 2025 13:13:00 +0100
 
 pkgsync (2.41) ubuntu; urgency=medium
 
