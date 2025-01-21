@@ -1,0 +1,87 @@
+#!/bin/bash
+# ------------------------------------------------------------
+# script:  /usr/local/sbin/remove-kernel
+# Author:  Esteban M. Navas Martín
+# Date:    17-01-2025
+# Ver:     21-01-2025
+#
+# Purpose: List installed kernels ordered by version and allow removal
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+# Obtener los nombres completos de los kernels instalados
+kernel_list=$(dpkg --list | grep -E "^ii\s+(linux-image|proxmox-kernel)-[0-9]" | awk '{print $2}')
+
+# Filtrar los paquetes que representan kernels con versiones completas
+filtered_kernel_list=$(echo "$kernel_list" | grep -E '([0-9]+\.[0-9]+\.[0-9]+)')
+
+# Obtener el kernel en ejecución
+current_kernel=$(uname -r | sed -E 's/(linux-image|proxmox-kernel)-//')
+current_kernel_pkg=$(dpkg --list | grep "$current_kernel" | awk '{print $2}')
+
+# Mostrar los detalles de los kernels instalados por serie
+echo "Detalles de los kernels instalados por serie:"
+echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort | uniq | while read -r series; do
+    count=$(echo "$filtered_kernel_list" | grep -c "$series")
+    versions=$(echo "$filtered_kernel_list" | grep "$series")
+    echo -e "${GREEN}Serie $series: $count kernel(s)${NC}"
+    echo "    Detalles de las versiones instaladas:"
+    echo "$versions" | while read -r kernel; do
+        if [[ $kernel == *generic* ]]; then
+            type="generic"
+        elif [[ $kernel == *proxmox* ]]; then
+            type="proxmox"
+        else
+            type="desconocido"
+        fi
+        version=$(echo "$kernel" | sed -E 's/(linux-image|proxmox-kernel)-//')
+        echo -e "${GREEN}    - $version ($type)${NC}"
+    done
+done
+
+# Contar el número total de series diferentes
+series_count=$(echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort -u | wc -l)
+
+# Mostrar el total de series detectadas
+if [ "$series_count" -gt 1 ]; then
+    echo "Se detectaron $series_count series de kernel instaladas."
+else
+    echo "Solo se detectó una serie de kernel instalada."
+fi
+
+# Ofrecer la opción de desinstalar un kernel
+echo -e "\nSeleccione un kernel para desinstalar (el kernel en ejecución: $current_kernel será excluido):"
+PS3="Introduzca el número correspondiente: "
+options=($(echo "$filtered_kernel_list" | grep -v "$current_kernel_pkg") "Cancelar")
+select opt in "${options[@]}"; do
+    if [[ "$opt" == "Cancelar" ]]; then
+        echo "Operación cancelada."
+        exit 0
+    elif [[ -n "$opt" ]]; then
+        echo -e "${RED}Se desinstalará el kernel: $opt${NC}"
+        read -p "¿Está seguro? Esto eliminará también sus dependencias. (s/N): " confirm
+        if [[ "$confirm" =~ ^[sS]$ ]]; then
+            sudo apt-get remove --purge "$opt" -y
+            if [[ $? -eq 0 ]]; then
+                kernel_version=$(echo "$opt" | sed -E 's/(linux-image|proxmox-kernel)-|-signed//')
+                module_dir="/lib/modules/$kernel_version"
+                if [[ -d "$module_dir" ]]; then
+                    sudo rm -rf "$module_dir"
+                    echo -e "${GREEN}El directorio de módulos $module_dir ha sido eliminado.${NC}"
+                else
+                    echo -e "${RED}No se encontró el directorio de módulos $module_dir.${NC}"
+                fi
+                echo -e "${GREEN}El kernel $opt ha sido eliminado.${NC}"
+            else
+                echo -e "${RED}Hubo un error al intentar eliminar el kernel $opt.${NC}"
+            fi
+        else
+            echo "Operación cancelada."
+        fi
+        break
+    else
+        echo "Opción no válida, por favor intente de nuevo."
+    fi
+done

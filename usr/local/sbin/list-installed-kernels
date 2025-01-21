@@ -3,12 +3,13 @@
 # script:  /usr/local/sbin/list-installed-kernels
 # Author:  Esteban M. Navas Martín
 # Date:    06-07-2022
-# Ver:     15-01-2025
+# Ver:     21-01-2025
 #
 # Purpose: List installed kernels ordered by version
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
 # Obtener los nombres completos de los kernels instalados
@@ -16,6 +17,10 @@ kernel_list=$(dpkg --list | grep -E "^ii\s+(linux-image|proxmox-kernel)-[0-9]" |
 
 # Filtrar los paquetes que representan kernels con versiones completas
 filtered_kernel_list=$(echo "$kernel_list" | grep -E '([0-9]+\.[0-9]+\.[0-9]+)')
+
+# Identificar el kernel en ejecución
+current_kernel=$(uname -r)
+current_kernel_pkg=$(dpkg --list | grep -E "(linux-image|proxmox-kernel)-" | grep "$current_kernel" | awk '{print $2}')
 
 # Extraer las series, contar cuántos kernels hay de cada una, listar sus versiones e indicar el tipo
 echo "Detalles de los kernels instalados por serie:"
@@ -35,7 +40,11 @@ echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[
             type="desconocido"
         fi
         version=$(echo "$kernel" | sed -E 's/(linux-image|proxmox-kernel)-//')
-        echo -e "${GREEN}    - $version ($type)${NC}"
+        if [[ "$kernel" == "$current_kernel_pkg" ]]; then
+            echo -e "${YELLOW}    - $version ($type) [En ejecución]${NC}"
+        else
+            echo -e "${GREEN}    - $version ($type)${NC}"
+        fi
     done
 done
 

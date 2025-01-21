@@ -1,9 +1,16 @@
+pkgsync (2.44) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/install-kernel script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 21 Ene 2025 12:37:00 +0100
+
 pkgsync (2.43) ubuntu; urgency=medium
 
   * Added /usr/local/sbin/list-installed-kernels script
+  * Added /usr/local/sbin/remove-kernel script
   * Upgraded /usr/local/sbin/purge-old-kernels script
 
- -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 16 Ene 2025 17:31:00 +0100
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 21 Ene 2025 09:07:00 +0100
 
 pkgsync (2.42) ubuntu; urgency=medium
 
