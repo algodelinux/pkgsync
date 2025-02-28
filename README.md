@@ -170,7 +170,7 @@ THRESHOLD_FOR_APT_UPDATE="900"
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.42
+pkgsync 2.48
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]

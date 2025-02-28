@@ -1,3 +1,33 @@
+pkgsync (2.48) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to ensure installation of last kernels
+    defined on KEEP_LAST_KERNELS var
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 28 Feb 2025 11:29:00 +0100
+
+pkgsync (2.47) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/solve-apt-errors script
+  * Modified solveapterrors function on /usr/local/sbin/pkgsync script to include
+    changes made on /usr/local/sbin/solve-apt-errors script
+  * Modified /usr/local/sbin/limpiapaquetes to remove packages in ic state
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 20 Feb 2025 09:49:00 +0100
+
+pkgsync (2.46) ubuntu; urgency=medium
+
+  * Solved bug on /usr/local/sbin/install-last-available-kernels script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 19 Feb 2025 10:10:00 +0100
+
+pkgsync (2.45) ubuntu; urgency=medium
+
+  * Modified package priority to required
+  * Defined package as essential
+  * Added /usr/local/sbin/install-last-available-kernels script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 19 Feb 2025 08:35:00 +0100
+
 pkgsync (2.44) ubuntu; urgency=medium
 
   * Added /usr/local/sbin/install-kernel script

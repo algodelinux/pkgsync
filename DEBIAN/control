@@ -1,12 +1,13 @@
 Package: pkgsync
-Version: 2.44
+Version: 2.48
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
 Installed-Size: 64
 Depends: aptitude (>= 0.6.1.4-1), lockfile-progs, gpg, lsb-release
 Suggests: puppet | cfengine2 | cfengine | rdist, tagcoll | facter
 Section: admin
-Priority: optional
+Priority: required
+Essential: yes
 Description: automated package list synchronization
  pkgsync is a tool for keeping multiple machines reasonably similar and
  clean. Packages can either be in a `must be installed', `may be

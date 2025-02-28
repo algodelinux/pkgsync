@@ -1,7 +1,7 @@
 #!/bin/bash
 # limpiapaquetes - Hace limpieza purgando paquetes desinstalados y limpia la cache de apt
 #
-# 2013-2024 Esteban M. Navas Martín
+# 2013-2025 Esteban M. Navas Martín
 #
 
 wait_while_locked () {
@@ -21,7 +21,7 @@ TIMEOUT_FOR_DPKG_OR_APT="3m"
 
 wait_while_locked; apt-get -fy install &&
 wait_while_locked; dpkg --configure -a &&
-wait_while_locked; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
+wait_while_locked; apt-get -y remove --purge $(dpkg -l| grep -E '^(rc|ic)' | awk '{print $2}') &&
 wait_while_locked; apt-get -y clean
 [ $(which flatpak) ] && flatpak uninstall --unused -y
 [ $(which snap) ] && LANG=C snap list --all | awk '/disabled/{print $1, $3}' |

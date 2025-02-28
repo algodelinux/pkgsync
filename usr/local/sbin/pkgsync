@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.44
+export VERSION=2.48
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -399,6 +399,13 @@ solveapterrors() {
   # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
   if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
 
+
+  # Tratamos de instalar paquetes en estado ic
+  wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
+  if [ "$incomplete_packages" ]; then
+     wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $incomplete_packages
+  fi
+
   # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
   wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
   if [ "$very_bad_state_packages" ]; then
@@ -454,10 +461,21 @@ solveapterrors() {
   export LC_ALL=$idioma
 }
 
-eliminar_kernels() {
-  # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
-  if [ $PURGE_OLD_KERNELS = "yes" ] && [ -x /usr/local/sbin/purge-old-kernels ]; then
-     wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
+ensure_kernels() {
+  if [ $PURGE_OLD_KERNELS = "yes" ]; then
+     NUM_INSTALLED_KERNELS=$(ls /boot/vmlinuz-* | sed -e "s/^\/boot\/vmlinuz-//" | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
+
+     if [ "$NUM_INSTALLED_KERNELS" -lt "$KEEP_LAST_KERNELS" ]; then
+        # Asegurar que se encuentre instalado el número de kernels definido en $KEEP_LAST_KERNELS
+        if [ -x /usr/local/sbin/install-last-available-kernels ]; then
+           wait_while_locked; /usr/local/sbin/install-last-available-kernels $KEEP_LAST_KERNELS
+        fi
+     fi
+
+     # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
+     if [ -x /usr/local/sbin/purge-old-kernels ]; then
+        wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
+     fi
   fi
 }
 
@@ -835,7 +853,7 @@ fi
 
 run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
 run_aptitude autoclean
-eliminar_kernels;eliminar_dependencias
+ensure_kernels;eliminar_dependencias
 
 if [ $ABORT_ON_FAILED_REPOS = "no" ] && [ $DISABLED_FAILED_REPOS = true ]; then enable_repositories; fi
 

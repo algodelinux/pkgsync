@@ -1,6 +1,6 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
-# 2013-2024 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 killprocess() {
@@ -76,6 +76,12 @@ if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 
 # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
 if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
+
+# Tratamos de instalar paquetes en estado ic
+wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
+if [ "$incomplete_packages" ]; then
+   wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $incomplete_packages
+fi
 
 # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
 wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
