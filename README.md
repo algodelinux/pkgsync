@@ -229,6 +229,11 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 - **softwareupdate**: Actualiza paquetes instalados mediante apt, flatpak, snap y realiza limpieza.
 - **solve-apt-errors**: Trata de resolver posibles errores en los paquetes instalados.
 - **wait_for_apt_or_dpkg**: Permite realizar una espera mientras se esté realizando una actualización de índices o una actualización de paquetes.
+- **list-installed-kernels**: Muestra la lista de kernels instalados en el sistema.
+- **install-kernel**: Obtiene la lista de kernels disponibles en los repositorios organizados por series y permite realizar la instalación de un kernel específico.
+- **install-last-available-kernels**: Pasándole el número de kernels que queremos tener instalados, instalará los kernels de la misma serie que falten.
+- **remove-kernel**: Muestra la lista de kernels instalados y nos permite seleccionar el que queremos desinstalar.
+
 
 ## Autores ✒️
 
