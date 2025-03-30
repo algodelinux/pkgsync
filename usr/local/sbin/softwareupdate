@@ -1,9 +1,9 @@
 #!/bin/bash
 # softwareupdate - Actualiza paquetes instalados mediante aptitude o apt-get, flatpak, snap y realiza limpieza
-# 2013-2024 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.7
+export VERSION=1.8
 
 # Usar preferentemente aptitude y, si no se encuentra instalado, usar apt-get
 APT_COMMAND=$(command -v aptitude)
@@ -11,6 +11,33 @@ APT_COMMAND=$(command -v aptitude)
 
 APT_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
 
+convert_seconds() {
+    local SEGUNDOS=$1
+
+    # Validar que el parámetro sea un número positivo
+    if ! [[ $SEGUNDOS =~ ^[0-9]+$ ]]; then
+        echo "Error: El parámetro debe ser un número entero positivo."
+        return 1
+    fi
+
+    # Calcular los valores
+    local DIAS=$(( SEGUNDOS / 86400 ))
+    local HORAS=$(( (SEGUNDOS % 86400) / 3600 ))
+    local MINUTOS=$(( (SEGUNDOS % 3600) / 60 ))
+    local SEGUNDOS_RESTANTES=$(( SEGUNDOS % 60 ))
+
+    # Construir el resultado dinámicamente
+    local RESULTADO=""
+    [ $DIAS -gt 0 ] && RESULTADO="$RESULTADO$DIAS días, "
+    [ $HORAS -gt 0 ] && RESULTADO="$RESULTADO$HORAS horas, "
+    [ $MINUTOS -gt 0 ] && RESULTADO="$RESULTADO$MINUTOS minutos, "
+    [ $SEGUNDOS_RESTANTES -gt 0 ] && RESULTADO="$RESULTADO$SEGUNDOS_RESTANTES segundos, "
+
+    # Eliminar la última coma y espacio
+    RESULTADO=${RESULTADO%, }
+
+    echo "$RESULTADO"
+}
 
 print_help() {
         echo "$(basename $0) $VERSION"
@@ -140,6 +167,32 @@ solveapterrors() {
   export LC_ALL=$idioma
 }
 
+check_apt_update() {
+  # Archivo de caché que registra la última ejecución de `apt update`
+  local CACHE_FILE="/var/lib/apt/periodic/update-success-stamp"
+
+  # Verificar si el archivo de caché existe
+  if [ ! -f "$CACHE_FILE" ]; then
+    echo -e "${GREEN}El archivo de caché no existe. Ejecutando 'aptitude update'...${NC}"
+    $APT_COMMAND $APT_ARGS update | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+    return 0
+  fi
+
+  # Calcular la antigüedad del archivo
+  local LAST_UPDATE=$(stat -c %Y "$CACHE_FILE")
+  local CURRENT_TIME=$(date +%s)
+  local AGE=$((CURRENT_TIME - LAST_UPDATE))
+  local LIMIT=$(convert_seconds $THRESHOLD_FOR_APT_UPDATE)
+
+  # Comprobar si ha pasado más tiempo que el umbral
+  if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
+    echo -e "${GREEN}Han pasado más de $LIMIT desde la última ejecución de 'aptitude update'. Ejecutándolo ahora...${NC}"
+    $APT_COMMAND $APT_ARGS update | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+  else
+    echo -e "${GREEN}No es necesario ejecutar 'aptitude update'. Última ejecución hace menos de $LIMIT.${NC}"
+  fi
+}
+
 apagar_equipo() {
   # Apagar el equipo si el usuario pasó el parámetro -S
   if [ $SHUTDOWN = true ]; then wait_while_locked; /sbin/poweroff; fi
@@ -153,7 +206,7 @@ reiniciar_equipo() {
 
 SHUTDOWN=false # No apagar
 REBOOT=false   # No reiniciar
-
+THRESHOLD_FOR_APT_UPDATE=$((30 * 60)) # Definir el umbral de tiempo en segundos (por defecto 30 minutos = 1800 segundos)
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -182,6 +235,10 @@ do
 done
 shift $((OPTIND-1))
 
+lockfile="/tmp/softwareupdate.lock"
+trap "rm -f $lockfile" EXIT
+touch $lockfile
+
 # Obtenemos claves públicas de repositorios si se encuentra launchpad-getkeys
 [ -x /usr/local/sbin/launchpad-getkeys ] && echo -e "${GREEN}\nObteniendo claves públicas de repositorios...${NC}" && /usr/local/sbin/launchpad-getkeys
 
@@ -189,12 +246,17 @@ shift $((OPTIND-1))
 wait_while_locked; solveapterrors
 
 # Instalamos el paquete linux-headers-generic-hwe-22.04 si el paquete linux-image-generic-hwe-22.04 se encuentra instalado
-#if dpkg -l | grep -q "^ii  linux-image-generic-hwe-22.04 " && ! dpkg -l | grep -q "ii  linux-headers-generic-hwe-22.04 "; then
-#   $APT_COMMAND $APT_ARGS install linux-headers-generic-hwe-22.04
-#fi
+if dpkg -l | grep -q "^ii  linux-image-generic-hwe-22.04 " && ! dpkg -l | grep -q "ii  linux-headers-generic-hwe-22.04 "; then
+   $APT_COMMAND $APT_ARGS install linux-headers-generic-hwe-22.04
+fi
 
-# Actualizamos paquetes deb
-[ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; solveapterrors; $APT_COMMAND $APT_ARGS update | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
+# Si existen paquetes deb actualizables, los actualizamos
+UPDATES=$(apt-get -s upgrade | grep "Inst" | wc -l)
+if [ "$UPDATES" -gt 0 ]; then
+   [ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; solveapterrors; check_apt_update; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
+else
+   echo -e "\n${GREEN}Los paquetes deb del sistema se encuentran completamente actualizados.${NC}"
+fi
 
 # Si se encuentra instalado flatpak, actualizamos el software instalado mediante flatpak
 [ -x /usr/bin/flatpak ] && echo -e "${GREEN}\nActualizando software instalado mediante flatpak...\n${NC}"  && /usr/bin/flatpak update -y
@@ -208,7 +270,7 @@ echo -e "${GREEN}\nRealizando limpieza de paquetes...\n${NC}"
 wait_while_locked; apt-get -fy install &&
 wait_while_locked; dpkg --configure -a &&
 wait_while_locked; apt-get -y remove --purge $(dpkg -l| grep ^rc | awk '{print $2}') &&
-wait_while_locked; apt-get -y --no-install-recommends autoremove &&
+#wait_while_locked; apt-get -y --no-install-recommends autoremove &&
 wait_while_locked; $APT_COMMAND -y clean
 
 [ $(which flatpak) ] && flatpak uninstall --unused -y
@@ -220,3 +282,5 @@ wait_while_locked; $APT_COMMAND -y clean
 [ -f /tmp/apterrors ] && rm -f /tmp/apterrors
 
 apagar_equipo && reiniciar_equipo
+
+rm -f $lockfile

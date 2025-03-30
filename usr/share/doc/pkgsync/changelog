@@ -1,3 +1,10 @@
+pkgsync (2.49) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys to last version
+  * Upgraded /usr/local/sbin/softwareupdate to last version
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 14 Mar 2025 13:29:00 +0100
+
 pkgsync (2.48) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to ensure installation of last kernels
