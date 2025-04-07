@@ -1,3 +1,16 @@
+pkgsync (2.51) ubuntu; urgency=medium
+
+  * Solved little bug at /usr/local/sbin/pkgsync
+  * Modified /usr/local/sbin/pkgsync to not update packages when running in simulation mode.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 04 Abr 2025 12:52:00 +0100
+
+pkgsync (2.50) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 03 Abr 2025 14:00:00 +0100
+
 pkgsync (2.49) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/launchpad-getkeys to last version

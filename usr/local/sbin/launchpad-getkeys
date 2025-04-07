@@ -1,6 +1,6 @@
 #! /bin/bash
 # Modified version by Esteban M. Navas <algodelinux@gmail.com>
-# Date: 14/03/2025
+# Date: 03/04/2025
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -122,8 +122,8 @@ echo -e "${GREEN}\nTrying to import all the missing keys${NC}"
 	IFS=$'\n'
 	n=1
 	while read curline; do
-		GPGKEYTOGET=$(echo $curline | grep NO_PUBKEY | sed -e 's/.*: \|NO_PUBKEY //g')
-        [ -z "${GPGKEYTOGET}" ] && continue # Skip empty values
+           echo $curline | awk '{for(i=1;i<=NF;i++) if($i=="NO_PUBKEY") print $(i+1)}' | \
+            while read -r GPGKEYTOGET; do        [ -z "${GPGKEYTOGET}" ] && continue # Skip empty values
         [[ " ${IMPORTED_KEYS[@]} " =~ " ${GPGKEYTOGET} " ]] && continue # Skip repeatable keys
         GPGTMPHOME=$(mktemp -d /tmp/gpg-tmp-home.XXXXXXXXXX)
         KEYBOX=$GPGTMPHOME/pubring.gpg
@@ -158,6 +158,7 @@ echo -e "${GREEN}\nTrying to import all the missing keys${NC}"
         rm -Rf $GPGTMPHOME
         IMPORTED_KEYS+=($GPGKEYTOGET)
 		let n=n+1
+        done
 	done < /tmp/updateresults
 
 	echo -e "${GREEN}\nlaunchpad-getkeys has finished importing all missing GPG keys.

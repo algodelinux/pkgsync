@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.49
+export VERSION=2.51
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -152,6 +152,7 @@ parse_options () {
 		case "$1" in
 			-s|--simulate)
 				APTITUDE_ARGS="$APTITUDE_ARGS -s"
+                                SIMULATE="yes"
 				shift
 				;;
 			-k|--keep-unused)
@@ -463,9 +464,9 @@ solveapterrors() {
 
 ensure_kernels() {
   if [ $PURGE_OLD_KERNELS = "yes" ]; then
-     NUM_INSTALLED_KERNELS=$(ls /boot/vmlinuz-* | sed -e "s/^\/boot\/vmlinuz-//" | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
+     NUM_INSTALLED_KERNELS=$(find /boot -name "vmlinuz-*" | sed -e "s/^\/boot\/vmlinuz-//" | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
 
-     if [ "$NUM_INSTALLED_KERNELS" -lt "$KEEP_LAST_KERNELS" ]; then
+     if [[ "$NUM_INSTALLED_KERNELS" -lt "$KEEP_LAST_KERNELS" ]]; then
         # Asegurar que se encuentre instalado el número de kernels definido en $KEEP_LAST_KERNELS
         if [ -x /usr/local/sbin/install-last-available-kernels ]; then
            wait_while_locked; /usr/local/sbin/install-last-available-kernels $KEEP_LAST_KERNELS
@@ -656,6 +657,7 @@ AUTO_TEST_FILES="no"
 ALERT_EMAIL_RECEIVER=""
 ALERT_EMAIL_ON_ERROR="no"
 ENSURE_ESSENTIAL="no"
+SIMULATE="no"
 
 LAUNCH_SINC_PUPPET=yes
 
@@ -752,7 +754,10 @@ if [ $? -eq 0 ]; then
    exit 1
 fi
 
-disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; enable_repositories
+# Fist upgrade software if no simulation option is selected
+if [[ "$SIMULATE" == "no" ]]; then
+   disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; enable_repositories
+fi
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 
