@@ -1,6 +1,6 @@
 #! /bin/bash
 # Modified version by Esteban M. Navas <algodelinux@gmail.com>
-# Date: 03/04/2025
+# Date: 27/05/2025
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -41,13 +41,20 @@ fi
 for KEYPATH in $KEYPATHS; do
     if [ -d $KEYPATH ] && [ "$(ls -A $KEYPATH)" ]; then
        for keyfile in $(find $KEYPATH/* -not -name "*~"); do
-           LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
+           mimetype=$(file --mime "$keyfile")
 
-           if [ -s /tmp/expiredkeys ]; then
-              for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
-                  echo -e "${GREEN}Deleting KEY $keyid from $keyfile${NC}"
-                  gpg --no-default-keyring --keyring=$keyfile --batch --yes --delete-keys $keyid
-              done
+           if [[ "$mimetype" = *"charset=binary"* ]]; then
+              LC_ALL=C gpg --no-default-keyring --keyring=$keyfile --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
+
+              if [ -s /tmp/expiredkeys ]; then
+                 for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
+                     echo -e "${GREEN}Deleting KEY $keyid from $keyfile${NC}"
+                     gpg --no-default-keyring --keyring=$keyfile --batch --yes --delete-keys $keyid
+                 done
+             fi
+          else # Remove ascii key file
+             echo "Removing ascii key file $keyfile"
+             rm -f $keyfile
           fi
        done
     fi
@@ -79,7 +86,6 @@ if [[ $SERVER ]] && [[ $PORT ]]; then
 fi
 
 if [[ $KEYSERVER ]]; then
-
 	KEYSERVERANDPORT=$(echo $KEYSERVER | grep ":")
 	if [[ ! $KEYSERVERANDPORT ]]; then
 	   echo -e "${RED}Error: please enter a keyserver and a port, like so: sudo launchpad-getkeys -k SERVER:PORT${NC}"
@@ -88,12 +94,15 @@ if [[ $KEYSERVER ]]; then
 fi
 
 if [[ $PROXY ]]; then
-
 	PROXYSERVERANDPORT=$(echo $PROXY | grep ":")
 	if [[ ! $PROXYSERVERANDPORT ]]; then
 	   echo -e "${RED}Error: please enter a proxyserver and a port, like so: sudo launchpad-getkeys -p http://PROXYSERVER:PORT${NC}"
 	   exit 0
 	fi
+fi
+
+if [ "$REMOVE_EXPIRED_KEYS" = "yes" ]; then
+   remove_expired_keys
 fi
 
 echo -e "${GREEN}\nPlease wait... launchpad-getkeys is running an update so
@@ -115,24 +124,75 @@ fi
 
 if [[ $MISSINGGEYS ]]; then
 
-declare -a IMPORTED_KEYS=()
+   declare -a IMPORTED_KEYS=()
 
-echo -e "${GREEN}\nTrying to import all the missing keys${NC}"
+   echo -e "${GREEN}\nTrying to import all the missing keys${NC}"
 
-	IFS=$'\n'
-	n=1
-	while read curline; do
-           echo $curline | awk '{for(i=1;i<=NF;i++) if($i=="NO_PUBKEY") print $(i+1)}' | \
-            while read -r GPGKEYTOGET; do        [ -z "${GPGKEYTOGET}" ] && continue # Skip empty values
+   IFS=$'\n'
+   n=1
+   while read curline; do
+      echo $curline | awk '{for(i=1;i<=NF;i++) if($i=="NO_PUBKEY") print $(i+1)}' | \
+      while read -r GPGKEYTOGET; do        [ -z "${GPGKEYTOGET}" ] && continue # Skip empty values
         [[ " ${IMPORTED_KEYS[@]} " =~ " ${GPGKEYTOGET} " ]] && continue # Skip repeatable keys
+        GPGFILE="/etc/apt/trusted.gpg.d/launchpad-getkeys_imported____$GPGKEYTOGET.gpg"
+
+        case "$GPGKEYTOGET" in
+           A2F683C52980AECF)
+              wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | sudo gpg --yes --output /usr/share/keyrings/oracle-virtualbox-2016.gpg --dearmor > /dev/null
+              continue
+              ;;
+           0FAD31CA8719FCE4)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -qO- "https://build.opensuse.org/projects/home:stevenpusser/signing_keys/download?kind=gpg" | gpg --dearmor | sudo tee $GPGFILE > /dev/null
+              continue
+              ;;
+           0E406D181DCEE19C)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -q --https-only --secure-protocol=TLSv1_2 -O $GPGFILE https://repo.waydro.id/waydroid.gpg
+              continue
+              ;;
+           54832F89F09FED90)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -qO- https://packagecloud.io/netdata/netdata/gpgkey | sudo gpg --yes --output /etc/apt/keyrings/netdata_netdata-archive-keyring.gpg --dearmor > /dev/null
+              continue
+              ;;
+           8E61C2AB9A6D1557)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -qO- https://packagecloud.io/ookla/speedtest-cli/gpgkey | sudo gpg --yes --output /usr/share/keyrings/ookla_speedtest-cli-archive-keyring.gpg --dearmor > /dev/null
+              continue
+              ;;
+           1655A0AB68576280)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -qO- https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --dearmor | sudo tee /usr/share/keyrings/nodesource.gpg > /dev/null
+              continue
+              ;;
+           AA16FCBCA621E701)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -qO- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null
+              continue
+              ;;
+           7EA0A9C3F273FCD8)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              wget -qO- https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null
+              continue
+              ;;
+           458CA832957F5868)
+              [ -f $GPGFILE ] && rm -f $GPGFILE
+              distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"') && \
+              codename=$(lsb_release -cs) && \
+              wget -qO- "https://pkgs.tailscale.com/stable/${distro}/${codename}.noarmor.gpg" | sudo tee $GPGFILE > /dev/null
+              continue
+              ;;
+        esac
+
         GPGTMPHOME=$(mktemp -d /tmp/gpg-tmp-home.XXXXXXXXXX)
         KEYBOX=$GPGTMPHOME/pubring.gpg
         KEYSRV_OPTS=( --keyserver hkp://keyserver.ubuntu.com:80 )
-		if [[ $KEYSERVER ]]; then
+	if [[ $KEYSERVER ]]; then
             KEYSRV_OPTS=( --keyserver hkp://$KEYSERVER )
-    fi
+        fi
 
-		gpg --ignore-time-conflict --no-options --no-default-keyring \
+	gpg --ignore-time-conflict --no-options --no-default-keyring \
             --no-auto-check-trustdb --trust-model always \
             --homedir "$GPGTMPHOME"                      \
             --keyring "$KEYBOX"          \
@@ -158,14 +218,13 @@ echo -e "${GREEN}\nTrying to import all the missing keys${NC}"
         rm -Rf $GPGTMPHOME
         IMPORTED_KEYS+=($GPGKEYTOGET)
 		let n=n+1
-        done
-	done < /tmp/updateresults
+      done
+   done < /tmp/updateresults
 
-	echo -e "${GREEN}\nlaunchpad-getkeys has finished importing all missing GPG keys.
-Try running "sudo apt-get update" - you shouldn't see any key
-errors anymore${NC}"
+   echo -e "${GREEN}\nlaunchpad-getkeys has finished importing all missing GPG keys.${NC}"
+   echo -e "${GREEN}Try running "sudo apt-get update" - you shouldn't see any key errors anymore${NC}"
 else
-	echo -e "${GREEN}\nThere are no missing GPG keys!${NC}"
+  echo -e "${GREEN}\nThere are no missing GPG keys!${NC}"
 fi
 
 rm /tmp/updateresults

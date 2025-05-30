@@ -1,8 +1,7 @@
 Package: pkgsync
-Version: 2.51
+Version: 2.53
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
-Installed-Size: 64
 Depends: aptitude (>= 0.6.1.4-1), lockfile-progs, gpg, lsb-release
 Suggests: puppet | cfengine2 | cfengine | rdist, tagcoll | facter
 Section: admin

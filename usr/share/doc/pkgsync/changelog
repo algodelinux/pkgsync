@@ -1,3 +1,15 @@
+pkgsync (2.53) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 30 May 2025 08:50:00 +0100
+
+pkgsync (2.52) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 23 May 2025 11:50:00 +0100
+
 pkgsync (2.51) ubuntu; urgency=medium
 
   * Solved little bug at /usr/local/sbin/pkgsync
