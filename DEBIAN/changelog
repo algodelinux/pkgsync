@@ -1,3 +1,9 @@
+pkgsync (2.54) ubuntu; urgency=medium
+
+  * Rewrited /usr/local/sbin/wait_for_apt_or_dpkg code to avoid locks
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 12 Jul 2025 10:41:00 +0100
+
 pkgsync (2.53) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/launchpad-getkeys
