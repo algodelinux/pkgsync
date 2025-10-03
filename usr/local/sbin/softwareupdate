@@ -3,7 +3,7 @@
 # 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.8
+export VERSION=1.9
 
 # Usar preferentemente aptitude y, si no se encuentra instalado, usar apt-get
 APT_COMMAND=$(command -v aptitude)
@@ -168,15 +168,8 @@ solveapterrors() {
 }
 
 check_apt_update() {
-  # Archivo de caché que registra la última ejecución de `apt update`
-  local CACHE_FILE="/var/lib/apt/periodic/update-success-stamp"
-
-  # Verificar si el archivo de caché existe
-  if [ ! -f "$CACHE_FILE" ]; then
-    echo -e "${GREEN}El archivo de caché no existe. Ejecutando 'aptitude update'...${NC}"
-    $APT_COMMAND $APT_ARGS update | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
-    return 0
-  fi
+  # Archivo usado para comprobar la última ejecución de `apt update`
+  local CACHE_FILE="/var/lib/apt/lists/"
 
   # Calcular la antigüedad del archivo
   local LAST_UPDATE=$(stat -c %Y "$CACHE_FILE")

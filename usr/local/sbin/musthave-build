@@ -48,7 +48,7 @@ case $codename in
   done
   sort -u -o /etc/pkgsync/musthave /etc/pkgsync/musthave
   ;;
-"trusty"|"bionic"|"jammy")
+"trusty"|"bionic"|"jammy"|"noble")
   test -s /etc/pkgsync/musthave && mv /etc/pkgsync/musthave /etc/pkgsync/musthave.$(date +"%Y%m%d") && echo -e "${GREEN}Realizando backup de /etc/pkgsync/musthave en /etc/pkgsync/musthave.$(date +'%Y%m%d')${NC}"
 
   echo -e "${GREEN}Generando lista de paquetes instalados en /etc/pkgsync/musthave...${NC}"

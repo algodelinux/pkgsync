@@ -1,3 +1,15 @@
+pkgsync (2.56) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/musthave-build to generate musthave for Ubuntu Noble
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 03 Oct 2025 10:11:00 +0100
+
+pkgsync (2.55) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/softwareupdate to optimize performance
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 18 Jul 2025 08:30:00 +0100
+
 pkgsync (2.54) ubuntu; urgency=medium
 
   * Rewrited /usr/local/sbin/wait_for_apt_or_dpkg code to avoid locks
