@@ -3,7 +3,7 @@
 # 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.9
+export VERSION=1.11
 
 # Usar preferentemente aptitude y, si no se encuentra instalado, usar apt-get
 APT_COMMAND=$(command -v aptitude)
@@ -121,7 +121,7 @@ solveapterrors() {
      for packagename in $very_bad_state_packages; do
          mv /var/lib/dpkg/info/$packagename.* /tmp/
          wait_while_locked; dpkg --purge --force-all $packagename
-         wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $packagename
+         wait_while_locked; $APT_COMMAND -y install -o Dpkg::Options::="--force-confold" $packagename
          if [ $? -ne 0 ]; then
             wait_while_locked; dpkg --purge --force-all $packagename
          fi
@@ -140,10 +140,10 @@ solveapterrors() {
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
   wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
   if [ "$bad_packages" ]; then
-     wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $bad_packages
+     wait_while_locked; $APT_COMMAND -y install -o Dpkg::Options::="--force-confold" $bad_packages
      wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
      if [ "$bad_packages" ]; then
-        wait_while_locked; run_aptitude remove -y $bad_packages
+        wait_while_locked; $APT_COMMAND remove -y $bad_packages
         if [ $? -ne 0 ]; then
            wait_while_locked; dpkg --purge --force-all $bad_packages
         fi

@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.56
+export VERSION=2.57
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -151,9 +151,11 @@ parse_options () {
 	while :; do
 		case "$1" in
 			-s|--simulate)
-				APTITUDE_ARGS="$APTITUDE_ARGS -s"
-                                SIMULATE="yes"
-				shift
+				#APTITUDE_ARGS="$APTITUDE_ARGS -s"
+                                #SIMULATE="yes"
+				#shift
+                                simulate
+                                exit 0
 				;;
 			-k|--keep-unused)
 				APTITUDE_ARGS="$APTITUDE_ARGS -o Aptitude::Delete-Unused=false"
@@ -301,6 +303,24 @@ merge_files() {
   # Remove maynothave.all and musthave.orphan packages from musthave.all
   comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all
   comm -23 /tmp/musthave.all /etc/pkgsync/maynothave.all > /etc/pkgsync/musthave.all
+}
+
+simulate() {
+  # Merge files
+  merge_files
+
+  # Find out what parameters to give to aptitude.
+  installed=$( dpkg -l | grep '^ii' | cut -c5- | cut '-d ' -f1 )
+  musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
+  maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
+  mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
+  # mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
+
+  if [ "$IGNORE_MUSTHAVE" = "no" ]; then
+     rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
+  fi
+
+  run_aptitude full-upgrade -s '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
 }
 
 wait_for_apt_or_dpkg() {
@@ -754,10 +774,8 @@ if [ $? -eq 0 ]; then
    exit 1
 fi
 
-# Fist upgrade software if no simulation option is selected
-if [[ "$SIMULATE" == "no" ]]; then
-   disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; enable_repositories
-fi
+# Upgrade software
+disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; enable_repositories
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 

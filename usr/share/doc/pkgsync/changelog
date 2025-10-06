@@ -1,3 +1,11 @@
+pkgsync (2.57) ubuntu; urgency=medium
+
+  * Solved bug at /usr/local/sbin/softwareupdate
+  * Modified /usr/local/sbin/pkgsync to perform only simulation operation when `pkgsync` 
+    is running with the `-s` parameter
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 06 Oct 2025 12:26:00 +0100
+
 pkgsync (2.56) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/musthave-build to generate musthave for Ubuntu Noble

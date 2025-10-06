@@ -30,11 +30,11 @@ b09bde611e6fd47a26a86888b98785ff  usr/share/man/man8/softwareupdate.8.gz
 8afc4bf7712b3e4dc9433bc83fa4f877  usr/share/applications/Software_Update.desktop
 3359de4f501e7b3156868ca3e4f85101  usr/share/doc/pkgsync/README.Debian
 b6d147664ec87a8e37b9f5e51d169750  usr/share/doc/pkgsync/musthave
-9af84b68e87fda98be14b68b4cadc173  usr/share/doc/pkgsync/NEWS.Debian.gz
+afe793951e21229a4b0af0d627e4d6b4  usr/share/doc/pkgsync/NEWS.Debian.gz
 b367055953781fcb4946419c2d815dd7  usr/share/doc/pkgsync/maynothave
 e99096f6a423bf4a413afdc2527faf5a  usr/share/doc/pkgsync/copyright
 a16111f16bfbc89cec75e6c9eae02b62  usr/share/doc/pkgsync/mayhave
-a0e9925d81948a2cb928ea58b0f0b310  usr/share/doc/pkgsync/changelog
+4bb6411f92a794eca16ea4fefdd930b7  usr/share/doc/pkgsync/changelog
 f3a31393fd39b23f430c071727d62f8a  usr/sbin/pkgsync
 fe5f50dd9e17d1139b7f3cc5c81cbebc  usr/local/sbin/wait_for_apt_or_dpkg
 652c84517e4fe5d7cff83da0892a9e26  usr/local/sbin/list-disabled-repositories
@@ -42,7 +42,7 @@ fe5f50dd9e17d1139b7f3cc5c81cbebc  usr/local/sbin/wait_for_apt_or_dpkg
 530ff9497880db05157e535922980680  usr/local/sbin/launchpad-getkeys
 96ba71bece256f0d5bdcb099d6265f0a  usr/local/sbin/remove-kernel
 13b9e3f3458e4e251b3df54d73a4ca06  usr/local/sbin/solve-apt-errors
-6e1ce9a62bf063bf7a111304cc7749db  usr/local/sbin/pkgsync
+82676c9cd4e4e184fa1bb38af2b4f2c9  usr/local/sbin/pkgsync
 d30c6464456554d2840ee7a4222c11ff  usr/local/sbin/disable-failed-repositories
 e0ceba5e542646ca961104966120e834  usr/local/sbin/remove-failed-repositories
 a8dfe6978b92bbfb13d965b79b8f8788  usr/local/sbin/remove-backup-repositories
@@ -67,7 +67,7 @@ b47922a15b0da9eb84d681ed976c5f72  usr/local/sbin/limpiapaquetes
 358ac528e33be348c1cc00c9d540bc47  usr/local/sbin/restore-backup-repositories
 58399bd95fa85e6c1daff86fb267df9b  usr/local/sbin/download_pkg_and_deps
 6837f67d8411385b996e56b55dea9f8a  usr/local/sbin/disable-pkgsync-terminal
-bff415d5936bc827a4426c049282b3aa  usr/local/sbin/softwareupdate
+daf216e20cdeebe53aa19ef01e6f692c  usr/local/sbin/softwareupdate
 4f5cab665a453bc33ddb3bd8985ba22d  usr/local/sbin/clean-pkgsync-files
 221edf90c401d269ec2e4c502d465afa  lib/systemd/system/getty@tty12.service
 1004da34ccea981cbed46ef2c0ac8e5b  etc/default/launchpad-getkeys
