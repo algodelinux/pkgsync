@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.57
+export VERSION=2.57-1
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -151,9 +151,6 @@ parse_options () {
 	while :; do
 		case "$1" in
 			-s|--simulate)
-				#APTITUDE_ARGS="$APTITUDE_ARGS -s"
-                                #SIMULATE="yes"
-				#shift
                                 simulate
                                 exit 0
 				;;
@@ -314,13 +311,8 @@ simulate() {
   musthave_install=$( getpkgs /etc/pkgsync/musthave.all | sort -u | sed "s/$/+/" )
   maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
   mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
-  # mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
 
-  if [ "$IGNORE_MUSTHAVE" = "no" ]; then
-     rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
-  fi
-
-  run_aptitude full-upgrade -s '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+  run_aptitude full-upgrade -s '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto | tee -a /var/log/pkgsync.log
 }
 
 wait_for_apt_or_dpkg() {

@@ -1,3 +1,9 @@
+pkgsync (2.57-1) ubuntu; urgency=medium
+
+  * Solved bug at simulate function in /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 07 Oct 2025 09:16:00 +0100
+
 pkgsync (2.57) ubuntu; urgency=medium
 
   * Solved bug at /usr/local/sbin/softwareupdate

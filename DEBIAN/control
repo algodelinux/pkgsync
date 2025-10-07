@@ -1,5 +1,5 @@
 Package: pkgsync
-Version: 2.57
+Version: 2.57-1
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
 Depends: aptitude (>= 0.6.1.4-1), lockfile-progs, gpg, lsb-release
