@@ -23,6 +23,31 @@ wait_while_locked() {
    [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
+reinstall_broken_dpkg() {
+    local INFO_DIR="/var/lib/dpkg/info"
+    local BROKEN_PACKAGES=()
+
+    # Iterar sobre paquetes instalados
+    for pkg in $(dpkg -l | awk '/^ii/ {print $2}'); do
+        if [ ! -f "$INFO_DIR/${pkg}.list" ]; then
+            BROKEN_PACKAGES+=("$pkg")
+        fi
+    done
+
+    # Si no hay paquetes rotos, salir silenciosamente
+    if [ ${#BROKEN_PACKAGES[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    # Mostrar solo si hay paquetes con archivos .list faltantes
+    echo "Paquetes con archivos .list faltantes:"
+    printf '%s\n' "${BROKEN_PACKAGES[@]}"
+
+    echo "Reinstalando paquetes automáticamente..."
+    apt-get update; apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
+    echo "Reinstalación completada."
+}
+
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -129,8 +154,11 @@ if [ -s /tmp/apterrors ]; then
 
    grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install; wait_while_locked; dpkg --configure -a
    grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
-   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
+   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt-get update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
 fi
+
+# Reinstalamos paquetes con archivos .list faltantes
+reinstall_broken_dpkg
 
 # Aseguramos la actualización de pkgsync
 wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -y install -o Dpkg::Options::="--force-confold" pkgsync

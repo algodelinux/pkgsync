@@ -3,7 +3,7 @@
 # 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
-export VERSION=1.11
+export VERSION=1.12
 
 # Usar preferentemente aptitude y, si no se encuentra instalado, usar apt-get
 APT_COMMAND=$(command -v aptitude)
@@ -88,6 +88,82 @@ wait_while_locked () {
    [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
+check_apt_update() {
+    # Colores para mensajes
+    GREEN='\033[0;32m'
+    NC='\033[0m'
+
+    # Umbral en segundos (por defecto 1 día)
+    local THRESHOLD_FOR_APT_UPDATE=${THRESHOLD_FOR_APT_UPDATE:-86400}
+
+    # Archivos de caché de apt
+    local PKG_CACHE="/var/cache/apt/pkgcache.bin"
+    local SRC_CACHE="/var/cache/apt/srcpkgcache.bin"
+
+    # Comprobar cuál existe y tomar el más reciente
+    local LATEST_CACHE=""
+    if [ -f "$PKG_CACHE" ] && [ -f "$SRC_CACHE" ]; then
+        if [ "$PKG_CACHE" -nt "$SRC_CACHE" ]; then
+            LATEST_CACHE="$PKG_CACHE"
+        else
+            LATEST_CACHE="$SRC_CACHE"
+        fi
+    elif [ -f "$PKG_CACHE" ]; then
+        LATEST_CACHE="$PKG_CACHE"
+    elif [ -f "$SRC_CACHE" ]; then
+        LATEST_CACHE="$SRC_CACHE"
+    else
+        echo -e "${GREEN}No se encontraron archivos de caché de apt. Ejecutando 'apt update'...${NC}"
+        sudo apt update
+        return
+    fi
+
+    # Calcular antigüedad
+    local LAST_UPDATE=$(stat -c %Y "$LATEST_CACHE")
+    local CURRENT_TIME=$(date +%s)
+    local AGE=$((CURRENT_TIME - LAST_UPDATE))
+
+    # Convertir AGE en días, horas, minutos
+    local DAYS=$((AGE / 86400))
+    local HOURS=$(((AGE % 86400) / 3600))
+    local MINUTES=$(((AGE % 3600) / 60))
+    local AGE_HUMAN="${DAYS}d ${HOURS}h ${MINUTES}m"
+
+    # Decidir si ejecutar apt update
+    if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
+        echo -e "${GREEN}Han pasado ${AGE_HUMAN} desde la última actualización. Ejecutando 'apt update'...${NC}"
+        sudo apt update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+    else
+        echo -e "${GREEN}No es necesario ejecutar 'apt update'. Última ejecución hace ${AGE_HUMAN}.${NC}"
+    fi
+}
+
+reinstall_broken_dpkg() {
+    local INFO_DIR="/var/lib/dpkg/info"
+    local BROKEN_PACKAGES=()
+
+    # Iterar sobre paquetes instalados
+    for pkg in $(dpkg -l | awk '/^ii/ {print $2}'); do
+        if [ ! -f "$INFO_DIR/${pkg}.list" ]; then
+            BROKEN_PACKAGES+=("$pkg")
+        fi
+    done
+
+    # Si no hay paquetes rotos, salir silenciosamente
+    if [ ${#BROKEN_PACKAGES[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    # Mostrar solo si hay paquetes con archivos .list faltantes
+    echo "Paquetes con archivos .list faltantes:"
+    printf '%s\n' "${BROKEN_PACKAGES[@]}"
+
+    echo "Reinstalando paquetes automáticamente..."
+    check_apt_update
+    sudo apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
+    echo "Reinstalación completada."
+}
+
 solveapterrors() {
   set +e
 
@@ -159,31 +235,14 @@ solveapterrors() {
         if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
      fi
 
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; apt-get -yf install && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -y --no-install-recommends autoremove
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -yf install && wait_while_locked; apt-get -y --no-install-recommends autoremove
+     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install && wait_while_locked; dpkg --configure -a && wait_while_locked; apt-get -y --no-install-recommends autoremove
+     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a && wait_while_locked; aptitude -yf install && wait_while_locked; apt-get -y --no-install-recommends autoremove
      grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; $APT_COMMAND $APT_ARGS update; wait_while_locked; dpkg --configure -a; wait_while_locked; apt-get -yf install
   fi
 
+  reinstall_broken_dpkg
+
   export LC_ALL=$idioma
-}
-
-check_apt_update() {
-  # Archivo usado para comprobar la última ejecución de `apt update`
-  local CACHE_FILE="/var/lib/apt/lists/"
-
-  # Calcular la antigüedad del archivo
-  local LAST_UPDATE=$(stat -c %Y "$CACHE_FILE")
-  local CURRENT_TIME=$(date +%s)
-  local AGE=$((CURRENT_TIME - LAST_UPDATE))
-  local LIMIT=$(convert_seconds $THRESHOLD_FOR_APT_UPDATE)
-
-  # Comprobar si ha pasado más tiempo que el umbral
-  if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
-    echo -e "${GREEN}Han pasado más de $LIMIT desde la última ejecución de 'aptitude update'. Ejecutándolo ahora...${NC}"
-    $APT_COMMAND $APT_ARGS update | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
-  else
-    echo -e "${GREEN}No es necesario ejecutar 'aptitude update'. Última ejecución hace menos de $LIMIT.${NC}"
-  fi
 }
 
 apagar_equipo() {
@@ -246,7 +305,7 @@ fi
 # Si existen paquetes deb actualizables, los actualizamos
 UPDATES=$(apt-get -s upgrade | grep "Inst" | wc -l)
 if [ "$UPDATES" -gt 0 ]; then
-   [ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && wait_while_locked; solveapterrors; check_apt_update; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
+   [ -x $APT_COMMAND ] && echo -e "${GREEN}\nActualizando paquetes...\n${NC}" && check_apt_update; disable_failed_repositories; $APT_COMMAND $APT_ARGS upgrade; enable_repositories
 else
    echo -e "\n${GREEN}Los paquetes deb del sistema se encuentran completamente actualizados.${NC}"
 fi

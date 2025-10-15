@@ -1,3 +1,11 @@
+pkgsync (2.58) ubuntu; urgency=medium
+
+  * Added reinstall_broken_dpkg function to /usr/local/sbin/pkgsync, 
+    /usr/local/sbin/softwareupdate and /usr/local/sbin/solve_apt_errors for reinstall 
+    packages without .list files
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 07 Oct 2025 09:16:00 +0100
+
 pkgsync (2.57-1) ubuntu; urgency=medium
 
   * Solved bug at simulate function in /usr/local/sbin/pkgsync
