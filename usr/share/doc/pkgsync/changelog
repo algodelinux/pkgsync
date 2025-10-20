@@ -1,3 +1,9 @@
+pkgsync (2.59) ubuntu; urgency=medium
+
+  * Added pkgsync indicator to show info about state of pkgsync in desktop 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 20 Oct 2025 10:43:00 +0100
+
 pkgsync (2.58) ubuntu; urgency=medium
 
   * Added reinstall_broken_dpkg function to /usr/local/sbin/pkgsync, 

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Pkgsync Indicator
+Exec=/usr/local/bin/pkgsync_appindicator.py
+Icon=emblem-synchronizing
+Comment=Indicator for pkgsync
+X-GNOME-Autostart-enabled=true
+NoDisplay=false
+Terminal=false
