@@ -1,0 +1,135 @@
+#!/bin/bash
+# ------------------------------------------------------------
+# restore-ldconfig
+# Restaura /sbin/ldconfig si falta y repara libc-bin
+# Compatible con Debian y Ubuntu, locales en español
+# 2025 Esteban M. Navas Martín <algodelinux@gmail.com>
+# ------------------------------------------------------------
+
+set -euo pipefail
+
+# ------------------------------------------------------------
+# Forzar localización inglesa para evitar problemas de traducción
+# ------------------------------------------------------------
+export LC_ALL=C
+export LANG=C
+
+# ------------------------------------------------------------
+# 🎨 Colores y símbolos Unicode seguros
+# ------------------------------------------------------------
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+CYAN="\e[36m"
+RESET="\e[0m"
+
+INFO="${CYAN}[INFO]${RESET}"
+OK="${GREEN}[✔]${RESET}"
+WARN="${YELLOW}[!]${RESET}"
+FAIL="${RED}[✖]${RESET}"
+DIR="${CYAN}[DIR]${RESET}"
+LOG="${CYAN}[LOG]${RESET}"
+
+TMPDIR="/tmp/libc-bin-restore"
+mkdir -p "$TMPDIR"
+
+# ------------------------------------------------------------
+# 1️⃣ Comprobación inicial
+# ------------------------------------------------------------
+echo -e "$INFO Comprobando si ldconfig existe..."
+if command -v ldconfig >/dev/null 2>&1; then
+    echo -e "$OK ldconfig ya está presente en: $(command -v ldconfig)"
+    exit 0
+fi
+
+echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
+
+# ------------------------------------------------------------
+# 2️⃣ Detectar distribución y versión
+# ------------------------------------------------------------
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    DISTRO=${ID,,}
+    VERSION_ID=${VERSION_ID:-unknown}
+else
+    echo -e "$FAIL No se puede determinar la distribución (falta /etc/os-release)."
+    exit 1
+fi
+
+ARCH=$(dpkg --print-architecture)
+echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
+
+# ------------------------------------------------------------
+# 3️⃣ Obtener URL del paquete libc-bin
+# ------------------------------------------------------------
+echo -e "$INFO Buscando paquete libc-bin adecuado..."
+
+case "$DISTRO" in
+    ubuntu)
+        REPO="http://archive.ubuntu.com/ubuntu"
+        ;;
+    debian)
+        REPO="http://deb.debian.org/debian"
+        ;;
+    *)
+        echo -e "$FAIL Distribución no soportada: $DISTRO"
+        exit 1
+        ;;
+esac
+
+# Intentar obtener versión candidata con apt-cache (forzando LC_ALL=C)
+PKG_VER=$(LC_ALL=C apt-cache policy libc-bin 2>/dev/null | grep "Candidate:" | awk '{print $2}' || true)
+
+if [ -z "$PKG_VER" ]; then
+    echo -e "$WARN No se pudo determinar versión de libc-bin con apt-cache, usando fallback..."
+    PKG_URL=$(
+        curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
+        | gunzip -c 2>/dev/null \
+        | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}'
+    )
+else
+    PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${PKG_VER}_${ARCH}.deb"
+fi
+
+PKG_NAME=$(basename "$PKG_URL")
+PKG_PATH="$TMPDIR/$PKG_NAME"
+
+echo -e "$LOG Descargando $PKG_NAME ..."
+wget -q -O "$PKG_PATH" "$PKG_URL"
+
+# ------------------------------------------------------------
+# 4️⃣ Extraer ldconfig
+# ------------------------------------------------------------
+echo -e "$INFO Extrayendo paquete..."
+dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
+
+if [ ! -f "$TMPDIR/extracted/sbin/ldconfig" ]; then
+    echo -e "$FAIL No se encontró ldconfig dentro del paquete descargado."
+    exit 1
+fi
+
+echo -e "$INFO Copiando ldconfig a /sbin ..."
+cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/
+chmod 755 /sbin/ldconfig
+
+# ------------------------------------------------------------
+# 5️⃣ Verificación y reparación
+# ------------------------------------------------------------
+echo -e "$INFO Verificando funcionamiento..."
+if /sbin/ldconfig -p >/dev/null 2>&1; then
+    echo -e "$OK ldconfig restaurado correctamente."
+else
+    echo -e "$WARN ldconfig copiado pero no parece funcional."
+fi
+
+echo -e "$INFO Reinstalando libc-bin y reparando dependencias..."
+apt-get install --reinstall -y libc-bin || true
+apt-get -f install -y || true
+
+# ------------------------------------------------------------
+# 6️⃣ Limpieza
+# ------------------------------------------------------------
+echo -e "$INFO Limpiando archivos temporales..."
+rm -rf "$TMPDIR"
+
+echo -e "$OK Proceso completado. ldconfig debería estar operativo."

@@ -19,3 +19,5 @@ OLDKEYFILE="/etc/apt/trusted.gpg"
 # apt keys directories
 KEYPATHS="/usr/share/keyrings /etc/apt/keyrings /etc/apt/trusted.gpg.d"
 
+# Run interval for apt-get update
+UPDATE_INTERVAL_MINUTES=30

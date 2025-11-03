@@ -1,19 +1,19 @@
 #! /bin/bash
 # Modified version by Esteban M. Navas <algodelinux@gmail.com>
-# Date: 27/05/2025
+# Last update: 02/11/2025
+
+UPDATE_INTERVAL_MINUTES=30 # intervalo deseado (en minutos)
+TIMESTAMP_FILE="/var/lib/apt/periodic/update-success-stamp"
+UPDATE_LOG="/tmp/updateresults"
+
+# Crear log si no existe
+[[ ! -f "$UPDATE_LOG" ]] && touch "$UPDATE_LOG"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 WHITE='\033[1;37m'
+CYAN="\033[36m"
 NC='\033[0m' # No Color
-
-if [ "`whoami`" != "root" ]; then
-   echo -e "${RED}Please run with SUDO or root user account${NC}"
-   exit 1
-fi
-
-OLDKEYFILE="/etc/apt/trusted.gpg"
-KEYPATHS="/usr/share/keyrings /etc/apt/keyrings /etc/apt/trusted.gpg.d"
 
 function HELP () {
 echo -e "${WHITE}\nlaunchpad-getkeys${NC} is an utility to automatically import all Lunchpad PPAs missing GPG keys.
@@ -22,21 +22,51 @@ Usage:
    * use without any parameter to automatically import all the missing GPG keys.
    * ${WHITE}-k SERVER:PORT${NC} will pass a new keyserver, in case the default keyserver is down.
    * ${WHITE}-p PROXY:PORT${NC} lets you specify a proxy-server other than the default one.
-   * ${WHITE}-r${NC} remove all expired keys.\n"
+   * ${WHITE}-r${NC} remove all expired keys.
+   * ${WHITE}-f${NC} force apt-get update.\n"
 exit 0
 }
 
 function remove_expired_keys () {
-if [ -f $OLDKEYFILE ]; then
-   LC_ALL=C gpg --no-default-keyring --keyring=$OLDKEYFILE --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
+    if [ -f $OLDKEYFILE ]; then
+       LC_ALL=C gpg --no-default-keyring --keyring=$OLDKEYFILE --list-keys | grep -E pub.*expired -A 1 > /tmp/expiredkeys
 
-   if [ -s /tmp/expiredkeys ]; then
-      for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
-          echo -e "${GREEN}Deleting KEY $keyid from $OLDKEYFILE${NC}"
-          gpg --no-default-keyring --keyring=$OLDKEYFILE --batch --yes --delete-keys $keyid
-      done
-   fi
+       if [ -s /tmp/expiredkeys ]; then
+          for keyid in $(grep -E [[:xdigit:]]{40} /tmp/expiredkeys | sed 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//;'); do
+              echo -e "${GREEN}Deleting KEY $keyid from $OLDKEYFILE${NC}"
+              gpg --no-default-keyring --keyring=$OLDKEYFILE --batch --yes --delete-keys $keyid
+          done
+       fi
+    fi
+}
+
+function should_run_update() {
+    # Si el archivo no existe, ejecutar update
+    [[ ! -f "$TIMESTAMP_FILE" ]] && return 0
+
+    # Ejecutar update si log no existe o está vacío
+    [[ ! -f "$UPDATE_LOG" ]] && return 0
+
+    # Calcular minutos transcurridos desde la última ejecución exitosa
+    local last_update_ts
+    last_update_ts=$(stat -c %Y "$TIMESTAMP_FILE")
+    local now
+    now=$(date +%s)
+    local elapsed_min=$(( (now - last_update_ts) / 60 ))
+
+    # Si ha pasado más del intervalo, ejecutar update
+    (( elapsed_min >= UPDATE_INTERVAL_MINUTES ))
+}
+
+
+if [ "`whoami`" != "root" ]; then
+   echo -e "${RED}Please run with SUDO or root user account${NC}"
+   exit 1
 fi
+
+OLDKEYFILE="/etc/apt/trusted.gpg"
+KEYPATHS="/usr/share/keyrings /etc/apt/keyrings /etc/apt/trusted.gpg.d"
+FORCE_UPDATE=0
 
 for KEYPATH in $KEYPATHS; do
     if [ -d $KEYPATH ] && [ "$(ls -A $KEYPATH)" ]; then
@@ -59,17 +89,17 @@ for KEYPATH in $KEYPATHS; do
        done
     fi
 done
-}
 
 REMOVE_EXPIRED_KEYS="no"
 
 [ -s /etc/default/launchpad-getkeys ] && . /etc/default/launchpad-getkeys
 
-while getopts "k:p:rh\?" opt; do
+while getopts "k:p:rhf\?" opt; do
 	case "$opt" in
 		k ) KEYSERVER="$OPTARG"			;;
 		p ) PROXY="$OPTARG"			;;
 		r ) remove_expired_keys 		;;
+		f ) FORCE_UPDATE=1                      ;;
 		h ) HELP				;;
 		\?) HELP				;;
 		* ) warn "Unknown option '$opt'";	;;
@@ -106,16 +136,31 @@ if [ "$REMOVE_EXPIRED_KEYS" = "yes" ]; then
 fi
 
 echo -e "${GREEN}\nPlease wait... launchpad-getkeys is running an update so
-it can detect the missing GPG keys
+it can detect the missing GPG keys\n${NC}"
 
-Updating repositories...\n${NC}"
+if (( FORCE_UPDATE )); then
+    echo -e "${GREEN}Forcing APT package index update...${NC}"
+    LC_ALL=C apt-get update 2> "$UPDATE_LOG"
+    if [[ $? -eq 0 ]]; then
+       touch "$TIMESTAMP_FILE"
+       echo -e "${GREEN}✓ apt-get update completed successfully.${NC}"
+    else
+        echo -e "${RED}✗ Error running apt-get update. Check ${UPDATE_LOG}${NC}"
+    fi
+elif should_run_update; then
+    echo -e "${GREEN}Running apt-get update (more than ${UPDATE_INTERVAL_MINUTES} minutes elapsed)...${NC}"
+    LC_ALL=C apt-get update 2> "$UPDATE_LOG"
+    if [[ $? -eq 0 ]]; then
+        touch "$TIMESTAMP_FILE"
+        echo -e "${GREEN}✓ apt-get update completed successfully.${NC}"
+    else
+        echo -e "${RED}✗ Error running apt-get update. Check ${UPDATE_LOG}${NC}"
+    fi
+else
+    echo -e "${CYAN}→ Skipping apt-get update (last update was less than ${UPDATE_INTERVAL_MINUTES} minutes ago).${NC}"
+fi
 
-#apt-get update -qq 2> /tmp/updateresults
-
-apt-get update 2> /tmp/updateresults
-
-
-MISSINGGEYS=$(cat /tmp/updateresults)
+MISSINGGEYS=$(cat $UPDATE_LOG)
 
 PROXY_OPTS=()
 if [[ ! -z ${PROXY:-} ]]; then

@@ -1,3 +1,18 @@
+pkgsync (2.61) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys 
+  * Improved /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 03 Nov 2025 09:58:00 +0100
+
+pkgsync (2.60) ubuntu; urgency=medium
+
+  * Added restore-ldconfig script to repair ldconfig 
+  * Added restore-ldconfig function to solve-apt-errors script 
+  * Added restore-ldconfig function to pkgsync script 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 30 Oct 2025 13:12:00 +0100
+
 pkgsync (2.59) ubuntu; urgency=medium
 
   * Added pkgsync indicator to show info about state of pkgsync in desktop 

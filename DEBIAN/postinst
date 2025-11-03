@@ -2,6 +2,7 @@
 set -e
 
 USERID="pkgsync"
+SERVICE_NAME="getty@tty12.service"
 
 if [ -f /etc/cron.d/pkgsync ]; then
 	rm -f /etc/cron.d/pkgsync
@@ -23,7 +24,18 @@ if id -nG "$USERID" | grep -qw "sudo"; then
   deluser "$USERID" sudo
 fi
 
-[ -x /bin/systemctl ] && systemctl is-active getty@tty12.service>/dev/null || systemctl start getty@tty12.service; systemctl is-enabled getty@tty12.service>/dev/null || systemctl enable getty@tty12.service; systemctl daemon-reload
+if [ -x /bin/systemctl ]; then
+   systemctl daemon-reload
+
+   if ! systemctl is-active --quiet "$SERVICE_NAME"; then
+      systemctl start "$SERVICE_NAME"
+   fi
+
+   if ! systemctl is-enabled --quiet "$SERVICE_NAME"; then
+      systemctl enable "$SERVICE_NAME"
+   fi
+fi
+
 
 [ -f /etc/sudoers ] && sed -i '/pkgsync.*/d' /etc/sudoers 2>&1>/dev/null
 

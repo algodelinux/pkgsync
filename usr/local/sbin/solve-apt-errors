@@ -3,6 +3,17 @@
 # 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
+idioma=$LC_ALL
+export LC_ALL=C
+export DEBIAN_FRONTEND=noninteractive
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW="\033[33m"
+CYAN="\033[36m"
+NC='\033[0m' # No Color
+
+
 killprocess() {
 
    updatehour=$(ps aux|grep $1 | grep -v grep | head -1 | awk '{print $9}')
@@ -48,19 +59,122 @@ reinstall_broken_dpkg() {
     echo "Reinstalación completada."
 }
 
+restore_ldconfig() {
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m' # No Color
+    INFO="${CYAN}[INFO]${NC}"
+    OK="${GREEN}[✔]${NC}"
+    WARN="${YELLOW}[!]${NC}"
+    FAIL="${RED}[✖]${NC}"
+    DIR="${CYAN}[DIR]${NC}"
+    LOG="${CYAN}[LOG]${NC}"
+
+    TMPDIR="/tmp/libc-bin-restore"
+    mkdir -p "$TMPDIR"
+
+    # ------------------------------------------------------------
+    # 1️⃣ Comprobación inicial
+    # ------------------------------------------------------------
+    if command -v ldconfig >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
+
+    # ------------------------------------------------------------
+    # 2️⃣ Detectar distribución y versión
+    # ------------------------------------------------------------
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO=${ID,,}
+        VERSION_ID=${VERSION_ID:-unknown}
+    else
+        echo -e "$FAIL No se puede determinar la distribución (falta /etc/os-release)."
+        return 1
+    fi
+
+    ARCH=$(dpkg --print-architecture)
+    echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
+
+    # ------------------------------------------------------------
+    # 3️⃣ Obtener URL del paquete libc-bin
+    # ------------------------------------------------------------
+    echo -e "$INFO Buscando paquete libc-bin adecuado..."
+
+    case "$DISTRO" in
+        ubuntu)
+            REPO="http://archive.ubuntu.com/ubuntu"
+            ;;
+        debian)
+            REPO="http://deb.debian.org/debian"
+            ;;
+        *)
+            echo -e "$FAIL Distribución no soportada: $DISTRO"
+            return 1
+            ;;
+    esac
+
+    PKG_VER=$(LC_ALL=C apt-cache policy libc-bin 2>/dev/null | grep "Candidate:" | awk '{print $2}' || true)
+
+    if [ -z "$PKG_VER" ]; then
+        echo -e "$WARN No se pudo determinar versión de libc-bin con apt-cache, usando fallback..."
+        PKG_URL=$(
+            curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
+            | gunzip -c 2>/dev/null \
+            | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}'
+        )
+    else
+        PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${PKG_VER}_${ARCH}.deb"
+    fi
+
+    PKG_NAME=$(basename "$PKG_URL")
+    PKG_PATH="$TMPDIR/$PKG_NAME"
+
+    echo -e "$LOG Descargando $PKG_NAME ..."
+    wget -q -O "$PKG_PATH" "$PKG_URL"
+
+    # ------------------------------------------------------------
+    # 4️⃣ Extraer ldconfig
+    # ------------------------------------------------------------
+    echo -e "$INFO Extrayendo paquete..."
+    dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
+
+    if [ ! -f "$TMPDIR/extracted/sbin/ldconfig" ]; then
+        echo -e "$FAIL No se encontró ldconfig dentro del paquete descargado."
+        return 1
+    fi
+
+    echo -e "$INFO Copiando ldconfig a /sbin ..."
+    cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/
+    chmod 755 /sbin/ldconfig
+
+    # ------------------------------------------------------------
+    # 5️⃣ Verificación y reparación
+    # ------------------------------------------------------------
+    echo -e "$INFO Verificando funcionamiento..."
+    if /sbin/ldconfig -p >/dev/null 2>&1; then
+        echo -e "$OK ldconfig restaurado correctamente."
+    else
+        echo -e "$WARN ldconfig copiado pero no parece funcional."
+    fi
+
+    echo -e "$INFO Reinstalando libc-bin y reparando dependencias..."
+    apt-get install --reinstall -y libc-bin || true
+    apt-get -f install -y || true
+
+    # ------------------------------------------------------------
+    # 6️⃣ Limpieza
+    # ------------------------------------------------------------
+    echo -e "$INFO Limpiando archivos temporales..."
+    rm -rf "$TMPDIR"
+
+    echo -e "$OK Proceso completado. ldconfig debería estar operativo."
+}
+
 
 if (( $EUID != 0 )); then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
    exit 1
 fi
-
-idioma=$LC_ALL
-export LC_ALL=C
-export DEBIAN_FRONTEND=noninteractive
 
 # Tiempo máximo en minutos que puede estar corriendo sinc_puppet antes de matarlo
 TIMEOUT_FOR_SINC_PUPPET="5"
@@ -101,6 +215,9 @@ if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 
 # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
 if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
+
+# Restauramos ldconfig si no se encuentra
+restore_ldconfig
 
 # Tratamos de instalar paquetes en estado ic
 wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')

@@ -8,11 +8,12 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.59
+export VERSION=2.62
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
 YELLOW='\e[0;33m'
+CYAN="\033[36m"
 NC='\e[0m' # No Color
 
 convert_seconds() {
@@ -325,6 +326,53 @@ wait_for_apt_or_dpkg() {
   done
 }
 
+wait_for_sinc_puppet() {
+    local timeout_min=$1   # Timeout en minutos
+    local timeout_seconds=0
+    local elapsed=0
+    local pids
+
+    # Convertir minutos a segundos
+    if [[ -n "$timeout_min" && "$timeout_min" -gt 0 ]]; then
+        timeout_seconds=$((timeout_min * 60))
+    fi
+
+    # Comprobar si sinc_puppet está corriendo
+    pids=$(pgrep sinc_puppet)
+    if [[ -n "$pids" ]]; then
+        echo -e "${YELLOW}Esperando a que termine sinc_puppet...${NC}"
+        runned_sinc_puppet=true
+    fi
+
+    # Bucle de espera
+    while [[ -n "$pids" ]]; do
+        sleep 1
+        ((elapsed++))
+        pids=$(pgrep sinc_puppet)
+
+        if [[ $timeout_seconds -gt 0 && $elapsed -ge $timeout_seconds ]]; then
+            if [[ -n "$pids" ]]; then
+                echo -e "${RED}Timeout alcanzado esperando a sinc_puppet ($timeout_min min). Matando proceso(s)...${NC}"
+                kill -TERM $pids 2>/dev/null
+                sleep 2
+                pids=$(pgrep sinc_puppet)
+                if [[ -n "$pids" ]]; then
+                    echo -e "${RED}Proceso(s) persistente(s), usando kill -KILL...${NC}"
+                    kill -KILL $pids 2>/dev/null
+                fi
+            fi
+            break
+        fi
+    done
+
+    # Devolver si hubo que esperar
+    if [[ "$runned_sinc_puppet" == true ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 run_aptitude() {
 
   if [[ $@ == *full-upgrade* ]]; then
@@ -386,10 +434,6 @@ killprocess() {
 }
 
 check_apt_update() {
-    # Colores para mensajes
-    GREEN='\033[0;32m'
-    NC='\033[0m'
-
     # Umbral en segundos (por defecto 1 día)
     local THRESHOLD_FOR_APT_UPDATE=${THRESHOLD_FOR_APT_UPDATE:-86400}
 
@@ -410,8 +454,8 @@ check_apt_update() {
     elif [ -f "$SRC_CACHE" ]; then
         LATEST_CACHE="$SRC_CACHE"
     else
-        echo -e "${GREEN}No se encontraron archivos de caché de apt. Ejecutando 'apt update'...${NC}"
-        sudo apt update
+        echo -e "${GREEN}No se encontraron archivos de caché de apt. Ejecutando 'apt-get update'...${NC}"
+        apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
         return
     fi
 
@@ -426,12 +470,12 @@ check_apt_update() {
     local MINUTES=$(((AGE % 3600) / 60))
     local AGE_HUMAN="${DAYS}d ${HOURS}h ${MINUTES}m"
 
-    # Decidir si ejecutar apt update
+    # Decidir si ejecutar apt-get update
     if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
-        echo -e "${GREEN}Han pasado ${AGE_HUMAN} desde la última actualización. Ejecutando 'apt update'...${NC}"
-        sudo apt update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
+        echo -e "${GREEN}Han pasado ${AGE_HUMAN} desde la última actualización. Ejecutando 'apt-get update'...${NC}"
+        apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
     else
-        echo -e "${GREEN}No es necesario ejecutar 'apt update'. Última ejecución hace ${AGE_HUMAN}.${NC}"
+        echo -e "${GREEN}No es necesario ejecutar 'apt-get update'. Última ejecución hace ${AGE_HUMAN}.${NC}"
     fi
 }
 
@@ -461,6 +505,104 @@ reinstall_broken_dpkg() {
     echo "Reinstalación completada."
 }
 
+restore_ldconfig() {
+    INFO="${CYAN}[INFO]${NC}"
+    OK="${GREEN}[✔]${NC}"
+    WARN="${YELLOW}[!]${NC}"
+    FAIL="${RED}[✖]${NC}"
+    DIR="${CYAN}[DIR]${NC}"
+    LOG="${CYAN}[LOG]${NC}"
+
+    TMPDIR="/tmp/libc-bin-restore"
+    mkdir -p "$TMPDIR"
+
+    # Comprobación inicial
+    if command -v ldconfig >/dev/null 2>&1; then
+        return 0
+    fi
+
+    echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
+
+    # Detectar distribución y versión
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO=${ID,,}
+        VERSION_ID=${VERSION_ID:-unknown}
+    else
+        echo -e "$FAIL No se puede determinar la distribución (falta /etc/os-release)."
+        return 1
+    fi
+
+    ARCH=$(dpkg --print-architecture)
+    echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
+
+    # Obtener URL del paquete libc-bin
+    echo -e "$INFO Buscando paquete libc-bin adecuado..."
+
+    case "$DISTRO" in
+        ubuntu)
+            REPO="http://archive.ubuntu.com/ubuntu"
+            ;;
+        debian)
+            REPO="http://deb.debian.org/debian"
+            ;;
+        *)
+            echo -e "$FAIL Distribución no soportada: $DISTRO"
+            return 1
+            ;;
+    esac
+
+    PKG_VER=$(LC_ALL=C apt-cache policy libc-bin 2>/dev/null | grep "Candidate:" | awk '{print $2}' || true)
+
+    if [ -z "$PKG_VER" ]; then
+        echo -e "$WARN No se pudo determinar versión de libc-bin con apt-cache, usando fallback..."
+        PKG_URL=$(
+            curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
+            | gunzip -c 2>/dev/null \
+            | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}'
+        )
+    else
+        PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${PKG_VER}_${ARCH}.deb"
+    fi
+
+    PKG_NAME=$(basename "$PKG_URL")
+    PKG_PATH="$TMPDIR/$PKG_NAME"
+
+    echo -e "$LOG Descargando $PKG_NAME ..."
+    wget -q -O "$PKG_PATH" "$PKG_URL"
+
+    # Extraer ldconfig
+    echo -e "$INFO Extrayendo paquete..."
+    dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
+
+    if [ ! -f "$TMPDIR/extracted/sbin/ldconfig" ]; then
+        echo -e "$FAIL No se encontró ldconfig dentro del paquete descargado."
+        return 1
+    fi
+
+    echo -e "$INFO Copiando ldconfig a /sbin ..."
+    cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/
+    chmod 755 /sbin/ldconfig
+
+    # Verificación y reparación
+    echo -e "$INFO Verificando funcionamiento..."
+    if /sbin/ldconfig -p >/dev/null 2>&1; then
+        echo -e "$OK ldconfig restaurado correctamente."
+    else
+        echo -e "$WARN ldconfig copiado pero no parece funcional."
+    fi
+
+    echo -e "$INFO Reinstalando libc-bin y reparando dependencias..."
+    apt-get install --reinstall -y libc-bin || true
+    apt-get -f install -y || true
+
+    # Limpieza
+    echo -e "$INFO Limpiando archivos temporales..."
+    rm -rf "$TMPDIR"
+
+    echo -e "$OK Proceso completado. ldconfig debería estar operativo."
+}
+
 solveapterrors() {
   set +e
 
@@ -485,19 +627,24 @@ solveapterrors() {
   stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
   if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 
-  # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
-  if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
+  # Esperamos a que termine sinc_puppet o lo matamos si ha transcurrido el timeout
+  wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET"
 
+  # Restauramos ldconfig si no se encuentra
+  restore_ldconfig
 
   # Tratamos de instalar paquetes en estado ic
   wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
   if [ "$incomplete_packages" ]; then
+     echo -e "${GREEN}Tratando de reparar paquetes en estado ^ic.${NC}"
      wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $incomplete_packages
   fi
 
   # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
   wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
   if [ "$very_bad_state_packages" ]; then
+     echo -e "${GREEN}Tratando de reparar paquetes en muy mal estado.${NC}"
+
      for packagename in $very_bad_state_packages; do
          mv /var/lib/dpkg/info/$packagename.* /tmp/
          wait_while_locked; dpkg --purge --force-all $packagename
@@ -511,15 +658,18 @@ solveapterrors() {
   # Desinstalamos paquetes en estado de inconsistencia
   wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
   if [ "$inconsistent_packages" ]; then
+     echo -e "${GREEN}Tratando de reparar paquetes en estado ^iU.${NC}"
+
      for packagename in $inconsistent_packages; do
          mv /var/lib/dpkg/info/$packagename.* /tmp/
          wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename
-     done 
+     done
   fi
 
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
   wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
   if [ "$bad_packages" ]; then
+     echo -e "${GREEN}Tratando de reinstalar paquetes en estado ^iF o ^ri.${NC}"
      wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $bad_packages
      wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
      if [ "$bad_packages" ]; then
@@ -722,6 +872,7 @@ ALERT_EMAIL_RECEIVER=""
 ALERT_EMAIL_ON_ERROR="no"
 ENSURE_ESSENTIAL="no"
 SIMULATE="no"
+runned_sinc_puppet=false
 
 LAUNCH_SINC_PUPPET=yes
 
@@ -823,16 +974,7 @@ disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; ena
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 
-   runned_sinc_puppet=false
-   # Si está corriendo sinc_puppet, esperamos hasta que termine
-   if [[ $(pgrep sinc_puppet) ]]; then
-      echo -e "${YELLOW}Esperando a que termine sinc_puppet...${NC}"
-      runned_sinc_puppet=true
-   fi
-
-   while [[ $(pgrep sinc_puppet) ]]; do
-      sleep 1
-   done
+   wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET"
 
    # Si el servidor puppet responde, se encuentra el ejecutable de sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
    [ -n "$PUPPET_SERVER" ] && ping -c1 $PUPPET_SERVER > /dev/null 2>&1
@@ -849,8 +991,11 @@ if [ -x /usr/sbin/sinc_puppet ]; then
    fi
 fi
 
+echo -e "${GREEN}Realizando pkgsync...${NC}"
+
 # Update the package lists
-wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
+# wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
+wait_while_locked; check_apt_update
 
 # Get failed repositories
 cat /tmp/apterrors | grep '^Err' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories

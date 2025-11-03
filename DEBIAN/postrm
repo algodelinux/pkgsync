@@ -6,6 +6,8 @@ SERVICE_NAME="getty@tty12.service"
 
 # Verificar si systemd está disponible
 if [ -x /bin/systemctl ]; then
+   systemctl daemon-reload
+
    if systemctl is-active --quiet "$SERVICE_NAME"; then
       systemctl stop "$SERVICE_NAME"
    fi
@@ -13,7 +15,6 @@ if [ -x /bin/systemctl ]; then
    if systemctl is-enabled --quiet "$SERVICE_NAME"; then
       systemctl disable "$SERVICE_NAME"
    fi
-   systemctl daemon-reload
 fi
 
 pkill -9 -u $USERID || true; deluser --quiet --system $USERID

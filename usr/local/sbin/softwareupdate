@@ -89,9 +89,6 @@ wait_while_locked () {
 }
 
 check_apt_update() {
-    # Colores para mensajes
-    GREEN='\033[0;32m'
-    NC='\033[0m'
 
     # Umbral en segundos (por defecto 1 día)
     local THRESHOLD_FOR_APT_UPDATE=${THRESHOLD_FOR_APT_UPDATE:-86400}
