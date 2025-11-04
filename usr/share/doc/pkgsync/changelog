@@ -1,3 +1,9 @@
+pkgsync (2.63) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 04 Nov 2025 08:44:00 +0100
+
 pkgsync (2.61) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/launchpad-getkeys 

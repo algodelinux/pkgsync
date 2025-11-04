@@ -1,6 +1,6 @@
 #! /bin/bash
 # Modified version by Esteban M. Navas <algodelinux@gmail.com>
-# Last update: 02/11/2025
+# Last update: 04/11/2025
 
 UPDATE_INTERVAL_MINUTES=30 # intervalo deseado (en minutos)
 TIMESTAMP_FILE="/var/lib/apt/periodic/update-success-stamp"
@@ -158,6 +158,27 @@ elif should_run_update; then
     fi
 else
     echo -e "${CYAN}→ Skipping apt-get update (last update was less than ${UPDATE_INTERVAL_MINUTES} minutes ago).${NC}"
+fi
+
+# Comprobar si existen líneas con "unsupported filetype"
+if grep -q "unsupported filetype" "$UPDATE_LOG"; then
+
+   # Extraer y eliminar los ficheros GPG problemáticos
+grep -E "unsupported filetype" "$UPDATE_LOG" | \
+grep -oE "/etc/apt/trusted\.gpg\.d/[^ ]+\.gpg" | \
+sort -u | while read -r keyfile; do
+    if [ -f "$keyfile" ]; then
+        echo "🗑️  Eliminando $keyfile (unsupported filetype)"
+        rm -f "$keyfile"
+    fi
+done
+
+# Eliminar las líneas con "unsupported filetype" del log
+echo
+echo " Limpiando entradas de 'unsupported filetype' del log..."
+sed -i '/unsupported filetype/d' "$UPDATE_LOG"
+
+echo "✅ Limpieza completada."
 fi
 
 MISSINGGEYS=$(cat $UPDATE_LOG)
