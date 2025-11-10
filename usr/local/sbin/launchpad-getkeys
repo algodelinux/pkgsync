@@ -65,7 +65,8 @@ function download_key_from_known_sources() {
     local keyid="$1"
     local target="$2"
 
-    echo -e "${CYAN}Trying to download key ${keyid} from known sources...${NC}"
+    # For testing purposes only
+    # echo -e "${CYAN}Trying to download key ${keyid} from known sources...${NC}"
 
     case "$keyid" in
         # Oracle VirtualBox
@@ -81,11 +82,6 @@ function download_key_from_known_sources() {
         # Waydroid
         0E406D181DCEE19C)
             wget -q --https-only --secure-protocol=TLSv1_2 -O /usr/share/keyrings/waydroid.gpg https://repo.waydro.id/waydroid.gpg
-            ;;
-
-        # Netdata
-        54832F89F09FED90)
-            wget -qO- https://packagecloud.io/netdata/netdata/gpgkey | gpg --yes --output /etc/apt/keyrings/netdata_netdata-archive-keyring.gpg --dearmor > /dev/null 2>&1
             ;;
 
         # Ookla (Speedtest)
@@ -106,6 +102,11 @@ function download_key_from_known_sources() {
         # Docker
         7EA0A9C3F273FCD8)
             wget -qO- https://download.docker.com/linux/ubuntu/gpg | gpg --yes --dearmor | tee /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null 2>&1
+            ;;
+
+        # Netdata
+        54832F89F09FED90)
+            curl -fsSL https://packagecloud.io/netdata/netdata/gpgkey | gpg --dearmor > /etc/apt/trusted.gpg.d/netdata_netdata.gpg
             ;;
 
         # Tailscale
@@ -169,7 +170,7 @@ fi
 
 PROXY_OPTS=()
 if [[ ! -z ${PROXY:-} ]]; then
-    PROXY_OPTS=( --keyserver-options http-proxy=$PROXY )
+   PROXY_OPTS=( --keyserver-options http-proxy=$PROXY )
 fi
 
 KEYSRV_OPTS=( --keyserver hkp://keyserver.ubuntu.com:80 )
@@ -193,44 +194,58 @@ fi
 echo -e "${GREEN}\nRunning apt-get update to detect missing GPG keys...${NC}"
 LC_ALL=C apt-get update 2> "$UPDATE_LOG"
 
-# Parse log and download keys
+# Parse log and download keys, grouping by repo and concatenating all its pubkeys
 grep -i "error" "$UPDATE_LOG" | grep -A1 "NO_PUBKEY" | grep -Eo 'https?://[^ ]+|NO_PUBKEY[[:space:]]+[A-Za-z0-9:]+([[:space:]]|$)' |
-while read -r line; do
-    if [[ "$line" =~ ^https?:// ]]; then
-        repo="$line"
-        repo="${repo#http://}"
-        repo="${repo#https://}"
-        repo="${repo//\//-}"
-        repo="${repo%-InRelease}"
-        current_repo="$KEYRING_DIR/$repo.gpg"
-    elif [[ "$line" =~ NO_PUBKEY[[:space:]]+([A-Za-z0-9:]+) ]]; then
-        key="${BASH_REMATCH[1]##*:}"
-        if [[ -n "$current_repo" ]]; then
-            echo -e "${CYAN}==> Processing key ${key} for ${current_repo}${NC}"
+awk '
+    /^https?:\/\// { if (repo) print repo " " keys; repo=$0; keys=""; next }
+    /NO_PUBKEY/ { sub(/^NO_PUBKEY[[:space:]]+/, "", $0); keys=keys" "$0 }
+    END { if (repo) print repo " " keys }
+' |
+while read -r repo keys; do
+    repo_clean="${repo#http://}"
+    repo_clean="${repo_clean#https://}"
+    repo_clean="${repo_clean//\//-}"
+    repo_clean="${repo_clean%-InRelease}"
+    current_repo="$KEYRING_DIR/$repo_clean.gpg"
 
-            # Try known sources first
-            if download_key_from_known_sources "$key" "$current_repo"; then
-                current_repo=""
-                continue
-            fi
+    echo -e "${CYAN}==> Processing repository: ${repo}${NC}"
+    echo -e "${CYAN}    Keys: ${keys}${NC}"
 
-            # Fallback to keyserver
-            echo -e "${CYAN}Trying to fetch ${key} from keyserver.ubuntu.com...${NC}"
-            TMP_KEYRING="$(mktemp)"
+    for key in $keys; do
+        echo -e "${CYAN}--> Fetching key ${key}${NC}"
 
-            if gpg --ignore-time-conflict --no-options --no-default-keyring --no-auto-check-trustdb --trust-model always --keyring "$TMP_KEYRING" "${KEYSRV_OPTS[@]}" "${PROXY_OPTS[@]}" --recv-keys "$key" >/dev/null 2>&1; then
-               gpg --ignore-time-conflict --no-options --no-default-keyring --no-auto-check-trustdb --trust-model always --keyring "$TMP_KEYRING" --export "$key" | gpg --yes --dearmor -o "$current_repo" >/dev/null 2>&1
-               rm -f "$TMP_KEYRING"
-            fi
-
-            if [[ -s "$current_repo" && $(gpg --list-packets "$current_repo" >/dev/null 2>&1; echo $?) -eq 0 ]]; then
-                echo -e "${GREEN}✔ Key ${key} successfully saved in ${current_repo}${NC}"
-            else
-                echo -e "${RED}✖ Failed to fetch key ${key}${NC}"
-                rm -f "$current_repo"
-            fi
-            current_repo=""
+        # Try known sources first
+        if download_key_from_known_sources "$key" "$current_repo"; then
+            echo -e "${GREEN}✔ Key ${key} obtained from known source${NC}"
+            continue
         fi
+
+        # Fallback to keyserver
+        # For testing purposes only
+        #echo -e "${CYAN}Trying to fetch ${key} from keyserver.ubuntu.com...${NC}"
+
+        TMP_KEYRING="$(mktemp)"
+        if gpg --ignore-time-conflict --no-options --no-default-keyring --no-auto-check-trustdb \
+               --trust-model always --keyring "$TMP_KEYRING" "${KEYSRV_OPTS[@]}" "${PROXY_OPTS[@]}" \
+               --recv-keys "$key" >/dev/null 2>&1; then
+
+            # Append (concatenate) the key to the repo keyring
+            gpg --ignore-time-conflict --no-options --no-default-keyring --no-auto-check-trustdb \
+                --trust-model always --keyring "$TMP_KEYRING" --export "$key" | \
+                gpg --yes --dearmor >> "$current_repo"
+            echo -e "${GREEN}✔ Key ${key} added to ${current_repo}${NC}"
+        else
+            echo -e "${RED}✖ Failed to fetch key ${key}${NC}"
+        fi
+        rm -f "$TMP_KEYRING"
+    done
+
+    # Final validation: ensure file is valid GPG
+    if [[ -s "$current_repo" && $(gpg --list-packets "$current_repo" >/dev/null 2>&1; echo $?) -eq 0 ]]; then
+        echo -e "${GREEN}✔ All keys successfully saved in ${current_repo}${NC}"
+    else
+        echo -e "${RED}✖ Invalid keyring created for ${repo}${NC}"
+        rm -f "$current_repo"
     fi
 done | tee /var/log/launchpad-getkeys.log
 
