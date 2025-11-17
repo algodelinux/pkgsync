@@ -8,13 +8,20 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.64-2
+export VERSION=2.68
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
 YELLOW='\e[0;33m'
 CYAN="\033[36m"
 NC='\e[0m' # No Color
+
+INFO="${CYAN}[INFO]${NC}"
+OK="${GREEN}[✔]${NC}"
+WARN="${YELLOW}[!]${NC}"
+FAIL="${RED}[✖]${NC}"
+DIR="${CYAN}[DIR]${NC}"
+LOG="${CYAN}[LOG]${NC}"
 
 convert_seconds() {
     local SEGUNDOS=$1
@@ -479,6 +486,52 @@ check_apt_update() {
     fi
 }
 
+unlock_dpkg() {
+    local TIME_MINUTES="${1:-5}"
+    local LOG_FILE="/var/log/solve-apt-errors.log"
+
+    # For testing purposes only
+    echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}" | tee -a "$LOG_FILE"
+
+    ps -eo pid,etime,comm,args --sort=etime | while read -r PID ETIME COMM ARGS; do
+        # Solo dpkg o apt
+        if [[ "$COMM" != "dpkg" && "$COMM" != "apt" ]]; then
+            continue
+        fi
+
+        # Convertir ETIME a minutos aproximados
+        minutes=0
+        if [[ $ETIME =~ - ]]; then
+            # D-HH:MM o D-HH:MM:SS
+            IFS=- read -r DAYS TIME_PART <<< "$ETIME"
+            IFS=: read -r H M S <<< "$TIME_PART:0:0"
+            minutes=$((DAYS*24*60 + H*60 + M))
+        else
+            # HH:MM:SS o MM:SS
+            IFS=: read -r H M S <<< "$ETIME:0:0"
+            H=${H:-0}
+            M=${M:-0}
+            minutes=$((H*60 + M))
+        fi
+
+        if [ "$minutes" -ge "$TIME_MINUTES" ]; then
+            # Identificar si está configurando un paquete
+            ACTION_DESC="bloqueado"
+            [[ "$ARGS" == *"--configure"* ]] && ACTION_DESC="configurando paquetes"
+
+            echo -e "${RED}Proceso $PID ($COMM) $ACTION_DESC lleva $minutes minutos. Terminando...${NC}" | tee -a "$LOG_FILE"
+
+            kill -TERM "$PID" 2>/dev/null
+            sleep 2
+            if ps -p "$PID" > /dev/null; then
+                echo -e "${RED}Proceso $PID no terminó, forzando KILL...${NC}" | tee -a "$LOG_FILE"
+                kill -KILL "$PID" 2>/dev/null
+            fi
+        fi
+    done
+
+}
+
 reinstall_broken_dpkg() {
     local INFO_DIR="/var/lib/dpkg/info"
     local BROKEN_PACKAGES=()
@@ -506,13 +559,6 @@ reinstall_broken_dpkg() {
 }
 
 restore_ldconfig() {
-    INFO="${CYAN}[INFO]${NC}"
-    OK="${GREEN}[✔]${NC}"
-    WARN="${YELLOW}[!]${NC}"
-    FAIL="${RED}[✖]${NC}"
-    DIR="${CYAN}[DIR]${NC}"
-    LOG="${CYAN}[LOG]${NC}"
-
     TMPDIR="/tmp/libc-bin-restore"
     mkdir -p "$TMPDIR"
 
@@ -603,6 +649,49 @@ restore_ldconfig() {
     echo -e "$OK Proceso completado. ldconfig debería estar operativo."
 }
 
+install_shim_if_uefi() {
+    # Comprobar si el sistema usa UEFI
+    if [ -d /sys/firmware/efi ]; then
+        # echo "Sistema UEFI detectado."
+
+        # Comprobar si shim-signed está instalado o solo en estado rc
+        PKG_STATUS=$(dpkg -l shim-signed 2>/dev/null | awk '/^ii|^rc/ {print $1}')
+        if [[ "$PKG_STATUS" != "ii" ]]; then
+            echo "Paquete 'shim-signed' no instalado o estado rc. Procediendo a instalar..."
+
+            # Actualizar lista de paquetes
+            apt-get update -qq
+
+            # Descargar el paquete
+            apt-get download shim-signed
+
+            # Obtener el nombre del archivo .deb descargado
+            DEB_FILE=$(ls shim-signed_*.deb 2>/dev/null | head -n1)
+
+            if [ -n "$DEB_FILE" ]; then
+                echo "Instalando $DEB_FILE..."
+                dpkg -i "$DEB_FILE"
+
+                # Resolver dependencias automáticamente
+                apt-get install -f -y
+
+                rm -f "$DEB_FILE"
+
+                # Comprobar si se instaló correctamente
+                if dpkg -s shim-signed >/dev/null 2>&1; then
+                    echo "✔ Paquete 'shim-signed' instalado correctamente."
+                else
+                    echo "✖ Falló la instalación de 'shim-signed'."
+                    return 1
+                fi
+            else
+                echo "✖ No se pudo descargar el paquete 'shim-signed'."
+                return 1
+            fi
+        fi
+    fi
+}
+
 solveapterrors() {
   set +e
 
@@ -630,8 +719,14 @@ solveapterrors() {
   # Esperamos a que termine sinc_puppet o lo matamos si ha transcurrido el timeout
   wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET"
 
+  # Buscamos procesos dpkg/apt detenidos más de 6 minutos
+  unlock_dpkg 6
+
   # Restauramos ldconfig si no se encuentra
   restore_ldconfig
+
+  # Instalamos shim en sistemas uefi, si se encuentra en estado ^rc
+  install_shim_if_uefi
 
   # Tratamos de instalar paquetes en estado ic
   wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
@@ -842,6 +937,22 @@ fi
 stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
 if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 
+# Evitar múltiples ejecuciones simultáneas 
+LOCKFILE="/var/lock/$(basename "$0").lock"
+SCRIPTNAME="$(basename "$0")"
+
+exec 200>"$LOCKFILE"1
+flock -n 200 || {
+    echo -e "${RED}[ERROR] '$SCRIPTNAME' ya está en ejecución (lock: $LOCKFILE)${NC}" >&2
+    exit 2
+}
+
+# For testing purposes only
+# echo "[INFO] Lock obtenido por '$SCRIPTNAME' (PID $$)"
+
+trap 'flock -u 200; rm -f "$LOCKFILE"' EXIT
+############################################
+
 # Establecemos valores por defecto
 ENABLE=yes # Controlamos la ejecución manual o automática de pkgsync
 HELP=false
@@ -888,14 +999,6 @@ if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
   echo "           Para activarla poner el valor ENABLE=yes."
   exit 0
 fi
-
-# Definimos el fichero de lock
-lockfile=/var/lock/$(basename $0)
-lockfile-create $lockfile || exit 2
-lockfile-touch $lockfile &
-BADGER="$!"
-
-trap "kill "${BADGER}" 2>/dev/null || true; lockfile-remove $lockfile; exit" QUIT INT TERM EXIT
 
 # Crear el directorio /etc/pkgsync y sus subdirectorios si no existen
 if [ ! -d /etc/pkgsync ]; then
@@ -1076,5 +1179,14 @@ if [ $ALERT_EMAIL_ON_ERROR = "yes" ] && [ -n "$ALERT_EMAIL_RECEIVER" ]; then
       mail -s "Error al ejecutar pkgsync en el equipo $(hostname)" "$ALERT_EMAIL_RECEIVER" < /var/log/pkgsync.log
    fi
 fi
+
+# El lock se libera automáticamente al salir, pero añadimos un trap por limpieza explícita
+cleanup() {
+	# For testing purposes only
+    # echo "[INFO] Liberando lock $LOCKFILE"
+    flock -u 200
+    rm -f "$LOCKFILE"
+}
+trap cleanup EXIT
 
 apagar_equipo;reiniciar_equipo

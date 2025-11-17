@@ -1,3 +1,29 @@
+pkgsync (2.68) ubuntu; urgency=medium
+
+  * Removed lockfile-progs use from /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 17 Nov 2025 11:40:00 +0100
+
+pkgsync (2.67) ubuntu; urgency=medium
+
+  * Modificado el código de pkgsync para usar bloqueo con flock (sin lockfile-progs)
+  * Upgraded /usr/local/sbin/launchpad-getkeys 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 13 Nov 2025 12:25:00 +0100
+
+pkgsync (2.66) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 12 Nov 2025 12:33:00 +0100
+
+pkgsync (2.65) ubuntu; urgency=medium
+
+  * Replaced /usr/local/sbin/solved-apt-errors with a new version
+  * Upgraded /usr/local/sbin/pkgsync 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 11 Nov 2025 20:14:00 +0100
+
 pkgsync (2.64-2) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/launchpad-getkeys to support several keys from every 

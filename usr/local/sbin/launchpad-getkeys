@@ -1,7 +1,7 @@
 #! /bin/bash
 # launchpad-getkeys
 # Rewrited version by Esteban M. Navas <algodelinux@gmail.com>
-# Last update: 09/11/2025
+# Last update: 13/11/2025
 #
 # Parses the apt log, removes "GPG error:" lines, # extracts NO_PUBKEY and downloads missing keys,
 
@@ -61,6 +61,31 @@ function remove_expired_keys () {
     rm -f /tmp/expiredkeys
 }
 
+function install_official_keyrings() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        DISTRO_ID=$(echo "$ID" | tr '[:upper:]' '[:lower:]')
+    else
+        DISTRO_ID="debian"  # valor por defecto
+    fi
+
+    case "$DISTRO_ID" in
+        debian)
+            echo "Instalando claves oficiales de Debian..."
+            apt-get install --reinstall -y --no-install-recommends \
+                debian-archive-keyring
+            ;;
+        ubuntu)
+            echo "Instalando claves oficiales de Ubuntu..."
+            apt-get install --reinstall -y --no-install-recommends \
+                ubuntu-keyring
+            ;;
+        *)
+            echo "Distribución no reconocida, saltando instalación de claves oficiales."
+            ;;
+    esac
+}
+
 function download_key_from_known_sources() {
     local keyid="$1"
     local target="$2"
@@ -106,7 +131,7 @@ function download_key_from_known_sources() {
 
         # Netdata
         54832F89F09FED90)
-            curl -fsSL https://packagecloud.io/netdata/netdata/gpgkey | gpg --dearmor > /etc/apt/trusted.gpg.d/netdata_netdata.gpg
+            curl -fsSL https://packagecloud.io/netdata/netdata/gpgkey | gpg --yes --dearmor > /etc/apt/trusted.gpg.d/netdata_netdata.gpg
             ;;
 
         # Tailscale
@@ -194,6 +219,14 @@ fi
 echo -e "${GREEN}\nRunning apt-get update to detect missing GPG keys...${NC}"
 LC_ALL=C apt-get update 2> "$UPDATE_LOG"
 
+# Comprobar si hay errores NO_PUBKEY de repositorios oficiales
+if grep -E "NO_PUBKEY" "$UPDATE_LOG" | grep -E "security\.debian\.org|deb\.debian\.org|archive\.ubuntu\.com|security\.ubuntu\.com" >/dev/null; then
+   # For testing purposes only
+   echo -e "\n[INFO] Se detectaron errores NO_PUBKEY de repositorios oficiales. Instalando keyrings oficiales..."
+   install_official_keyrings
+fi
+
+
 # Parse log and download keys, grouping by repo and concatenating all its pubkeys
 grep -i "error" "$UPDATE_LOG" | grep -A1 "NO_PUBKEY" | grep -Eo 'https?://[^ ]+|NO_PUBKEY[[:space:]]+[A-Za-z0-9:]+([[:space:]]|$)' |
 awk '
@@ -241,11 +274,10 @@ while read -r repo keys; do
     done
 
     # Final validation: ensure file is valid GPG
-    if [[ -s "$current_repo" && $(gpg --list-packets "$current_repo" >/dev/null 2>&1; echo $?) -eq 0 ]]; then
-        echo -e "${GREEN}✔ All keys successfully saved in ${current_repo}${NC}"
+    if gpg --no-default-keyring --keyring "$current_repo" --list-keys >/dev/null 2>&1; then
+        echo -e "${GREEN}✔ Key(s) successfully saved in ${current_repo}${NC}"
     else
-        echo -e "${RED}✖ Invalid keyring created for ${repo}${NC}"
-        rm -f "$current_repo"
+        echo -e "${RED}✖ Failed to save key(s) for ${repo}${NC}"
     fi
 done | tee /var/log/launchpad-getkeys.log
 

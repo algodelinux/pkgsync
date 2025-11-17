@@ -1,7 +1,7 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
 # 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
-#
+# Last update: 11/11/2025
 
 idioma=$LC_ALL
 export LC_ALL=C
@@ -32,6 +32,52 @@ killprocess() {
 
 wait_while_locked() {
    [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
+}
+
+unlock_dpkg() {
+    local TIME_MINUTES="${1:-5}"
+    local LOG_FILE="/var/log/solve-apt-errors.log"
+
+    # For testing purposes only
+    # echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}" | tee -a "$LOG_FILE"
+
+    ps -eo pid,etime,comm,args --sort=etime | while read -r PID ETIME COMM ARGS; do
+        # Solo dpkg o apt
+        if [[ "$COMM" != "dpkg" && "$COMM" != "apt" ]]; then
+            continue
+        fi
+
+        # Convertir ETIME a minutos aproximados
+        minutes=0
+        if [[ $ETIME =~ - ]]; then
+            # D-HH:MM o D-HH:MM:SS
+            IFS=- read -r DAYS TIME_PART <<< "$ETIME"
+            IFS=: read -r H M S <<< "$TIME_PART:0:0"
+            minutes=$((DAYS*24*60 + H*60 + M))
+        else
+            # HH:MM:SS o MM:SS
+            IFS=: read -r H M S <<< "$ETIME:0:0"
+            H=${H:-0}
+            M=${M:-0}
+            minutes=$((H*60 + M))
+        fi
+
+        if [ "$minutes" -ge "$TIME_MINUTES" ]; then
+            # Identificar si está configurando un paquete
+            ACTION_DESC="bloqueado"
+            [[ "$ARGS" == *"--configure"* ]] && ACTION_DESC="configurando paquetes"
+
+            echo -e "${RED}Proceso $PID ($COMM) $ACTION_DESC lleva $minutes minutos. Terminando...${NC}" | tee -a "$LOG_FILE"
+
+            kill -TERM "$PID" 2>/dev/null
+            sleep 2
+            if ps -p "$PID" > /dev/null; then
+                echo -e "${RED}Proceso $PID no terminó, forzando KILL...${NC}" | tee -a "$LOG_FILE"
+                kill -KILL "$PID" 2>/dev/null
+            fi
+        fi
+    done
+
 }
 
 reinstall_broken_dpkg() {
@@ -71,18 +117,14 @@ restore_ldconfig() {
     TMPDIR="/tmp/libc-bin-restore"
     mkdir -p "$TMPDIR"
 
-    # ------------------------------------------------------------
-    # 1️⃣ Comprobación inicial
-    # ------------------------------------------------------------
+    # Comprobación inicial
     if command -v ldconfig >/dev/null 2>&1; then
         return 0
     fi
 
     echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
 
-    # ------------------------------------------------------------
-    # 2️⃣ Detectar distribución y versión
-    # ------------------------------------------------------------
+    # Detectar distribución y versión
     if [ -f /etc/os-release ]; then
         . /etc/os-release
         DISTRO=${ID,,}
@@ -95,9 +137,7 @@ restore_ldconfig() {
     ARCH=$(dpkg --print-architecture)
     echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
 
-    # ------------------------------------------------------------
-    # 3️⃣ Obtener URL del paquete libc-bin
-    # ------------------------------------------------------------
+    # Obtener URL del paquete libc-bin
     echo -e "$INFO Buscando paquete libc-bin adecuado..."
 
     case "$DISTRO" in
@@ -132,9 +172,7 @@ restore_ldconfig() {
     echo -e "$LOG Descargando $PKG_NAME ..."
     wget -q -O "$PKG_PATH" "$PKG_URL"
 
-    # ------------------------------------------------------------
-    # 4️⃣ Extraer ldconfig
-    # ------------------------------------------------------------
+    # Extraer ldconfig
     echo -e "$INFO Extrayendo paquete..."
     dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
 
@@ -147,9 +185,7 @@ restore_ldconfig() {
     cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/
     chmod 755 /sbin/ldconfig
 
-    # ------------------------------------------------------------
-    # 5️⃣ Verificación y reparación
-    # ------------------------------------------------------------
+    # Verificación y reparación
     echo -e "$INFO Verificando funcionamiento..."
     if /sbin/ldconfig -p >/dev/null 2>&1; then
         echo -e "$OK ldconfig restaurado correctamente."
@@ -161,13 +197,54 @@ restore_ldconfig() {
     apt-get install --reinstall -y libc-bin || true
     apt-get -f install -y || true
 
-    # ------------------------------------------------------------
-    # 6️⃣ Limpieza
-    # ------------------------------------------------------------
+    # Limpieza
     echo -e "$INFO Limpiando archivos temporales..."
     rm -rf "$TMPDIR"
 
     echo -e "$OK Proceso completado. ldconfig debería estar operativo."
+}
+
+install_shim_if_uefi() {
+    # Comprobar si el sistema usa UEFI
+    if [ -d /sys/firmware/efi ]; then
+        # echo "Sistema UEFI detectado."
+
+        # Comprobar si shim-signed está instalado o solo en estado rc
+        PKG_STATUS=$(dpkg -l shim-signed 2>/dev/null | awk '/^ii|^rc/ {print $1}')
+        if [[ "$PKG_STATUS" != "ii" ]]; then
+            echo "Paquete 'shim-signed' no instalado o estado rc. Procediendo a instalar..."
+
+            # Actualizar lista de paquetes
+            apt-get update -qq
+
+            # Descargar el paquete
+            apt-get download shim-signed
+
+            # Obtener el nombre del archivo .deb descargado
+            DEB_FILE=$(ls shim-signed_*.deb 2>/dev/null | head -n1)
+
+            if [ -n "$DEB_FILE" ]; then
+                echo "Instalando $DEB_FILE..."
+                dpkg -i "$DEB_FILE"
+
+                # Resolver dependencias automáticamente
+                apt-get install -f -y
+
+                rm -f "$DEB_FILE"
+
+                # Comprobar si se instaló correctamente
+                if dpkg -s shim-signed >/dev/null 2>&1; then
+                    echo "✔ Paquete 'shim-signed' instalado correctamente."
+                else
+                    echo "✖ Falló la instalación de 'shim-signed'."
+                    return 1
+                fi
+            else
+                echo "✖ No se pudo descargar el paquete 'shim-signed'."
+                return 1
+            fi
+        fi
+    fi
 }
 
 
@@ -216,8 +293,14 @@ if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
 # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
 if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
 
+# Buscamos procesos dpkg/apt detenidos más de 5 minutos (valor por defecto)
+unlock_dpkg
+
 # Restauramos ldconfig si no se encuentra
 restore_ldconfig
+
+# Instalamos shim en sistemas uefi, si se encuentra en estado ^rc
+install_shim_if_uefi
 
 # Tratamos de instalar paquetes en estado ic
 wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
