@@ -1,3 +1,11 @@
+pkgsync (2.69) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/shim-repair
+  * Replaced /usr/local/sbin/solved-apt-errors with a new version
+  * Upgraded /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 19 Nov 2025 11:51:00 +0100
+
 pkgsync (2.68) ubuntu; urgency=medium
 
   * Removed lockfile-progs use from /usr/local/sbin/pkgsync
