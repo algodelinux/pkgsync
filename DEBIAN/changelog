@@ -1,3 +1,9 @@
+pkgsync (2.71) ubuntu; urgency=medium
+
+  * Upgraded reinstall_broken_dpkg function on /usr/local/sbin/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 21 Nov 2025 10:03:00 +0100
+
 pkgsync (2.69) ubuntu; urgency=medium
 
   * Added /usr/local/sbin/shim-repair

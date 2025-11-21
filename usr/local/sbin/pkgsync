@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.69
+export VERSION=2.71
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -481,16 +481,17 @@ check_apt_update() {
     if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
         echo -e "${GREEN}Han pasado ${AGE_HUMAN} desde la última actualización. Ejecutando 'apt-get update'...${NC}"
         apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
-    else
-        echo -e "${GREEN}No es necesario ejecutar 'apt-get update'. Última ejecución hace ${AGE_HUMAN}.${NC}"
+    #else
+    #    echo -e "${GREEN}No es necesario ejecutar 'apt-get update'. Última ejecución hace ${AGE_HUMAN}.${NC}"
     fi
 }
 
 unlock_dpkg() {
     local TIME_MINUTES="${1:-5}"
     local LOG_FILE="/var/log/solve-apt-errors.log"
+    local FOUND=0
 
-    # For testing purposes only
+    # Para propósitos de prueba
     echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}" | tee -a "$LOG_FILE"
 
     ps -eo pid,etime,comm,args --sort=etime | while read -r PID ETIME COMM ARGS; do
@@ -515,6 +516,7 @@ unlock_dpkg() {
         fi
 
         if [ "$minutes" -ge "$TIME_MINUTES" ]; then
+            FOUND=1
             # Identificar si está configurando un paquete
             ACTION_DESC="bloqueado"
             [[ "$ARGS" == *"--configure"* ]] && ACTION_DESC="configurando paquetes"
@@ -530,6 +532,10 @@ unlock_dpkg() {
         fi
     done
 
+    # Mensaje si no se encontraron procesos
+    if [ "$FOUND" -eq 0 ]; then
+        echo -e "${GREEN}No se encontraron procesos dpkg/apt bloqueados.${NC}" | tee -a "$LOG_FILE"
+    fi
 }
 
 reinstall_broken_dpkg() {
@@ -538,6 +544,9 @@ reinstall_broken_dpkg() {
 
     # Iterar sobre paquetes instalados
     for pkg in $(dpkg -l | awk '/^ii/ {print $2}'); do
+        if [[ "$pkg" == "wine32:i386" ]]; then
+            pkg="${pkg%%:*}"
+        fi
         if [ ! -f "$INFO_DIR/${pkg}.list" ]; then
             BROKEN_PACKAGES+=("$pkg")
         fi
@@ -683,7 +692,8 @@ install_shim_if_uefi() {
 
     # Si shim-signed ya está instalado, no hacer nada
     if [[ "$PKG_STATUS" == "ii" ]]; then
-        echo "'shim-signed' ya está instalado. No se realizará ninguna acción."
+        # For testing purposes only
+        # echo "'shim-signed' ya está instalado. No se realizará ninguna acción."
         return 0
     fi
 
@@ -1114,9 +1124,7 @@ check_auto_reboot
 launchpad_getkeys | tee -a /var/log/pkgsync.log
 
 # Actualizamos los paquetes instalados
-echo
-echo -e "${GREEN}Comprobando si existen actualizaciones de paquetes instalados...${NC}"
-solveapterrors; wait_while_locked; LC_ALL=C check_apt_update | tee /tmp/apterrors
+solveapterrors; echo -e "${CYAN}Comprobando si existen actualizaciones de paquetes instalados...${NC}"; wait_while_locked; LC_ALL=C check_apt_update | tee /tmp/apterrors
 
 # Abort if repository downloads fail (possible mirror failure).
 grep -w '^W: Failed to fetch' /tmp/apterrors 2>&1 >/dev/null
