@@ -1,7 +1,7 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
 # 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
-# Last update: 19/11/2025
+# Last update: 23/11/2025
 
 idioma=$LC_ALL
 export LC_ALL=C
@@ -13,9 +13,16 @@ YELLOW="\033[33m"
 CYAN="\033[36m"
 NC='\033[0m' # No Color
 
+INFO="${CYAN}[INFO]${NC}"
+OK="${GREEN}[✔]${NC}"
+WARN="${YELLOW}[!]${NC}"
+FAIL="${RED}[✖]${NC}"
+DIR="${CYAN}[DIR]${NC}"
+LOG="${CYAN}[LOG]${NC}"
+
+LOG_FILE="/var/log/solve-apt-errors.log"
 
 killprocess() {
-
    updatehour=$(ps aux|grep $1 | grep -v grep | head -1 | awk '{print $9}')
    if [ -n $updatehour ]; then
       timestampupdate=$(date -d "$updatehour" +'%s')
@@ -34,9 +41,95 @@ wait_while_locked() {
    [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
+install_packages() {
+    local packages="$1"
+    local problem_pkgs
+    local tmp_dir="/tmp/install_packages_debs"
+    local LOG_FILE="/var/log/install_packages.log"
+
+    # Comprobar si se han pasado paquetes
+    if [ -z "$packages" ]; then
+        echo "No se han especificado paquetes para instalar." | tee -a "$LOG_FILE"
+        return 1
+    fi
+
+    echo "Instalando los siguientes paquetes: $packages" | tee -a "$LOG_FILE"
+
+    # Separar paquetes por si se pasan rutas a .deb y nombres
+    local apt_packages=()
+    local deb_files=()
+    for pkg in $packages; do
+        if [[ "$pkg" == *.deb ]]; then
+            deb_files+=("$pkg")
+        else
+            apt_packages+=("$pkg")
+        fi
+    done
+
+    # Instalar paquetes con apt-get (solo nombres de paquetes)
+    if [ "${#apt_packages[@]}" -gt 0 ]; then
+        if apt-get -y install -o Dpkg::Options::="--force-confold" "${apt_packages[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Instalación inicial de paquetes apt completada correctamente." | tee -a "$LOG_FILE"
+        else
+            echo "Error durante la instalación de paquetes apt." | tee -a "$LOG_FILE"
+            return 2
+        fi
+    fi
+
+    # Instalar paquetes locales .deb
+    if [ "${#deb_files[@]}" -gt 0 ]; then
+        echo "Instalando paquetes locales .deb con dpkg: ${deb_files[*]}" | tee -a "$LOG_FILE"
+        if dpkg -i "${deb_files[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+            echo "Instalación de paquetes .deb completada correctamente." | tee -a "$LOG_FILE"
+        else
+            echo "Error durante la instalación de paquetes .deb." | tee -a "$LOG_FILE"
+            return 3
+        fi
+    fi
+
+    # Buscar paquetes en estados problemáticos después de la instalación
+    problem_pkgs=$(dpkg -l | awk '/^(ic|iU|iF|ri|.HR)/ {print $2}')
+
+    if [ -z "$problem_pkgs" ]; then
+        echo "No se detectaron paquetes problemáticos después de la instalación." | tee -a "$LOG_FILE"
+        return 0
+    fi
+
+    echo "Se han detectado paquetes problemáticos: $problem_pkgs" | tee -a "$LOG_FILE"
+
+    # Crear directorio temporal para descargar los .deb de los problemáticos
+    mkdir -p "$tmp_dir"
+    trap 'rm -rf "$tmp_dir"' EXIT
+
+    local downloaded_any=0
+
+    # Descargar los paquetes problemáticos
+    for pkg in $problem_pkgs; do
+        echo "Descargando paquete problemático: $pkg" | tee -a "$LOG_FILE"
+        if apt-get download -o=dir::cache="$tmp_dir" "$pkg" 2>&1 | tee -a "$LOG_FILE"; then
+            downloaded_any=1
+        else
+            echo "Error descargando el paquete $pkg, se omitirá." | tee -a "$LOG_FILE"
+        fi
+    done
+
+    if [ "$downloaded_any" -eq 0 ]; then
+        echo "No se descargó ningún paquete problemático, no se puede reinstalar." | tee -a "$LOG_FILE"
+        return 4
+    fi
+
+    # Instalar los paquetes descargados con dpkg
+    echo "Instalando paquetes problemáticos con dpkg..." | tee -a "$LOG_FILE"
+    if dpkg -i "$tmp_dir"/*.deb 2>&1 | tee -a "$LOG_FILE"; then
+        echo "Instalación de paquetes problemáticos completada correctamente." | tee -a "$LOG_FILE"
+    else
+        echo "Error durante la instalación de paquetes problemáticos con dpkg." | tee -a "$LOG_FILE"
+        return 5
+    fi
+}
+
 unlock_dpkg() {
     local TIME_MINUTES="${1:-5}"
-    local LOG_FILE="/var/log/solve-apt-errors.log"
 
     # For testing purposes only
     # echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}" | tee -a "$LOG_FILE"
@@ -80,40 +173,38 @@ unlock_dpkg() {
 
 }
 
+
 reinstall_broken_dpkg() {
     local INFO_DIR="/var/lib/dpkg/info"
     local BROKEN_PACKAGES=()
 
-    # Iterar sobre paquetes instalados
-    for pkg in $(dpkg -l | awk '/^ii/ {print $2}'); do
-        if [ ! -f "$INFO_DIR/${pkg}.list" ]; then
-            BROKEN_PACKAGES+=("$pkg")
-        fi
-    done
+    # Obtener todos los paquetes instalados con su arquitectura
+    mapfile -t BROKEN_PACKAGES < <(
+        dpkg -l | awk '/^ii/ {print $2}' | while IFS= read -r pkg; do
+            # Solo corregir wine32:i386 a wine32
+            [[ "$pkg" == "wine32:i386" ]] && pkg="wine32"
+            # Comprobar si falta el archivo .list
+            [ ! -f "$INFO_DIR/$pkg.list" ] && printf '%s\n' "$pkg"
+        done
+    )
 
     # Si no hay paquetes rotos, salir silenciosamente
     if [ ${#BROKEN_PACKAGES[@]} -eq 0 ]; then
         return 0
     fi
 
-    # Mostrar solo si hay paquetes con archivos .list faltantes
+    # Mostrar paquetes con archivos .list faltantes
     echo "Paquetes con archivos .list faltantes:"
     printf '%s\n' "${BROKEN_PACKAGES[@]}"
 
-    echo "Reinstalando paquetes automáticamente..."
-    apt-get update; apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
+    # Reinstalar paquetes automáticamente
+    echo "Reinstalando paquetes..."
+    check_apt_update
+    sudo apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
     echo "Reinstalación completada."
 }
 
 restore_ldconfig() {
-
-    INFO="${CYAN}[INFO]${NC}"
-    OK="${GREEN}[✔]${NC}"
-    WARN="${YELLOW}[!]${NC}"
-    FAIL="${RED}[✖]${NC}"
-    DIR="${CYAN}[DIR]${NC}"
-    LOG="${CYAN}[LOG]${NC}"
-
     TMPDIR="/tmp/libc-bin-restore"
     mkdir -p "$TMPDIR"
 
@@ -358,7 +449,7 @@ install_shim_if_uefi
 # Tratamos de instalar paquetes en estado ic
 wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
 if [ "$incomplete_packages" ]; then
-   wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $incomplete_packages
+   wait_while_locked; install_packages $incomplete_packages
 fi
 
 # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
@@ -367,7 +458,7 @@ if [ "$very_bad_state_packages" ]; then
    for packagename in $very_bad_state_packages; do
        mv /var/lib/dpkg/info/$packagename.* /tmp/
        wait_while_locked; dpkg --purge --force-all $packagename
-       wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $packagename
+       wait_while_locked; install_packages $packagename
        if [ $? -ne 0 ]; then
           wait_while_locked; dpkg --purge --force-all $packagename
        fi
@@ -386,7 +477,7 @@ fi
 # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
 wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
 if [ "$bad_packages" ]; then
-   wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $bad_packages
+   wait_while_locked; install_packages $bad_packages
    wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
    if [ "$bad_packages" ]; then
       wait_while_locked; apt-get remove -y $bad_packages
@@ -414,6 +505,6 @@ fi
 reinstall_broken_dpkg
 
 # Aseguramos la actualización de pkgsync
-wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && apt-get -y install -o Dpkg::Options::="--force-confold" pkgsync
+wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && install_packages pkgsync
 
 export LC_ALL=$idioma

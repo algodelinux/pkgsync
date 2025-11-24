@@ -1,3 +1,13 @@
+pkgsync (2.72) ubuntu; urgency=medium
+
+  * Improved reinstall_broken_dpkg function on /usr/local/sbin/pkgsync,
+    /usr/local/sbin/softwareupdate, /usr/local/sbin/solve-apt-errors and
+    added /usr/local/sbin/reinstall-broken-dpkg
+  * Modified /usr/local/sbin/download_pkg_and_deps to let specify a dependency level
+  * Improved /usr/local/sbin/solve-apt-errors
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sun, 23 Nov 2025 08:06:00 +0100
+
 pkgsync (2.71) ubuntu; urgency=medium
 
   * Upgraded reinstall_broken_dpkg function on /usr/local/sbin/pkgsync

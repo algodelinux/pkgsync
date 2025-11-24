@@ -1,0 +1,29 @@
+reinstall_broken_dpkg() {
+    local INFO_DIR="/var/lib/dpkg/info"
+    local BROKEN_PACKAGES=()
+
+    # Obtener todos los paquetes instalados con su arquitectura
+    mapfile -t BROKEN_PACKAGES < <(
+        dpkg -l | awk '/^ii/ {print $2}' | while IFS= read -r pkg; do
+            # Solo corregir wine32:i386 a wine32
+            [[ "$pkg" == "wine32:i386" ]] && pkg="wine32"
+            # Comprobar si falta el archivo .list
+            [ ! -f "$INFO_DIR/$pkg.list" ] && printf '%s\n' "$pkg"
+        done
+    )
+
+    # Si no hay paquetes rotos, salir silenciosamente
+    if [ ${#BROKEN_PACKAGES[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    # Mostrar paquetes con archivos .list faltantes
+    echo "Paquetes con archivos .list faltantes:"
+    printf '%s\n' "${BROKEN_PACKAGES[@]}"
+
+    # Reinstalar paquetes automáticamente
+    echo "Reinstalando paquetes..."
+    check_apt_update
+    sudo apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
+    echo "Reinstalación completada."
+}
