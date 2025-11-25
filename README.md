@@ -74,9 +74,10 @@ PURGE_OLD_KERNELS="yes"
 # KEEP_LAST_KERNELS="2"
 KEEP_LAST_KERNELS="3"
 
-# Eliminar dependencias de paquetes desinstalados, purgar paquetes desinstalados y limpiar la cache
-# CLEAN="no": no hacer limpieza (opción por defecto)
-# CLEAN="yes": hacer limpieza
+# Eliminar paquetes desinstalados, eliminar sus ficheros de configuración y limpiar la cache
+# CLEAN="no": No hacer limpieza (opción por defecto)
+# CLEAN="yes": Elimina paquetes desinstalados y limpia la cache
+# CLEAN="purge": Elimina paquetes desinstalados, sus ficheros de configuración y limpia la cache
 CLEAN="no"
 
 # Iniciar sinc_puppet antes de lanzar pkgsync para garantizar que los ficheros de pkgsync 
@@ -121,7 +122,7 @@ LAUNCHPAD_GETKEYS_PROXY="http://servidor:3128"
 # Es posible indicar a launchpad-getkeys que elimine claves públicas de repositorios caducadas
 # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes": indicar a launchpad-getkeys que elimine claves públicas caducadas
 # LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no": no indicar a launchpad-getkeys que elimine claves públicas caducadas (opción por defecto)
-LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="yes"
+LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS="no"
 
 # Definimos un tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync
 # Este parámetro sirve para evitar evitar que pkgsync quede bloqueado por un fallo anterior de dpkg o apt
@@ -139,7 +140,7 @@ ABORT_ON_FAILED_REPOS="yes"
 # de listas de paquetes.
 # AUTO_TEST_FILES="yes": Habilitar la revisión automática de las listas de paquetes
 # AUTO_TEST_FILES="no": Deshabilitar la revisión automática de las listas de paquetes (opción por defecto)
-AUTO_TEST_FILES="no"
+AUTO_TEST_FILES="yes"
 
 # ALERT_EMAIL_RECEIVER permite definir una dirección de email a la que enviar una alerta
 # ALERT_EMAIL_RECEIVER="miusuario@midominio.es"
@@ -170,31 +171,31 @@ THRESHOLD_FOR_APT_UPDATE="900"
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.51
+pkgsync 2.72
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
 Recognized options:
-  -h,  --help			display this help and exit
-  -v,  --version		display pkgsync version and exit
-  -k,  --keep-unused		don't remove unused packages
-  -e,  --ensure-essential	don't remove required, important and standard packages
-  -s,  --simulate		don't do anything, just print out what would have happened
-  -t,  --test-files		test pkgsync files
-  -tr, --test-files r		test and remove packages from pkgsync files lists
-  -d,  --delete-files		delete all pkgsync files
-  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist
-  -f,  --force			force pkgsync
-  -c,  --clean			remove uninstalled packages dependencies,
-				purge uninstalled packages and clean cache
-  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)
-				or the number specified in /etc/default/pkgsync file
-  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync
+  -h,  --help					display this help and exit
+  -v,  --version				display pkgsync version and exit
+  -k,  --keep-unused			don't remove unused packages
+  -e,  --ensure-essential		don't remove required, important and standard packages
+  -s,  --simulate				simulate and print out which packages would be installed/uninstalled or updated
+  -t,  --test-files				test pkgsync files
+  -tr, --test-files r			test and remove packages from pkgsync files lists
+  -d,  --delete-files			delete all pkgsync files
+  -b,  --build-files			build musthave and create empty mayhave and maynothave if they don't exist
+  -f,  --force					force pkgsync
+  -c,  --clean					remove uninstalled packages and clean cache
+  -C,  --clean-and-purge		remove uninstalled packages, delete their config files and clean cache
+  -p,  --purge-old-kernels		remove old kernels keeping the last two (by default)
+								or the number specified in /etc/default/pkgsync file
+  -n,  --no-sincpuppet			don't launch sinc_puppet from pkgsync
   -i,  --ignore-failed-repos	ignore failed repositories
-  -g,  --get-keys		exec launchpad-keys to get repositories keys
-  -S,  --shutdown		shutdown machine after pkgsync
-  -R,  --reboot			reboot machine after pkgsync
-  -Rw, --reboot w		reboot machine and boot into windows on EFI computers
+  -g,  --get-keys				exec launchpad-keys to get repositories keys
+  -S,  --shutdown				shutdown machine after pkgsync
+  -R,  --reboot					reboot machine after pkgsync
+  -Rw, --reboot w				reboot machine and boot into windows on EFI computers
 
 Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian.
 ```
@@ -203,9 +204,8 @@ Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian.
 Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales en el directorio **/usr/local/sbin/**:
 
 - **apt-list-expired-keys**: Muestra un listado de claves de repositorios expiradas, si las hay.
-
 - **apt-remove-expired-keys**: Elimina las claves de repositorios que han expirado.
-- ***backup-repositories***: Realiza un backup de los repositorios almacenados en el fichero **/etc/apt/sources.list** junto con los repositorios almacenados en el directorio **/etc/apt/sources.list.d/** y lo guarda en el archivo comprimido **/var/backups/sources.list.tar.gz**.
+- **backup-repositories**: Realiza un backup de los repositorios almacenados en el fichero **/etc/apt/sources.list** junto con los repositorios almacenados en el directorio **/etc/apt/sources.list.d/** y lo guarda en el archivo comprimido **/var/backups/sources.list.tar.gz**.
 - **list-backup-repositories**: Lista los repositorios incluidos en el fichero de backup **/var/backups/sources.list.tar.gz**.
 - **restore-backup-repositories**: Restaura fichero **/etc/apt/sources.list** y los ficheros alojados en el directorio **/etc/apt/sources.list.d/** a partir del backup almacenado en el fichero **/var/backups/sources.list.tar.gz**.
 - **remove-backup-repositories**: Elimina el fichero de backup de repositorios **/var/backups/sources.list.tar.gz**.
@@ -233,7 +233,7 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 - **install-kernel**: Obtiene la lista de kernels disponibles en los repositorios organizados por series y permite realizar la instalación de un kernel específico.
 - **install-last-available-kernels**: Pasándole el número de kernels que queremos tener instalados, instalará los kernels de la misma serie que falten.
 - **remove-kernel**: Muestra la lista de kernels instalados y nos permite seleccionar el que queremos desinstalar.
-
+- **shim-repair**: Instala el paquete shim-signed y sus dependencias en equipos con EFI.
 
 ## Autores ✒️
 
