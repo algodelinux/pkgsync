@@ -11,7 +11,7 @@ pkgsync es una herramienta que permite mantener una uniformidad en el software d
 
 En los ficheros **musthave** se deben incluir los nombres de los paquetes que pkgsync **debe** instalar. En los ficheros **mayhave** se debem agregar los nombres de los paquetes que **pueden** instalarse. Por último, en los ficheros **maynothave** se deben añadir los nombres de los paquetes que **no deben instalarse**.
  
-## Funcionamiento ⚙️
+## ⚙ Funcionamiento️
 **pkgsync** se encargará de cumplir con las demandas establecidas en las listas, instalando los paquetes que se encuentren en los ficheros **musthave**, manteniendo instalado lo que se encuentre en los ficheros **mayhave** y desintalando lo que se encuentre en los ficheros **maynothave**.
 
 Para permitir una administración compartida de paquetes, **pkgsync** maneja tres listas de paquetes:
@@ -43,7 +43,7 @@ Es **importante** destacar que los ficheros **maynothave** tienen prioridad sobr
 El script **nightly-pkgsync** bloquea el apagado del equipo mientras se está realizando el pkgsync. Ésto es realmente importante porque evita que el usuario apague el equipo mientras pkgsync esté instalando/desinstalando paquetes.
 Para lograr el bloqueo, **nightly-pkgsync** comprueba que exista la herramienta **systemd-inhibit**, lo que significa que debe estar instalado systemd en el sistema.
 
-## Configuración 🔧
+## 🔧 Configuración 
 **/etc/default/pkgsync** es el fichero de configuración de pkgsync. Podemos modificar su comportamiento por defecto modificando los valores definidos en él:
 
 ```
