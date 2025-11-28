@@ -2,7 +2,7 @@
 
 Herramienta de sincronización de paquetes automatizada
 
-## Descripción 📋
+## 📋 Descripción 
 
 pkgsync es una herramienta que permite mantener una uniformidad en el software de un conjunto de máquinas, garantizando que se instalen o desinstalen los paquetes especificados en tres tipos de listas:
 - musthave
@@ -167,7 +167,7 @@ ENSURE_ESSENTIAL="no"
 THRESHOLD_FOR_APT_UPDATE="900"
 ```
 
-## Opciones  🚀 
+## 🚀 Opciones 
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
@@ -200,7 +200,7 @@ Recognized options:
 Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian.
 ```
 
-## Herramientas adicionales 🛠️
+## 🛠️ Herramientas adicionales
 Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales en el directorio **/usr/local/sbin/**:
 
 - **apt-list-expired-keys**: Muestra un listado de claves de repositorios expiradas, si las hay.
@@ -235,13 +235,13 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 - **remove-kernel**: Muestra la lista de kernels instalados y nos permite seleccionar el que queremos desinstalar.
 - **shim-repair**: Instala el paquete shim-signed y sus dependencias en equipos con EFI.
 
-## Autores ✒️
+## ✒️ Autores
 
 * 2004-2007 **Steinar H. Gunderson** <sgunderson@bigfoot.com>.
 * 2013-2025 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
 
 
-## Licencia 📄
+## 📄 Licencia
 
 Este proyecto se encuentra publicado bajo la **licencia GNU GPL version 2**. En sistemas Debian, el texto completo de la licencia GPL v2 puede ser encontrado en **/usr/share/common-licenses/GPL-2**.
 
