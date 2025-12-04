@@ -1,3 +1,15 @@
+pkgsync (2.74) ubuntu; urgency=medium
+
+  * Solved bug in /usr/local/sbin/softwareupdate
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 04 Dic 2025 08:44:00 +0100
+
+pkgsync (2.74) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/purge-old-kernels
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 03 Dic 2025 05:42:00 +0100
+
 pkgsync (2.73) ubuntu; urgency=medium
 
   * Upgraded /usr/local/sbin/purge-old-kernels
