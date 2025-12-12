@@ -1,3 +1,11 @@
+pkgsync (2.76) ubuntu; urgency=medium
+
+  * Modified method for retrieving the dependencies of the shim-signed package in 
+    /usr/local/sbin/pkgsync, /usr/local/sbin/solve-apt-errors and 
+    /usr/local/sbin/shim-repair 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 12 Dic 2025 09:26:00 +0100
+
 pkgsync (2.75) ubuntu; urgency=medium
 
   * Solved bug in /usr/local/sbin/softwareupdate

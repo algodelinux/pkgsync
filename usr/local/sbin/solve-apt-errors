@@ -346,7 +346,7 @@ install_shim_if_uefi() {
     apt-get update -qq
 
     # Obtener shim-signed y todas sus dependencias automáticamente
-    PACKAGES=$(apt-cache depends shim-signed | awk '/Depends:/ {print $2}')
+    PACKAGES=$(apt-cache depends shim-signed  | awk '/Depends:/ {print $2}'  | grep -v '^<.*>$')
     PACKAGES="shim-signed $PACKAGES"
 
     echo "Descargando paquetes: $PACKAGES"

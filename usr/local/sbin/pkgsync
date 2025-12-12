@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.75
+export VERSION=2.76
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -710,7 +710,7 @@ install_shim_if_uefi() {
     apt-get update -qq
 
     # Obtener shim-signed y todas sus dependencias automáticamente
-    PACKAGES=$(apt-cache depends shim-signed | awk '/Depends:/ {print $2}')
+    PACKAGES=$(LC_ALL=C apt-cache depends shim-signed  | awk '/Depends:/ {print $2}'  | grep -v '^<.*>$')
     PACKAGES="shim-signed $PACKAGES"
 
     echo "Descargando paquetes: $PACKAGES"
