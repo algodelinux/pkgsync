@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# reorder-kernels - Reorganiza los links al kernel e initrd
+# 2013-2026 Esteban M. Navas Martín <algodelinux@gmail.com>
+# Last update: 23/11/2025
+
+set -euo pipefail
+
+BOOT_DIR="/boot"
+
+# Asegurarse de que el script se ejecuta como root
+if [[ $EUID -ne 0 ]]; then
+    echo "Este script debe ejecutarse como root."
+    exit 1
+fi
+
+# Obtener kernels disponibles usando globbing (sin ls)
+mapfile -t KERNELS < <(printf '%s\n' "$BOOT_DIR"/vmlinuz-* | sort -V)
+
+# Verificar número mínimo de kernels
+if (( ${#KERNELS[@]} < 2 )); then
+    echo "Error: Se necesitan al menos dos kernels instalados."
+    exit 1
+fi
+
+# Obtener los dos más recientes
+NEWEST_KERNEL="${KERNELS[-1]}"
+SECOND_NEWEST_KERNEL="${KERNELS[-2]}"
+
+# Extraer versiones
+NEWEST_VERSION="${NEWEST_KERNEL##*/vmlinuz-}"
+SECOND_NEWEST_VERSION="${SECOND_NEWEST_KERNEL##*/vmlinuz-}"
+
+echo "Kernel más nuevo        : $NEWEST_VERSION"
+echo "Segundo más nuevo       : $SECOND_NEWEST_VERSION"
+echo
+
+# Comprobar que existen los initrd correspondientes
+for v in "$NEWEST_VERSION" "$SECOND_NEWEST_VERSION"; do
+    if [[ ! -e "$BOOT_DIR/initrd.img-$v" ]]; then
+        echo "Error: No existe initrd.img-$v"
+        exit 1
+    fi
+done
+
+echo "Actualizando enlaces simbólicos..."
+
+ln -sf "vmlinuz-$SECOND_NEWEST_VERSION" "$BOOT_DIR/vmlinuz.old"
+ln -sf "initrd.img-$SECOND_NEWEST_VERSION" "$BOOT_DIR/initrd.img.old"
+
+ln -sf "vmlinuz-$NEWEST_VERSION" "$BOOT_DIR/vmlinuz"
+ln -sf "initrd.img-$NEWEST_VERSION" "$BOOT_DIR/initrd.img"
+
+echo
+echo "Enlaces actuales:"
+ls -l "$BOOT_DIR"/vmlinuz{,.old} "$BOOT_DIR"/initrd.img{,.old}
+
+echo
+echo "Actualizando GRUB..."
+update-grub
+
+echo
+echo "Proceso completado correctamente."

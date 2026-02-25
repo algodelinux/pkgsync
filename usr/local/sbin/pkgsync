@@ -2,13 +2,13 @@
 #
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
-# 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# 2013-2026 Esteban M. Navas Martín <algodelinux@gmail.com>.
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.76
+export VERSION=2.79
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -796,7 +796,13 @@ solveapterrors() {
   wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
   if [ "$incomplete_packages" ]; then
      echo -e "${GREEN}Tratando de reparar paquetes en estado ^ic.${NC}"
-     wait_while_locked; apt-get -y install -o Dpkg::Options::="--force-confold" $incomplete_packages
+
+     for packagename in $incomplete_packages; do
+         wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $packagename
+         if [ $? -ne 0 ]; then
+            wait_while_locked; dpkg --purge --force-all $packagename
+         fi
+     done
   fi
 
   # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar

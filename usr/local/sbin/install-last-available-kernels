@@ -1,35 +1,64 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # -------------------------------------------------------------------------------------------
 # script: install-last-available-kernels
 # Author:  Esteban M. Navas Martín
 # Date:    09-02-2024
-# Ver:     07-02-2025
+# Ver:     09-02-2026
 #
-# Purpose: Script para instalar los n últimos kernels
+# Purpose: Instala los n últimos kernels y reordena enlaces solo si hay linux-image nuevos
+
+set -euo pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-if (( $EUID != 0 )); then
+if (( EUID != 0 )); then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
    exit 1
 fi
 
-if [ ! -z "$1" ]; then
-    numkernels="$1"
-    AVAILABLE_KERNELS=$(apt-cache search linux-image-$(uname -r | cut -d'.' -f1,2) | sort -V | grep generic | tail -$numkernels | awk '{print $1}' | sed 's/linux-image-//')
-else
+if [[ -z "${1:-}" ]]; then
     echo -e "${RED}Error: Debe especificar el número de kernels a instalar${NC}"
     echo -e "${GREEN}Sintaxis: $0 numero-de-kernels${NC}"
     exit 1
 fi
 
+numkernels="$1"
+KERNEL_FLAVOR="$(uname -r | cut -d'.' -f1,2)"
+
+# Obtener últimos n kernels disponibles
+AVAILABLE_KERNELS=$(
+    apt-cache search "linux-image-$KERNEL_FLAVOR" \
+    | grep generic \
+    | sort -V \
+    | tail -n "$numkernels" \
+    | awk '{print $1}' \
+    | sed 's/linux-image-//'
+)
+
+# Flag solo para linux-image
+INSTALLED_NEW_IMAGE=false
+
 for KERNEL_VERSION in $AVAILABLE_KERNELS; do
    for PACKAGE_NAME in linux-image linux-headers linux-modules linux-modules-extra; do
        FULLPACKAGENAME="$PACKAGE_NAME-$KERNEL_VERSION"
-       if ! dpkg -l | grep -E "^ii\s+$FULLPACKAGENAME" > /dev/null 2>&1; then
-          apt-get -y install $FULLPACKAGENAME
+
+       if ! dpkg -s "$FULLPACKAGENAME" &>/dev/null; then
+          echo -e "${GREEN}Instalando $FULLPACKAGENAME${NC}"
+          apt-get -y install "$FULLPACKAGENAME"
+
+          # Activar flag solo si es linux-image
+          if [[ "$PACKAGE_NAME" == "linux-image" ]]; then
+              INSTALLED_NEW_IMAGE=true
+          fi
        fi
    done
 done
+
+# Reordenar kernels solo si se instaló un linux-image nuevo
+if [[ "$INSTALLED_NEW_IMAGE" == true ]]; then
+    echo
+    echo -e "${GREEN}Se ha instalado un nuevo kernel. Ejecutando reorder-kernels...${NC}"
+    /usr/local/sbin/reorder-kernels
+fi

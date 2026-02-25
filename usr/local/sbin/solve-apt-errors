@@ -1,7 +1,7 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
-# 2013-2025 Esteban M. Navas Martín <algodelinux@gmail.com>.
-# Last update: 23/11/2025
+# 2013-2026 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# Last update: 02/02/2026
 
 idioma=$LC_ALL
 export LC_ALL=C
@@ -104,19 +104,26 @@ install_packages() {
     local downloaded_any=0
 
     # Descargar los paquetes problemáticos
+    set -o pipefail
+
     for pkg in $problem_pkgs; do
-        echo "Descargando paquete problemático: $pkg" | tee -a "$LOG_FILE"
-        if apt-get download -o=dir::cache="$tmp_dir" "$pkg" 2>&1 | tee -a "$LOG_FILE"; then
+        echo "Procesando paquete problemático: $pkg" | tee -a "$LOG_FILE"
+
+        # Intentar descargar el paquete
+        if apt-get download -o=dir::cache="$tmp_dir" "$pkg" >>"$LOG_FILE" 2>&1; then
             downloaded_any=1
+            echo "Paquete $pkg descargado correctamente." | tee -a "$LOG_FILE"
         else
-            echo "Error descargando el paquete $pkg, se omitirá." | tee -a "$LOG_FILE"
+            echo "No se pudo descargar $pkg, se eliminará con dpkg." | tee -a "$LOG_FILE"
+            if dpkg --remove --force-remove-reinstreq "$pkg" >>"$LOG_FILE" 2>&1; then
+                echo "Paquete $pkg eliminado correctamente." | tee -a "$LOG_FILE"
+            else
+                echo "Error al eliminar el paquete $pkg con dpkg." | tee -a "$LOG_FILE"
+            fi
         fi
     done
 
-    if [ "$downloaded_any" -eq 0 ]; then
-        echo "No se descargó ningún paquete problemático, no se puede reinstalar." | tee -a "$LOG_FILE"
-        return 4
-    fi
+    set +o pipefail
 
     # Instalar los paquetes descargados con dpkg
     echo "Instalando paquetes problemáticos con dpkg..." | tee -a "$LOG_FILE"

@@ -1,3 +1,23 @@
+pkgsync (2.79) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/solve-apt-errors and solveapterrors function
+  * Added /usr/local/sbin/reorder-kernels script
+  * Improved /usr/local/sbin/install-last-available-kernels
+	
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 02 Feb 2026 12:44:00 +0100
+
+pkgsync (2.78) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/launchpad-getkeys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 30 Ene 2026 11:06:00 +0100
+
+pkgsync (2.77) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 09 Ene 2026 13:11:00 +0100
+
 pkgsync (2.76) ubuntu; urgency=medium
 
   * Modified method for retrieving the dependencies of the shim-signed package in 
