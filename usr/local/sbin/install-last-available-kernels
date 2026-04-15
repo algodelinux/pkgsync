@@ -3,7 +3,7 @@
 # script: install-last-available-kernels
 # Author:  Esteban M. Navas Martín
 # Date:    09-02-2024
-# Ver:     09-02-2026
+# Ver:     14-04-2026
 #
 # Purpose: Instala los n últimos kernels y reordena enlaces solo si hay linux-image nuevos
 
@@ -12,6 +12,10 @@ set -euo pipefail
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
+
+is_installed() {
+    dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"
+}
 
 if (( EUID != 0 )); then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
@@ -44,7 +48,7 @@ for KERNEL_VERSION in $AVAILABLE_KERNELS; do
    for PACKAGE_NAME in linux-image linux-headers linux-modules linux-modules-extra; do
        FULLPACKAGENAME="$PACKAGE_NAME-$KERNEL_VERSION"
 
-       if ! dpkg -s "$FULLPACKAGENAME" &>/dev/null; then
+       if ! is_installed "$FULLPACKAGENAME"; then
           echo -e "${GREEN}Instalando $FULLPACKAGENAME${NC}"
           apt-get -y install "$FULLPACKAGENAME"
 

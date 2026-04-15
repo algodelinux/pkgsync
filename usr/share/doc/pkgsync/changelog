@@ -1,3 +1,27 @@
+pkgsync (2.83) ubuntu; urgency=medium
+
+  * Solved bug in /usr/local/sbin/install-last-available-kernels
+	
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 14 Apr 2026 09:13:00 +0100
+
+pkgsync (2.82) ubuntu; urgency=medium
+
+  * Modified ensure_kernels function in /usr/local/sbin/pkgsync script
+	
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 11 Apr 2026 12:36:00 +0100
+
+pkgsync (2.81) ubuntu; urgency=medium
+
+  * Added modified version of /usr/local/sbin/list-installed-kernels script
+	
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 23 Mar 2026 16:14:00 +0100
+
+pkgsync (2.80) ubuntu; urgency=medium
+
+  * Solved bug in ensure_kernels function of /usr/local/sbin/pkgsync script
+	
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 20 Mar 2026 14:12:00 +0100
+
 pkgsync (2.79) ubuntu; urgency=medium
 
   * Improved /usr/local/sbin/solve-apt-errors and solveapterrors function

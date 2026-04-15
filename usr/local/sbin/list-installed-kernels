@@ -3,7 +3,7 @@
 # script:  /usr/local/sbin/list-installed-kernels
 # Author:  Esteban M. Navas Martín
 # Date:    06-07-2022
-# Ver:     21-01-2025
+# Ver:     23-03-2026
 #
 # Purpose: List installed kernels ordered by version
 
@@ -24,13 +24,15 @@ current_kernel_pkg=$(dpkg --list | grep -E "(linux-image|proxmox-kernel)-" | gre
 
 # Extraer las series, contar cuántos kernels hay de cada una, listar sus versiones e indicar el tipo
 echo "Detalles de los kernels instalados por serie:"
-echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort | uniq | while read -r series; do
+echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort -u | while read -r series; do
+    # Listar y ordenar las versiones de esta serie
+    versions=$(echo "$filtered_kernel_list" | grep "$series" | sort -V)
     # Contar cuántos kernels hay de esta serie
-    count=$(echo "$filtered_kernel_list" | grep -c "$series")
-    # Listar las versiones y tipos de esta serie
-    versions=$(echo "$filtered_kernel_list" | grep "$series")
+    count=$(echo "$versions" | wc -l)
+    
     echo -e "${GREEN}Serie $series: $count kernel(s)${NC}"
     echo "    Detalles de las versiones instaladas:"
+    
     echo "$versions" | while read -r kernel; do
         if [[ $kernel == *generic* ]]; then
             type="generic"
@@ -39,7 +41,9 @@ echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[
         else
             type="desconocido"
         fi
+        
         version=$(echo "$kernel" | sed -E 's/(linux-image|proxmox-kernel)-//')
+        
         if [[ "$kernel" == "$current_kernel_pkg" ]]; then
             echo -e "${YELLOW}    - $version ($type) [En ejecución]${NC}"
         else

@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.79
+export VERSION=2.83
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -872,16 +872,18 @@ ensure_kernels() {
   if [ $PURGE_OLD_KERNELS = "yes" ]; then
      NUM_INSTALLED_KERNELS=$(find /boot -name "vmlinuz-*" | sed -e "s/^\/boot\/vmlinuz-//" | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
 
+     if [[ "$NUM_INSTALLED_KERNELS" -gt "$KEEP_LAST_KERNELS" ]]; then
+        # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
+        if [ -x /usr/local/sbin/purge-old-kernels ]; then
+           wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
+        fi
+     fi
+
      if [[ "$NUM_INSTALLED_KERNELS" -lt "$KEEP_LAST_KERNELS" ]]; then
         # Asegurar que se encuentre instalado el número de kernels definido en $KEEP_LAST_KERNELS
         if [ -x /usr/local/sbin/install-last-available-kernels ]; then
            wait_while_locked; /usr/local/sbin/install-last-available-kernels $KEEP_LAST_KERNELS
         fi
-     fi
-
-     # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
-     if [ -x /usr/local/sbin/purge-old-kernels ]; then
-        wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
      fi
   fi
 }
