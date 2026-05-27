@@ -1,3 +1,9 @@
+pkgsync (2.84) ubuntu; urgency=medium
+
+  * Added mailutils to Depends and modified Suggests in control file
+	
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 27 May 2026 08:19:00 +0100
+
 pkgsync (2.83) ubuntu; urgency=medium
 
   * Solved bug in /usr/local/sbin/install-last-available-kernels
