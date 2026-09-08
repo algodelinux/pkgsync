@@ -171,31 +171,31 @@ THRESHOLD_FOR_APT_UPDATE="900"
 Para consultar las opciones disponibles, podéis ejecutar **pkgsync** con el parámetro **-h**:
 
 ```
-pkgsync 2.72
+pkgsync 2.83
 Automated package synchronization tool
 
 Usage: pkgsync [OPTIONS]
 Recognized options:
-  -h,  --help					display this help and exit
-  -v,  --version				display pkgsync version and exit
-  -k,  --keep-unused			don't remove unused packages
-  -e,  --ensure-essential		don't remove required, important and standard packages
-  -s,  --simulate				simulate and print out which packages would be installed/uninstalled or updated
-  -t,  --test-files				test pkgsync files
-  -tr, --test-files r			test and remove packages from pkgsync files lists
-  -d,  --delete-files			delete all pkgsync files
-  -b,  --build-files			build musthave and create empty mayhave and maynothave if they don't exist
-  -f,  --force					force pkgsync
-  -c,  --clean					remove uninstalled packages and clean cache
-  -C,  --clean-and-purge		remove uninstalled packages, delete their config files and clean cache
-  -p,  --purge-old-kernels		remove old kernels keeping the last two (by default)
-								or the number specified in /etc/default/pkgsync file
-  -n,  --no-sincpuppet			don't launch sinc_puppet from pkgsync
+  -h,  --help			display this help and exit
+  -v,  --version		display pkgsync version and exit
+  -k,  --keep-unused		don't remove unused packages
+  -e,  --ensure-essential	don't remove required, important and standard packages
+  -s,  --simulate		simulate and print out which packages would be installed/uninstalled or updated
+  -t,  --test-files		test pkgsync files
+  -tr, --test-files r		test and remove packages from pkgsync files lists
+  -d,  --delete-files		delete all pkgsync files
+  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist
+  -f,  --force			force pkgsync
+  -c,  --clean			remove uninstalled packages and clean cache
+  -C,  --clean-and-purge	remove uninstalled packages, delete their config files and clean cache
+  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)
+				or the number specified in /etc/default/pkgsync file
+  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync
   -i,  --ignore-failed-repos	ignore failed repositories
-  -g,  --get-keys				exec launchpad-keys to get repositories keys
-  -S,  --shutdown				shutdown machine after pkgsync
-  -R,  --reboot					reboot machine after pkgsync
-  -Rw, --reboot w				reboot machine and boot into windows on EFI computers
+  -g,  --get-keys		exec launchpad-keys to get repositories keys
+  -S,  --shutdown		shutdown machine after pkgsync
+  -R,  --reboot			reboot machine after pkgsync
+  -Rw, --reboot w		reboot machine and boot into windows on EFI computers
 
 Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian.
 ```
@@ -238,10 +238,9 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 ## ✒️ Autores
 
 * 2004-2007 **Steinar H. Gunderson** <sgunderson@bigfoot.com>.
-* 2013-2025 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
+* 2013-2026 **Esteban M. Navas Martín** <algodelinux@gmail.com>.
 
 
 ## 📄 Licencia
 
 Este proyecto se encuentra publicado bajo la **licencia GNU GPL version 2**. En sistemas Debian, el texto completo de la licencia GPL v2 puede ser encontrado en **/usr/share/common-licenses/GPL-2**.
-
