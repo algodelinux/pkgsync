@@ -1,9 +1,9 @@
 Package: pkgsync
-Version: 2.73
+Version: 2.87
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
-Depends: aptitude (>= 0.6.1.4-1), gpg, lsb-release
-Suggests: puppet | cfengine2 | cfengine | rdist, tagcoll | facter
+Depends: aptitude (>= 0.6.1.4-1), gpg, lsb-release, mailutils
+Suggests: puppet-agent | cfengine2 | cfengine | rdist, tagcoll 
 Section: admin
 Priority: required
 Essential: yes

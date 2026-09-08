@@ -18,3 +18,4 @@ if [ -f /lib/systemd/system/getty@tty12.service ]; then
    systemctl daemon-reload
 fi
 
+cd ..

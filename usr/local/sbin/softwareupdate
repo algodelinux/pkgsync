@@ -91,6 +91,58 @@ wait_while_locked () {
    [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
 }
 
+run_aptitude() {
+
+  # Detectar si aptitude está disponible, de lo contrario usar apt-get
+  if command -v aptitude >/dev/null 2>&1; then
+      APT_COMMAND="aptitude"
+      SANITIZED_ARGS="$APTITUDE_ARGS"
+  else
+      APT_COMMAND="apt-get"
+
+      # Filtro de opciones incompatibles con apt-get
+      SANITIZED_ARGS=$(echo "$APTITUDE_ARGS" | sed -E '
+         s/--without-recommends//g;
+         s/--with-recommends//g;
+         s/--verbose//g;
+         s/--quiet=[0-9]+//g;
+         s/--display-format=[^ ]+//g;
+      ' | tr -s ' ')
+  fi
+
+  BASE_CMD="$APT_COMMAND $SANITIZED_ARGS"
+
+  if [[ $@ == *full-upgrade* ]]; then
+     :> /var/log/pkgsync/removefromlists.log
+     COMMAND="$BASE_CMD $@"
+
+     retry=1
+     while [ $retry -eq 1 ]; do
+         echo "RUNNING: $COMMAND"
+         wait_while_locked; LC_ALL=C $COMMAND | tee /tmp/apterrors
+
+         problematic_package=$(grep 'Couldn'\''t find any package' /tmp/apterrors | cut -d'"' -f2)
+
+         if [ -n "$problematic_package" ]; then
+            echo -e "Package $problematic_package isn't in repositories" \
+                | tee -a /var/log/pkgsync/removefromlists.log
+
+            COMMAND=$(echo "$COMMAND" \
+                | sed "s/${problematic_package}[^[:space:]]*//" \
+                | tr -s ' ')
+         else
+            retry=0
+         fi
+     done
+  else
+     echo "RUNNING: $BASE_CMD $*"
+     wait_while_locked; $BASE_CMD "$@"
+  fi
+
+  return $?
+}
+
+
 check_apt_update() {
     # Colores para mensajes
     GREEN='\033[0;32m'
