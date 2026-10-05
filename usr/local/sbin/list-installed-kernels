@@ -3,7 +3,7 @@
 # script:  /usr/local/sbin/list-installed-kernels
 # Author:  Esteban M. Navas Martín
 # Date:    06-07-2022
-# Ver:     23-03-2026
+# Ver:     04-09-2026
 #
 # Purpose: List installed kernels ordered by version
 
@@ -26,7 +26,7 @@ current_kernel_pkg=$(dpkg --list | grep -E "(linux-image|proxmox-kernel)-" | gre
 echo "Detalles de los kernels instalados por serie:"
 echo "$filtered_kernel_list" | sed -E 's/(linux-image|proxmox-kernel)-([0-9]+\.[0-9]+).*/\2/' | sort -u | while read -r series; do
     # Listar y ordenar las versiones de esta serie
-    versions=$(echo "$filtered_kernel_list" | grep "$series" | sort -V)
+    versions=$(echo "$filtered_kernel_list" | grep -E "(linux-image|proxmox-kernel)-$series\." | sort -V)
     # Contar cuántos kernels hay de esta serie
     count=$(echo "$versions" | wc -l)
     

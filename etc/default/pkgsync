@@ -63,7 +63,7 @@ AUTOMATIC_REBOOT_INTO_WINDOWS="no"
 # instalado
 # LAUNCHPAD_GETKEYS="no": no tratar de obtener claves mediante launchpad-getkeys
 # LAUNCHPAD_GETKEYS="yes": tratar de obtener claves mediante launchpad-getkeys (opción por defecto)
-LAUNCHPAD_GETKEYS="yes"
+LAUNCHPAD_GETKEYS="no"
 
 # Es posible indicar un proxy a launchpad-getkeys para obtener las claves de repositorios
 # LAUNCHPAD_GETKEYS_PROXY="": no utilizar proxy
@@ -85,7 +85,7 @@ TIMEOUT_FOR_DPKG_OR_APT="3m"
 # los repositorios falle o continuar la ejecución ignorando los repositorios que fallan.
 # ABORT_ON_FAILED_REPOS="yes": abortar la ejecución si alguno de los repositorios da error (opción por defecto)
 # ABORT_ON_FAILED_REPOS="no": continuar la ejecución ignorando los repositorios que fallan
-ABORT_ON_FAILED_REPOS="yes"
+ABORT_ON_FAILED_REPOS="no"
 
 # AUTO_TEST_FILES permite elegir si queremos que pkgsync chequee automáticamente los ficheros
 # de listas de paquetes.
@@ -109,7 +109,7 @@ ALERT_EMAIL_ON_ERROR="no"
 # important y standard
 # ENSURE_ESSENTIAL="yes": Garantizar que no se desinstalan paquetes esenciales
 # ENSURE_ESSENTIAL="no": No controlar la desinstalación de paquetes esenciales (opción por defecto)
-ENSURE_ESSENTIAL="no"
+ENSURE_ESSENTIAL="yes"
 
 # Definimos un tiempo mínimo en segundos entre operaciones de aptitude update
 # Si no existe la variable THRESHOLD_FOR_APT_UPDATE o no tiene valor, es equivalente al valor '1800',

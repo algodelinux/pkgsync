@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=2.85
+export VERSION=3.01
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -681,7 +681,6 @@ install_shim_if_uefi() {
             echo "'shim-signed' está instalado pero no hay ESP. Procediendo a desinstalar..."
             export DEBIAN_FRONTEND=noninteractive
             apt-get remove --purge -y --allow-remove-essential shim-signed grub-efi-amd64-signed mokutil || true
-            apt-get autoremove -y
             unset DEBIAN_FRONTEND
             echo "✔ 'shim-signed' desinstalado correctamente."
         #else
@@ -868,21 +867,20 @@ solveapterrors() {
   export LC_ALL=$idioma
 }
 
+is_proxmox() {
+    command -v pveversion &>/dev/null && [[ -d /etc/pve ]]
+}
+
 ensure_kernels() {
   if [ $PURGE_OLD_KERNELS = "yes" ]; then
+     echo "APT::NeverAutoRemove::KernelCount \"$KEEP_LAST_KERNELS\";" | sudo tee /etc/apt/apt.conf.d/99kernel-count
+
      NUM_INSTALLED_KERNELS=$(find /boot -name "vmlinuz-*" | sed -e "s/^\/boot\/vmlinuz-//" | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
 
      if [[ "$NUM_INSTALLED_KERNELS" -gt "$KEEP_LAST_KERNELS" ]]; then
         # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
         if [ -x /usr/local/sbin/purge-old-kernels ]; then
            wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
-        fi
-     fi
-
-     if [[ "$NUM_INSTALLED_KERNELS" -lt "$KEEP_LAST_KERNELS" ]]; then
-        # Asegurar que se encuentre instalado el número de kernels definido en $KEEP_LAST_KERNELS
-        if [ -x /usr/local/sbin/install-last-available-kernels ]; then
-           wait_while_locked; /usr/local/sbin/install-last-available-kernels $KEEP_LAST_KERNELS
         fi
      fi
   fi
@@ -1237,6 +1235,16 @@ if [ $AUTO_TEST_FILES = "yes" ]; then
 fi
 
 run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+
+pkgs=$(find /etc/pkgsync/musthave /etc/pkgsync/musthave.ies /etc/pkgsync/musthave.d -type f -exec grep -h -w -F -f <(dpkg -l | awk '/^rc/ {print $2}') {} + 2>/dev/null | grep -v -w -F -f <(find /etc/pkgsync/maynothave /etc/pkgsync/maynothave.ies /etc/pkgsync/maynothave.d -type f -exec cat {} + 2>/dev/null | grep -E -v '^\s*($|#)') | sort -u)
+
+if [ -n "$pkgs" ]; then
+    echo "Se han encontrado paquetes en estado rc que deberían estar instalados:"
+    echo "$pkgs"
+    echo "Ejecutando nuevamente pkgsync"
+    run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+fi
+
 run_aptitude autoclean
 ensure_kernels;eliminar_dependencias
 

@@ -23,4 +23,6 @@ if [ -d "/var/home/pkgsync" ]; then
    rm -rf "/var/home/pkgsync"
 fi
 
+rm -f /etc/apt/apt.conf.d/99kernel-count
+
 exit 0

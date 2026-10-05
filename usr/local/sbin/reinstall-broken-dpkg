@@ -1,3 +1,14 @@
+#!/bin/bash
+# ==============================================================================
+# Purposes: Detects installed dpkg packages that are missing their
+#           corresponding list file (.list) in /var/lib/dpkg/info
+#           and automatically reinstalls them using apt-get.
+#
+# Date:     2025-10-07
+#
+# 2026      Esteban M. Navas Martín <algodelinux@gmail.com>.
+# ==============================================================================
+
 reinstall_broken_dpkg() {
     local INFO_DIR="/var/lib/dpkg/info"
     local BROKEN_PACKAGES=()
@@ -27,3 +38,5 @@ reinstall_broken_dpkg() {
     sudo apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
     echo "Reinstalación completada."
 }
+
+reinstall_broken_dpkg

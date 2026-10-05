@@ -1,0 +1,145 @@
+#!/bin/bash
+# ==============================================================================
+# Script:      select-next-kernel
+# Descripción: Permite seleccionar una entrada de GRUB para arrancar el equipo
+#              temporalmente con ella reiniciando directamente o en el próximo
+#              arranque.
+# Autor:       Esteban M. Navas Martín <algodelinux@gmail.com>
+# Fecha:       28 de septiembre de 2026
+# ==============================================================================
+
+# Verificar que se ejecute como superusuario
+if [ "$EUID" -ne 0 ]; then
+  echo "Error: Este script debe ejecutarse con sudo o como root."
+  exit 1
+fi
+
+# Detectar el archivo de configuración de GRUB
+GRUB_CFG=""
+if [ -f /boot/grub/grub.cfg ]; then
+    GRUB_CFG="/boot/grub/grub.cfg"
+elif [ -f /boot/grub2/grub.cfg ]; then
+    GRUB_CFG="/boot/grub2/grub.cfg"
+else
+    echo "Error: No se encontró el archivo de configuración de GRUB."
+    exit 1
+fi
+
+# Detectar la herramienta grub-reboot
+GRUB_REBOOT_CMD=""
+if command -v grub-reboot &> /dev/null; then
+    GRUB_REBOOT_CMD="grub-reboot"
+elif command -v grub2-reboot &> /dev/null; then
+    GRUB_REBOOT_CMD="grub2-reboot"
+else
+    echo "Error: No se encontró la orden grub-reboot o grub2-reboot."
+    exit 1
+fi
+
+echo "Analizando entradas de kernel en: $GRUB_CFG"
+echo "--------------------------------------------------------"
+
+targets=()
+labels=()
+
+main_idx=0
+sub_idx=0
+in_submenu=0
+submenu_title=""
+
+# Leer y parsear el archivo grub.cfg
+while IFS= read -r line; do
+    # Inicio de un submenú
+    if [[ "$line" =~ ^[[:space:]]*submenu[[:space:]]+[\'\"]([^\'\"]+)[\'\"] ]]; then
+        in_submenu=1
+        submenu_title="${BASH_REMATCH[1]}"
+        sub_idx=0
+    # Entrada de menú
+    elif [[ "$line" =~ ^[[:space:]]*menuentry[[:space:]]+[\'\"]([^\'\"]+)[\'\"] ]]; then
+        title="${BASH_REMATCH[1]}"
+        if [ $in_submenu -eq 1 ]; then
+            targets+=("${main_idx}>${sub_idx}")
+            labels+=("${submenu_title} ──> ${title}")
+            ((sub_idx++))
+        else
+            targets+=("${main_idx}")
+            labels+=("${title}")
+            ((main_idx++))
+        fi
+    # Cierre del submenú
+    elif [[ "$line" =~ ^\} ]] && [ $in_submenu -eq 1 ]; then
+        in_submenu=0
+        ((main_idx++))
+    fi
+done < "$GRUB_CFG"
+
+if [ ${#targets[@]} -eq 0 ]; then
+    echo "Error: No se encontraron entradas de kernel en GRUB."
+    exit 1
+fi
+
+# Mostrar menú de selección
+echo "Kernels y opciones disponibles:"
+echo ""
+for i in "${!labels[@]}"; do
+    printf "  [%2d] %s (Sintaxis GRUB: %s)\n" "$((i+1))" "${labels[$i]}" "${targets[$i]}"
+done
+echo ""
+
+# Solicitar selección al usuario
+read -p "Selecciona una opción (1-${#targets[@]}) [o 'q' para salir]: " choice
+
+if [[ "$choice" =~ ^[qQ]$ ]]; then
+    echo "Operación cancelada."
+    exit 0
+fi
+
+if ! [[ "$choice" =~ ^[0-9]+$ ]] || [ "$choice" -lt 1 ] || [ "$choice" -gt "${#targets[@]}" ]; then
+    echo "Opción inválida."
+    exit 1
+fi
+
+index=$((choice-1))
+selected_target="${targets[$index]}"
+selected_label="${labels[$index]}"
+
+echo ""
+echo "Has seleccionado: $selected_label"
+echo "Índice temporal en GRUB: $selected_target"
+echo ""
+
+# Menú para decidir si reiniciar o solo aplicar el cambio
+echo "¿Qué deseas hacer?"
+echo "  [1] Aplicar cambio y REINICIAR AHORA"
+echo "  [2] Solo aplicar cambio (sin reiniciar ahora)"
+echo "  [3] Cancelar"
+echo ""
+read -p "Selecciona una opción [1-3]: " action_choice
+
+case "$action_choice" in
+    1)
+        echo ""
+        echo "Ejecutando: $GRUB_REBOOT_CMD \"$selected_target\""
+        if $GRUB_REBOOT_CMD "$selected_target"; then
+            echo "Reinicio temporal configurado correctamente. Reiniciando el sistema..."
+            reboot
+        else
+            echo "Error al aplicar la configuración con $GRUB_REBOOT_CMD."
+            exit 1
+        fi
+        ;;
+    2)
+        echo ""
+        echo "Ejecutando: $GRUB_REBOOT_CMD \"$selected_target\""
+        if $GRUB_REBOOT_CMD "$selected_target"; then
+            echo "Configuración aplicada con éxito. El kernel '$selected_label' se cargará automáticamente en el próximo arranque."
+        else
+            echo "Error al aplicar la configuración con $GRUB_REBOOT_CMD."
+            exit 1
+        fi
+        ;;
+    *)
+        echo "Operación cancelada. No se han realizado cambios."
+        exit 0
+        ;;
+esac

@@ -1,3 +1,91 @@
+pkgsync (3.01) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/shim-repair script
+  * Improved /usr/local/sbin/install-last-available-kernels script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 05 Oct 2026 20:09:00 +0100
+
+pkgsync (2.99) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/select-next-kernel 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 28 Sept 2026 12:05:00 +0100
+
+pkgsync (2.98) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sun, 27 Sept 2026 07:23:00 +0100
+
+pkgsync (2.97) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/pkgsync script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 26 Sep 2026 13:23:00 +0100
+
+pkgsync (2.96) ubuntu; urgency=medium
+
+  * Modified ensure_kernels function in the /usr/local/sbin/pkgsync script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 26 Sep 2026 12:00:00 +0100
+
+pkgsync (2.95) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/musthave-build to support trixe
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 24 Sep 2026 06:39:00 +0100
+
+pkgsync (2.94) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/install-last-available-proxmox-kernels script to let install
+    proxmox kernels
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 23 Sep 2026 18:02:00 +0100
+
+pkgsync (2.93) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/install-kernel script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 23 Sep 2026 17:13:00 +0100
+
+pkgsync (2.92) ubuntu; urgency=medium
+
+  * Modified ensure_kernels function in the /usr/local/sbin/pkgsync script
+  * Restored /usr/local/sbin/install-last-available-kernels previous version
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 23 Sep 2026 16:34:00 +0100
+
+pkgsync (2.90) ubuntu; urgency=medium
+
+  * Modified ensure_kernels function in the /usr/local/sbin/pkgsync script
+  * Improved /usr/local/sbin/install-last-available-kernels script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 23 Sep 2026 10:24:00 +0100
+
+pkgsync (2.89) ubuntu; urgency=medium
+
+  * Removed "apt-get autoremove -y in /usr/local/sbin/pkgsync script
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 22 Sep 2026 10:53:00 +0100
+
+pkgsync (2.88) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/pkgsync 
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 21 Sep 2026 14:03:00 +0100
+
+pkgsync (2.87) ubuntu; urgency=medium
+
+  * Solved but in /usr/local/sbin/list-installed-kernels
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 04 Sep 2026 11:46:00 +0100
+
+pkgsync (2.86) ubuntu; urgency=medium
+
+  * Modified default options in /etc/default/pkgsync
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 08 Jul 2026 10:47:00 +0100
+
 pkgsync (2.85) ubuntu; urgency=medium
 
   * Improved /usr/local/sbin/purge-old-kernels

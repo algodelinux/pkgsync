@@ -1,8 +1,27 @@
 #!/bin/bash
+# ==============================================================================
+# Purpose: Manages shim-signed and GRUB EFI bootloader packages based on UEFI 
+# support and EFI System Partition (ESP) availability.
+#
+# Date:     2026-10-05
+#
+# 2026      Esteban M. Navas Martín <algodelinux@gmail.com>.
+# ==============================================================================
+
+has_esp()
+{
+    lsblk -rpno NAME,PARTTYPE 2>/dev/null |
+        awk '$2 == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" {
+                 found=1
+             }
+             END {
+                 exit !found
+             }'
+}
 
 install_shim_if_uefi() {
     # Comprobar si el sistema usa UEFI
-    if [ ! -d /sys/firmware/efi ]; then
+    if ! has_esp; then
         echo "Sistema no UEFI, no se requiere 'shim-signed'."
         return 0
     fi

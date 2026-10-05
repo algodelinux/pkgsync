@@ -1,5 +1,5 @@
 Package: pkgsync
-Version: 2.85
+Version: 3.01
 Architecture: all
 Maintainer: Esteban M. Navas Martín <algodelinux@gmail.com>
 Depends: aptitude (>= 0.6.1.4-1), gpg, lsb-release, mailutils

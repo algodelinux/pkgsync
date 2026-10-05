@@ -1,311 +1,148 @@
-#!/bin/bash
-# launchpad-getkeys
-# Rewrited version by Esteban M. Navas <algodelinux@gmail.com>
-# Last update: 30/01/2026
-#
-# Parses the apt log, removes "GPG error:" lines, # extracts NO_PUBKEY and downloads missing keys,
+#!/usr/bin/env python3
+import os
+import sys
+import re
+import glob
+import urllib.request
+import subprocess
 
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-WHITE='\033[1;37m'
-CYAN='\033[36m'
-NC='\033[0m' # No Color
+KEYSERVER_URL = "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x{key_id}"
 
-UPDATE_LOG="/tmp/updateresults"
-KEYRING_DIR="/etc/apt/trusted.gpg.d"
-OLDKEYFILE="/etc/apt/trusted.gpg"
-KEYPATHS="/usr/share/keyrings /etc/apt/keyrings /etc/apt/trusted.gpg.d"
+def normalize_uri(uri):
+    """Normaliza la URI para facilitar la coincidencia."""
+    uri = uri.strip().rstrip('/')
+    uri = re.sub(r'^https?://', '', uri)
+    # Ubuntu usa indistintamente ppa.launchpadcontent.net y ppa.launchpad.net
+    return uri.replace('ppa.launchpadcontent.net', 'ppa.launchpad.net')
 
-function HELP () {
-    echo -e "${WHITE}\nlaunchpad-getkeys${NC} is a utility to automatically import all missing GPG keys from repositories.\n"
-    echo -e "Usage:"
-    echo -e "   * No parameters: imports all missing GPG keys."
-    echo -e "   * ${WHITE}-k SERVER:PORT${NC} specifies an alternative key server."
-    echo -e "   * ${WHITE}-p PROXY:PORT${NC} uses an HTTP proxy."
-    echo -e "   * ${WHITE}-r${NC} removes expired keys."
-    echo -e "   * ${WHITE}-f${NC} forces an 'apt-get update'.\n"
-    exit 0
-}
+def parse_deb822_sources():
+    """Analiza los archivos .sources en /etc/apt/sources.list.d/"""
+    uri_to_signedby = {}
+    sources_files = glob.glob("/etc/apt/sources.list.d/*.sources")
 
-function remove_expired_keys () {
-    echo -e "${CYAN}Checking for expired keys...${NC}"
-    if [ -f "$OLDKEYFILE" ]; then
-        LC_ALL=C gpg --no-default-keyring --keyring="$OLDKEYFILE" --list-keys | grep -E 'pub.*expired' -A 1 > /tmp/expiredkeys
-        if [ -s /tmp/expiredkeys ]; then
-            for keyid in $(grep -E '[[:xdigit:]]{40}' /tmp/expiredkeys); do
-                echo -e "${GREEN}Removing key $keyid from $OLDKEYFILE${NC}"
-                gpg --no-default-keyring --keyring="$OLDKEYFILE" --batch --yes --delete-keys "$keyid"
-            done
-        fi
-    fi
+    for filepath in sources_files:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            current_stanza = {}
+            for line in f:
+                line_str = line.strip()
+                if not line_str or line_str.startswith('#'):
+                    if current_stanza:
+                        process_stanza(current_stanza, uri_to_signedby)
+                        current_stanza = {}
+                    continue
+                if ':' in line_str:
+                    k, v = line_str.split(':', 1)
+                    current_stanza[k.strip().lower()] = v.strip()
+            if current_stanza:
+                process_stanza(current_stanza, uri_to_signedby)
+                
+    return uri_to_signedby
 
-    for KEYPATH in $KEYPATHS; do
-        if [ -d "$KEYPATH" ] && [ "$(ls -A "$KEYPATH")" ]; then
-            for keyfile in $(find "$KEYPATH" -type f -not -name "*~"); do
-                mimetype=$(file --mime "$keyfile")
-                if [[ "$mimetype" == *"charset=binary"* ]]; then
-                    LC_ALL=C gpg --no-default-keyring --keyring="$keyfile" --list-keys | grep -E 'pub.*expired' -A 1 > /tmp/expiredkeys
-                    if [ -s /tmp/expiredkeys ]; then
-                        for keyid in $(grep -E '[[:xdigit:]]{40}' /tmp/expiredkeys); do
-                            echo -e "${GREEN}Removing key $keyid from $keyfile${NC}"
-                            gpg --no-default-keyring --keyring="$keyfile" --batch --yes --delete-keys "$keyid"
-                        done
-                    fi
-                else
-                    echo -e "${CYAN}Removing ASCII key file $keyfile${NC}"
-                    rm -f "$keyfile"
-                fi
-            done
-        fi
-    done
-    rm -f /tmp/expiredkeys
-}
+def process_stanza(stanza, uri_map):
+    uris = stanza.get('uris', '')
+    signed_by = stanza.get('signed-by', '')
+    if uris and signed_by and signed_by.startswith('/'):
+        for u in uris.split():
+            uri_map[normalize_uri(u)] = signed_by
 
-check_official_repos() {
-    local pattern="$1"
-    local files=(/etc/apt/sources.list /etc/apt/sources.list.d/*.list /etc/apt/sources.list.d/*.sources)
+def parse_traditional_lists():
+    """Soporte secundario para archivos .list tradicionales con [signed-by=...]"""
+    uri_to_signedby = {}
+    list_files = glob.glob("/etc/apt/sources.list.d/*.list")
+    if os.path.exists("/etc/apt/sources.list"):
+        list_files.append("/etc/apt/sources.list")
 
-    # Filtrar solo archivos existentes
-    files=( $(for f in "${files[@]}"; do [ -f "$f" ] && echo "$f"; done) )
-    [ ${#files[@]} -eq 0 ] && return 1
+    for filepath in list_files:
+        with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line_str = line.strip()
+                if line_str.startswith('#') or not line_str.startswith('deb'):
+                    continue
+                sb_match = re.search(r'\[.*signed-by=([^\s\]]+).*\]', line_str)
+                if sb_match:
+                    sb_path = sb_match.group(1)
+                    clean_line = re.sub(r'\[.*?\]', '', line_str)
+                    parts = clean_line.split()
+                    if len(parts) >= 2:
+                        uri_map_key = normalize_uri(parts[1])
+                        uri_to_signedby[uri_map_key] = sb_path
+    return uri_to_signedby
 
-    # Buscar repositorios oficiales en todos los archivos
-    for f in "${files[@]}"; do
-        if [[ "$f" == *.sources ]]; then
-            # Para .sources buscamos las URIs y el Signed-By
-            grep -E '^\s*URIs:\s*|^\s*Signed-By:\s*' "$f" 2>/dev/null \
-                | grep -Eqi "$pattern" && return 0
-        else
-            # Para .list buscamos líneas que empiezan por 'deb '
-            grep -E '^\s*deb\s+' "$f" 2>/dev/null | grep -Eqi "$pattern" && return 0
-        fi
-    done
+def fetch_and_save_key(key_id, target_path):
+    """Descarga la clave y la guarda en la ruta indicada convirtiendo a binario si es .gpg"""
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    url = KEYSERVER_URL.format(key_id=key_id)
+    
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'launchpad-getkeys/2.0'})
+        with urllib.request.urlopen(req) as response:
+            ascii_key = response.read()
 
-    return 1
-}
+        if not ascii_key or b"BEGIN PGP PUBLIC KEY BLOCK" not in ascii_key:
+            print(f"  ✗ No se pudo obtener la clave {key_id} desde el servidor.")
+            return False
 
-install_keyring_if_missing() {
-    local distro="$1"
-    case "$distro" in
-        debian)
-            if ! check_official_repos "(deb\.debian\.org|security\.debian\.org|ftp\.debian\.org|file:///etc/apt/mirrors|debian-archive-keyring\.gpg)"; then
-                echo "No se detectan repositorios oficiales de Debian."
-                if ! dpkg -s debian-archive-keyring >/dev/null 2>&1; then
-                    echo "Instalando debian-archive-keyring..."
-                    apt install -y --no-install-recommends debian-archive-keyring
-                else
-                    echo "debian-archive-keyring ya está instalado. Se omite instalación."
-                fi
-            fi
-            ;;
-        ubuntu)
-            if ! check_official_repos "(archive.ubuntu.com|security.ubuntu.com|file:///etc/apt/mirrors|ubuntu-keyring\.gpg)"; then
-                echo "No se detectan repositorios oficiales de Ubuntu."
-                if ! dpkg -s ubuntu-keyring >/dev/null 2>&1; then
-                    echo "Instalando ubuntu-keyring..."
-                    apt install -y --no-install-recommends ubuntu-keyring
-                else
-                    echo "ubuntu-keyring ya está instalado. Se omite instalación."
-                fi
-            fi
-            ;;
-        *)
-            echo "Distribución no reconocida. No se realiza ninguna instalación."
-            ;;
-    esac
-}
+        # Si el destino termina en .gpg, se convierte a binario OpenPGP con gpg --dearmor
+        if target_path.endswith('.gpg'):
+            proc = subprocess.run(
+                ["gpg", "--dearmor", "-o", target_path],
+                input=ascii_key,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True
+            )
+        else:
+            # Si termina en .asc o similar, se guarda en ASCII
+            with open(target_path, 'wb') as f:
+                f.write(ascii_key)
 
-function download_key_from_known_sources() {
-    local keyid="$1"
-    local target="$2"
+        os.chmod(target_path, 0o644)
+        print(f"  ✓ Clave {key_id} guardada con éxito en: {target_path}")
+        return True
 
-    # For testing purposes only
-    # echo -e "${CYAN}Trying to download key ${keyid} from known sources...${NC}"
+    except Exception as e:
+        print(f"  ✗ Error al procesar la clave {key_id}: {e}")
+        return False
 
-    case "$keyid" in
-        # Oracle VirtualBox
-        A2F683C52980AECF)
-            wget -qO- https://www.virtualbox.org/download/oracle_vbox_2016.asc | gpg --yes --output /usr/share/keyrings/oracle-virtualbox-2016.gpg --dearmor > /dev/null 2>&1
-            ;;
+def main():
+    if os.geteuid() != 0:
+        print("Error: Este script debe ejecutarse con sudo o como root.", file=sys.stderr)
+        sys.exit(1)
 
-        # Steven Pusser (Firefox / Thunderbird)
-        0FAD31CA8719FCE4)
-            wget -qO- "https://build.opensuse.org/projects/home:stevenpusser/signing_keys/download?kind=gpg" | gpg --yes --output /etc/apt/trusted.gpg.d/home_stevenpusser.gpg --dearmor > /dev/null 2>&1
-            ;;
+    print("Obteniendo mapa de archivos Signed-By en los repositorios...")
+    repo_map = parse_deb822_sources()
+    repo_map.update(parse_traditional_lists())
 
-        # Waydroid
-        0E406D181DCEE19C)
-            wget -q --https-only --secure-protocol=TLSv1_2 -O /usr/share/keyrings/waydroid.gpg https://repo.waydro.id/waydroid.gpg
-            ;;
+    print("Ejecutando apt-get update para detectar claves faltantes...")
+    res = subprocess.run(["apt-get", "update"], capture_output=True, text=True, env={**os.environ, "LC_ALL": "C"})
 
-        # Ookla (Speedtest)
-        8E61C2AB9A6D1557)
-            wget -qO- https://packagecloud.io/ookla/speedtest-cli/gpgkey | gpg --yes --output /usr/share/keyrings/ookla_speedtest-cli-archive-keyring.gpg --dearmor > /dev/null 2>&1
-            ;;
+    # Extrae pares (URI_del_error, KEY_ID)
+    matches = re.findall(r'GPG error:\s+(\S+)\s+\S+\s+InRelease:.*NO_PUBKEY\s+([0-9A-Fa-f]+)', res.stderr + res.stdout)
 
-        # NodeSource
-        1655A0AB68576280)
-            wget -qO- https://deb.nodesource.com/gpgkey/nodesource.gpg.key | gpg --yes --dearmor | tee /usr/share/keyrings/nodesource.gpg > /dev/null 2>&1
-            ;;
+    if not matches:
+        print("No se encontraron errores NO_PUBKEY en los repositorios.")
+        sys.exit(0)
 
-        # HashiCorp
-        AA16FCBCA621E701)
-            wget -qO- https://apt.releases.hashicorp.com/gpg | gpg --yes --dearmor | tee /usr/share/keyrings/hashicorp-archive-keyring.gpg > /dev/null 2>&1
-            ;;
+    processed_keys = set()
 
-        # Docker
-        7EA0A9C3F273FCD8)
-            wget -qO- https://download.docker.com/linux/ubuntu/gpg | gpg --yes --dearmor | tee /usr/share/keyrings/docker-archive-keyring.gpg > /dev/null 2>&1
-            ;;
-
-        # Netdata
-        54832F89F09FED90)
-            curl -fsSL https://packagecloud.io/netdata/netdata/gpgkey | gpg --yes --dearmor > /etc/apt/trusted.gpg.d/netdata_netdata.gpg
-            ;;
-
-        # Tailscale
-        458CA832957F5868)
-            local distro codename
-            distro=$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-            codename=$(lsb_release -cs)
-            wget -qO- "https://pkgs.tailscale.com/stable/${distro}/${codename}.noarmor.gpg" | tee /usr/share/keyrings/tailscale-archive-keyring.gpg > /dev/null 2>&1
-            ;;
-
-        # Unknown
-        *)  return 1
-            ;;
-    esac
-}
-
-# Initial checks
-if [[ $(whoami) != root ]]; then
-    echo -e "${RED}Please run this script as root or using sudo.${NC}"
-    exit 1
-fi
-
-REMOVE_EXPIRED_KEYS="no"
-
-[ -s /etc/default/launchpad-getkeys ] && . /etc/default/launchpad-getkeys
-
-while getopts "k:p:rhf\?" opt; do
-    case "$opt" in
-        k ) KEYSERVER="$OPTARG" ;;
-        p ) PROXY="$OPTARG" ;;
-        r ) REMOVE_EXPIRED_KEYS="yes" ;;
-        f ) FORCE_UPDATE=1 ;;
-        h | \? ) HELP ;;
-    esac
-done
-shift $((OPTIND -1))
-
-if [[ $SERVER ]] && [[ $PORT ]]; then
-   ping -c 1 $SERVER >/dev/null 2>&1
-
-   if [ $? -eq 0 ]; then
-       PROXY=http://$SERVER:$PORT
-   fi
-fi
-
-if [[ $KEYSERVER ]]; then
-	KEYSERVERANDPORT=$(echo $KEYSERVER | grep ":")
-	if [[ ! $KEYSERVERANDPORT ]]; then
-	   echo -e "${RED}Error: please enter a keyserver and a port, like so: sudo launchpad-getkeys -k SERVER:PORT${NC}"
-	   exit 0
-	fi
-fi
-
-if [[ $PROXY ]]; then
-	PROXYSERVERANDPORT=$(echo $PROXY | grep ":")
-	if [[ ! $PROXYSERVERANDPORT ]]; then
-	   echo -e "${RED}Error: please enter a proxyserver and a port, like so: sudo launchpad-getkeys -p http://PROXYSERVER:PORT${NC}"
-	   exit 0
-	fi
-fi
-
-PROXY_OPTS=()
-if [[ ! -z ${PROXY:-} ]]; then
-   PROXY_OPTS=( --keyserver-options http-proxy=$PROXY )
-fi
-
-KEYSRV_OPTS=( --keyserver hkp://keyserver.ubuntu.com:80 )
-if [[ $KEYSERVER ]]; then
-    KEYSRV_OPTS=( --keyserver hkp://$KEYSERVER )
-fi
-
-if [[ "$REMOVE_EXPIRED_KEYS" == "yes" ]]; then
-    remove_expired_keys
-fi
-
-# Detectar distribución
-DISTRO_ID=$(grep '^ID=' /etc/os-release | cut -d'=' -f2 | tr -d '"')
-
-# Ejecutar instalación condicional
-install_keyring_if_missing "$DISTRO_ID"
-mkdir -p "$KEYRING_DIR"
-
-# Remove previous automatic import files
-OLD_FILES=( $(find "$KEYRING_DIR" -maxdepth 1 -type f -name 'launchpad-getkeys_imported____*') )
-if [[ ${#OLD_FILES[@]} -gt 0 ]]; then
-    echo -e "${CYAN}Deleting ${#OLD_FILES[@]} old 'launchpad-getkeys_imported____*' file(s)...${NC}"
-    rm -f "${OLD_FILES[@]}"
-fi
-
-echo -e "${GREEN}\nRunning apt-get update to detect missing GPG keys...${NC}"
-LC_ALL=C apt-get update 2> "$UPDATE_LOG"
-
-# Parse log and download keys, grouping by repo and concatenating all its pubkeys
-grep -i "error" "$UPDATE_LOG" | grep -A1 "NO_PUBKEY" | grep -Eo 'https?://[^ ]+|NO_PUBKEY[[:space:]]+[A-Za-z0-9:]+([[:space:]]|$)' |
-awk '
-    /^https?:\/\// { if (repo) print repo " " keys; repo=$0; keys=""; next }
-    /NO_PUBKEY/ { sub(/^NO_PUBKEY[[:space:]]+/, "", $0); keys=keys" "$0 }
-    END { if (repo) print repo " " keys }
-' |
-while read -r repo keys; do
-    repo_clean="${repo#http://}"
-    repo_clean="${repo_clean#https://}"
-    repo_clean="${repo_clean//\//-}"
-    repo_clean="${repo_clean%-InRelease}"
-    current_repo="$KEYRING_DIR/$repo_clean.gpg"
-
-    echo -e "${CYAN}==> Processing repository: ${repo}${NC}"
-    echo -e "${CYAN}    Keys: ${keys}${NC}"
-
-    for key in $keys; do
-        echo -e "${CYAN}--> Fetching key ${key}${NC}"
-
-        # Try known sources first
-        if download_key_from_known_sources "$key" "$current_repo"; then
-            echo -e "${GREEN}✔ Key ${key} obtained from known source${NC}"
+    for uri, key_id in matches:
+        if key_id in processed_keys:
             continue
-        fi
 
-        # Fallback to keyserver
-        # For testing purposes only
-        #echo -e "${CYAN}Trying to fetch ${key} from keyserver.ubuntu.com...${NC}"
+        norm_uri = normalize_uri(uri)
+        target_path = repo_map.get(norm_uri)
 
-        TMP_KEYRING="$(mktemp)"
-        if gpg --ignore-time-conflict --no-options --no-default-keyring --no-auto-check-trustdb \
-               --trust-model always --keyring "$TMP_KEYRING" "${KEYSRV_OPTS[@]}" "${PROXY_OPTS[@]}" \
-               --recv-keys "$key" >/dev/null 2>&1; then
+        if target_path:
+            print(f"\nProcesando clave {key_id} para {uri}:")
+            fetch_and_save_key(key_id, target_path)
+            processed_keys.add(key_id)
+        else:
+            # Ruta de respaldo si el repositorio no declara un Signed-By explícito
+            fallback_path = f"/etc/apt/keyrings/launchpad-{key_id}.gpg"
+            print(f"\nAdvertencia: No se encontró Signed-By explícito para {uri}.")
+            print(f"Usando ruta de respaldo: {fallback_path}")
+            fetch_and_save_key(key_id, fallback_path)
+            processed_keys.add(key_id)
 
-            # Append (concatenate) the key to the repo keyring
-            gpg --ignore-time-conflict --no-options --no-default-keyring --no-auto-check-trustdb \
-                --trust-model always --keyring "$TMP_KEYRING" --export "$key" | \
-                gpg --yes --dearmor >> "$current_repo"
-            echo -e "${GREEN}✔ Key ${key} added to ${current_repo}${NC}"
-        else
-            echo -e "${RED}✖ Failed to fetch key ${key}${NC}"
-        fi
-        rm -f "$TMP_KEYRING"
-    done
-
-    # Final validation: ensure file is valid GPG
-    if gpg --no-default-keyring --keyring "$current_repo" --list-keys >/dev/null 2>&1; then
-        echo -e "${GREEN}✔ Key(s) successfully saved in ${current_repo}${NC}"
-    else
-        echo -e "${RED}✖ Failed to save key(s) for ${repo}${NC}"
-    fi
-done | tee /var/log/launchpad-getkeys.log
-
-echo -e "${GREEN}\nDone. Run 'sudo apt-get update' again to verify that no key errors remain.${NC}"
-#rm -f "$UPDATE_LOG"
+if __name__ == "__main__":
+    main()
