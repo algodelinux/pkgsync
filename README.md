@@ -234,6 +234,8 @@ Al instalar el paquete pkgsync, se instalan los siguientes scripts adicionales e
 - **install-last-available-kernels**: Pasándole el número de kernels que queremos tener instalados, instalará los kernels de la misma serie que falten.
 - **remove-kernel**: Muestra la lista de kernels instalados y nos permite seleccionar el que queremos desinstalar.
 - **shim-repair**: Instala el paquete shim-signed y sus dependencias en equipos con EFI.
+- **select-next-kernel**: Permite seleccionar una entrada de GRUB para arrancar el equipo temporalmente con ella reiniciando directamente o en el próximo arranque.
+
 
 ## ✒️ Autores
 
