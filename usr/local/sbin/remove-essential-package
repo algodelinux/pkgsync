@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# remove-essential-package
+# Desinstala un paquete incluso si está marcado como Essential: yes.
+#
+
+set -e
+
+if [ "$#" -ne 1 ]; then
+    echo "Uso: $0 nombre-paquete" >&2
+    exit 1
+fi
+
+PACKAGE="$1"
+
+# Comprobar privilegios de administrador
+if [ "$EUID" -ne 0 ]; then
+    echo "Error: debes ejecutar este script como root." >&2
+    exit 1
+fi
+
+# Comprobar que el paquete está instalado
+if ! dpkg-query -W -f='${db:Status-Abbrev}' "$PACKAGE" 2>/dev/null | grep -q '^ii'; then
+    echo "Error: el paquete '$PACKAGE' no está instalado." >&2
+    exit 1
+fi
+
+echo "ADVERTENCIA: se va a forzar la eliminación de '$PACKAGE'."
+echo
+
+dpkg --remove --force-remove-essential "$PACKAGE"
+
+echo "Paquete '$PACKAGE' desinstalado correctamente."

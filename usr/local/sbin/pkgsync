@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=3.01
+export VERSION=3.10
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -22,6 +22,14 @@ WARN="${YELLOW}[!]${NC}"
 FAIL="${RED}[✖]${NC}"
 DIR="${CYAN}[DIR]${NC}"
 LOG="${CYAN}[LOG]${NC}"
+
+log_output_pkgsync() {
+    "$@" | tee >(sed -E 's/\x1B\[[0-9;]*[mK]//g' >> /var/log/pkgsync.log)
+}
+
+log_output_solve_apt_errors() {
+    "$@" | tee >(sed -E 's/\x1B\[[0-9;]*[mK]//g' >> /var/log/solve-apt-errors.log)
+}
 
 convert_seconds() {
     local SEGUNDOS=$1
@@ -57,26 +65,30 @@ print_help () {
 	echo ""
 	echo "Usage: pkgsync [OPTIONS]"
 	echo "Recognized options:"
-	echo "  -h,  --help			display this help and exit"
-	echo "  -v,  --version		display pkgsync version and exit"
-	echo "  -k,  --keep-unused		don't remove unused packages"
-	echo "  -e,  --ensure-essential	don't remove required, important and standard packages"
-	echo "  -s,  --simulate		simulate and print out which packages would be installed/uninstalled or updated"
-	echo "  -t,  --test-files		test pkgsync files"
-	echo "  -tr, --test-files r		test and remove packages from pkgsync files lists"
-	echo "  -d,  --delete-files		delete all pkgsync files"
-	echo "  -b,  --build-files		build musthave and create empty mayhave and maynothave if they don't exist"
-	echo "  -f,  --force			force pkgsync"
-	echo "  -c,  --clean			remove uninstalled packages and clean cache"
-	echo "  -C,  --clean-and-purge	remove uninstalled packages, delete their config files and clean cache"
-	echo "  -p,  --purge-old-kernels	remove old kernels keeping the last two (by default)"
-	echo "				or the number specified in /etc/default/pkgsync file"
-	echo "  -n,  --no-sincpuppet		don't launch sinc_puppet from pkgsync"
-	echo "  -i,  --ignore-failed-repos	ignore failed repositories"
-	echo "  -g,  --get-keys		exec launchpad-keys to get repositories keys"
-	echo "  -S,  --shutdown		shutdown machine after pkgsync"
-	echo "  -R,  --reboot			reboot machine after pkgsync"
-	echo "  -Rw, --reboot w		reboot machine and boot into windows on EFI computers"
+	echo "  -h,   --help                            display this help and exit"
+	echo "  -v,   --version                         display pkgsync version and exit"
+	echo "  -k,   --keep-unused                     don't remove unused packages"
+	echo "  -e,   --ensure-essential                don't remove required, important and standard packages"
+	echo "  -s,   --simulate                        simulate and print out which packages would be installed/uninstalled or updated"
+	echo "  -t,   --test-files                      test all pkgsync files"
+	echo "  -tall --test-files all                  test all pkgsync files"
+	echo "  -tmusthave --test-files musthave        test musthave files"
+	echo "  -tmaythave --test-files mayhave         test mayhave files"
+	echo "  -tmaynothave --test-files maynothave    test maynothave files"
+	echo "  -tr,  --test-files r                    test and remove packages from pkgsync files lists"
+	echo "  -d,   --delete-files                    delete all pkgsync files"
+	echo "  -b,   --build-files                     build musthave and create empty mayhave and maynothave if they don't exist"
+	echo "  -f,   --force                           force pkgsync"
+	echo "  -c,   --clean                           remove uninstalled packages and clean cache"
+	echo "  -C,   --clean-and-purge                 remove uninstalled packages, delete their config files and clean cache"
+	echo "  -p,   --purge-old-kernels               remove old kernels keeping the last two (by default)"
+	echo "                                          or the number specified in /etc/default/pkgsync file"
+	echo "  -n,   --no-sincpuppet                   don't launch sinc_puppet from pkgsync"
+	echo "  -i,   --ignore-failed-repos             ignore failed repositories"
+	echo "  -g,   --get-keys                        exec launchpad-keys to get repositories keys"
+	echo "  -S,   --shutdown                        shutdown machine after pkgsync"
+	echo "  -R,   --reboot                          reboot machine after pkgsync"
+	echo "  -Rw,  --reboot w                        reboot machine and boot into windows on EFI computers"
 	echo ""
 	echo "Complete documentation can be found in /usr/share/doc/pkgsync/README.Debian."
 }
@@ -85,13 +97,39 @@ test_files () {
   set +e
   :>/var/log/pkgsync/removefromlists.log
 
-  for fichero in $(find /etc/pkgsync -type f -not -name "*.all" -not -name "*.bak*" -not -name "musthave.[[:digit:]]*"); do
+  local modo="${1:-all}"
+  local filtro_modo=()
+
+  case "$modo" in
+    musthave)
+        filtro_modo=( '(' -name "musthave" -o -name "musthave.ies" -o -path "*/musthave.d/*" ')' )
+        ;;
+    mayhave)
+        filtro_modo=( '(' -name "mayhave" -o -name "mayhave.ies" -o -path "*/mayhave.d/*" ')' )
+        ;;
+    maynothave)
+        filtro_modo=( '(' -name "maynothave" -o -name "maynothave.ies" -o -path "*/maynothave.d/*" ')' )
+        ;;
+    all)
+        filtro_modo=( '(' -name "musthave" -o -name "musthave.ies" -o -path "*/musthave.d/*" \
+                      -o -name "mayhave" -o -name "mayhave.ies" -o -path "*/mayhave.d/*" \
+                      -o -name "maynothave" -o -name "maynothave.ies" -o -path "*/maynothave.d/*" ')' )
+        ;;
+    *)
+        echo "Error: Mode '$modo' not found. Valid options: all, musthave, mayhave, maynothave." >&2
+        set -e
+        return 1
+        ;;
+  esac
+
+  # Ejecución de find inyectando el filtro seleccionado y manteniendo las exclusiones comunes
+  for fichero in $(find /etc/pkgsync -type f "${filtro_modo[@]}" -not -name "*.all" -not -name "*.bak*" -not -name "*.[[:digit:]]*"); do
       if [ -s "$fichero" ]; then
-         for linea in $(sed '/^[[:blank:]]*#/d;s/#.*//;' $fichero); do
-            paquete=$(echo $linea | cut -f1 -d" ")
+         for linea in $(sed '/^[[:blank:]]*#/d;s/#.*//;' "$fichero"); do
+            paquete=$(echo "$linea" | cut -f1 -d" ")
             echo "Checking $fichero: $paquete"
 
-            LC_ALL=C apt-cache --quiet=0 policy $paquete 2>&1 | tr -d " " | grep -e 'Candidate:(none)' -e 'N:Unabletolocatepackage' 2>&1>/dev/null
+            LC_ALL=C apt-cache --quiet=0 policy "$paquete" 2>&1 | tr -d " " | grep -e 'Candidate:(none)' -e 'N:Unabletolocatepackage' 2>&1>/dev/null
 
             if [ $? -eq 0 ]; then
                echo -e "Package $paquete in file $fichero isn't in repositories" | tee -a /var/log/pkgsync/removefromlists.log
@@ -99,7 +137,13 @@ test_files () {
          done
       fi
   done
-  echo "See /var/log/pkgsync/removefromlists.log"
+
+  if [ -s /var/log/pkgsync/removefromlists.log ]; then
+     echo -e "${GREEN}See /var/log/pkgsync/removefromlists.log${NC}"
+  else
+     echo -e "${GREEN}No non-existent packages were found.${NC}"
+  fi
+
   set -e
 }
 
@@ -120,7 +164,12 @@ remove_packages_from_lists () {
         # Comentamos la línea que contiene el nombre del paquete
         sed -i "s|^$paquete|#$paquete|" $fichero
      done < /var/log/pkgsync/removefromlists.log
-     echo -e "${GREEN}See /var/log/pkgsync/removedfromlists.log${NC}"
+
+     if [ -s /var/log/pkgsync/removedfromlists.log ]; then
+       echo -e "${GREEN}See /var/log/pkgsync/removedfromlists.log${NC}"
+     else
+       echo -e "${GREEN}No packages were found to be removed from lists.${NC}"
+     fi
   fi
 }
 
@@ -159,8 +208,8 @@ parse_options () {
 	while :; do
 		case "$1" in
 			-s|--simulate)
-                                simulate
-                                exit 0
+                                SIMULATE="yes"
+				shift
 				;;
 			-k|--keep-unused)
 				APTITUDE_ARGS="$APTITUDE_ARGS -o Aptitude::Delete-Unused=false"
@@ -211,10 +260,23 @@ parse_options () {
                                 esac
 				;;
 			-t|--test-files)
-				test_files
-                                if [ "$2" = "r" ]; then remove_packages_from_lists; fi
-				exit 0
-				;;
+				modo="${2:-all}" # Si $2 está vacío, asigna "all"
+
+				case "$modo" in
+				   all|musthave|mayhave|maynothave)
+				      test_files "$modo"
+			              ;;
+			           r)
+			              test_files
+			              remove_packages_from_lists
+				      ;;
+			          *)
+			              echo "Error: Opción '$modo' no reconocida para -t/--test-files" >&2
+			              exit 1
+ 			              ;;
+			      esac
+			      exit 0
+		  	      ;;
 			-d|--delete-files)
 				delete_files
 				exit 0
@@ -311,6 +373,9 @@ merge_files() {
 }
 
 simulate() {
+
+  if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f now; fi
+
   # Merge files
   merge_files
 
@@ -320,7 +385,8 @@ simulate() {
   maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
   mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
 
-  run_aptitude full-upgrade -s '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto | tee -a /var/log/pkgsync.log
+  log_output_pkgsync run_aptitude full-upgrade -s '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto
+
 }
 
 wait_for_apt_or_dpkg() {
@@ -488,11 +554,10 @@ check_apt_update() {
 
 unlock_dpkg() {
     local TIME_MINUTES="${1:-5}"
-    local LOG_FILE="/var/log/solve-apt-errors.log"
     local FOUND=0
 
     # Para propósitos de prueba
-    echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}" | tee -a "$LOG_FILE"
+    log_output_solve_apt_errors echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}"
 
     ps -eo pid,etime,comm,args --sort=etime | while read -r PID ETIME COMM ARGS; do
         # Solo dpkg o apt
@@ -521,12 +586,12 @@ unlock_dpkg() {
             ACTION_DESC="bloqueado"
             [[ "$ARGS" == *"--configure"* ]] && ACTION_DESC="configurando paquetes"
 
-            echo -e "${RED}Proceso $PID ($COMM) $ACTION_DESC lleva $minutes minutos. Terminando...${NC}" | tee -a "$LOG_FILE"
+            log_output_solve_apt_errors echo -e "${RED}Proceso $PID ($COMM) $ACTION_DESC lleva $minutes minutos. Terminando...${NC}"
 
             kill -TERM "$PID" 2>/dev/null
             sleep 2
             if ps -p "$PID" > /dev/null; then
-                echo -e "${RED}Proceso $PID no terminó, forzando KILL...${NC}" | tee -a "$LOG_FILE"
+                log_output_solve_apt_errors echo "Proceso $PID no terminó, forzando KILL..."
                 kill -KILL "$PID" 2>/dev/null
             fi
         fi
@@ -534,7 +599,7 @@ unlock_dpkg() {
 
     # Mensaje si no se encontraron procesos
     if [ "$FOUND" -eq 0 ]; then
-        echo -e "${GREEN}No se encontraron procesos dpkg/apt bloqueados.${NC}" | tee -a "$LOG_FILE"
+         log_output_solve_apt_errors echo -e "${GREEN}No se encontraron procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos.${NC}"
     fi
 }
 
@@ -986,12 +1051,12 @@ upgrade_packages() {
   local UPGRADABLE=$(aptitude search '~U')
 
   if [ -n "$UPGRADABLE" ]; then
-    echo -e "${GREEN}Se encontraron paquetes para actualizar:${NC}"
-    echo -e "${GREEN}$UPGRADABLE"
-    echo -e "${GREEN}Ejecutando 'aptitude upgrade'...${NC}"
+    log_output_pkgsync echo -e "${GREEN}Se encontraron paquetes para actualizar:${NC}"
+    log_output_pkgsync echo -e "${GREEN}$UPGRADABLE"
+    log_output_pkgsync echo -e "${GREEN}Ejecutando 'aptitude upgrade'...${NC}"
     run_aptitude upgrade
   else
-    echo -e "${GREEN}No hay paquetes para actualizar.${NC}"
+    log_output_pkgsync echo -e "${GREEN}No hay paquetes para actualizar.${NC}"
   fi
 }
 
@@ -1091,6 +1156,31 @@ if [ ! -d /etc/pkgsync/musthave.d ]; then
    mkdir -p /etc/pkgsync/musthave.d
 fi
 
+# Crear un fichero /etc/pkgsync/mayhave.ies vacío si no existe
+if [ ! -r /etc/pkgsync/mayhave.ies ]; then
+   echo -e "${GREEN}Creando el fichero /etc/pkgsync/mayhave.ies ...${NC}"
+   touch /etc/pkgsync/mayhave.ies
+fi
+
+# Crear un fichero /etc/pkgsync/maynothave.ies vacío si no existe
+if [ ! -r /etc/pkgsync/maynothave.ies ]; then
+   echo -e "${GREEN}Creando el fichero /etc/pkgsync/maynothave.ies ...${NC}"
+   touch /etc/pkgsync/maynothave.ies
+fi
+
+# Crear un fichero /etc/pkgsync/musthave.ies vacío si no existe
+if [ ! -r /etc/pkgsync/musthave.ies ]; then
+   echo -e "${GREEN}Creando el fichero /etc/pkgsync/musthave.ies ...${NC}"
+   touch /etc/pkgsync/musthave.ies
+fi
+
+
+# Crear un fichero /etc/pkgsync/musthave.orphan vacío si no existe
+if [ ! -r /etc/pkgsync/musthave.orphan ]; then
+   echo -e "${GREEN}Creando el fichero /etc/pkgsync/musthave.orphan ...${NC}"
+   touch /etc/pkgsync/musthave.orphan
+fi
+
 # Crear un fichero /etc/pkgsync/mayhave vacío si no existe
 if [ ! -r /etc/pkgsync/mayhave ]; then
    echo -e "${GREEN}Creando el fichero /etc/pkgsync/mayhave ...${NC}"
@@ -1121,6 +1211,13 @@ fi
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
 
+
+if [ $SIMULATE = "yes" ]; then
+   simulate
+   exit 0
+fi
+
+
 # Determinar si se debe apagar el equipo al terminar
 check_auto_shutdown
 
@@ -1128,7 +1225,7 @@ check_auto_shutdown
 check_auto_reboot
 
 # Descargar claves de repositorios
-launchpad_getkeys | tee -a /var/log/pkgsync.log
+log_output_pkgsync launchpad_getkeys
 
 # Actualizamos los paquetes instalados
 solveapterrors; echo -e "${CYAN}Comprobando si existen actualizaciones de paquetes instalados...${NC}"; wait_while_locked; LC_ALL=C check_apt_update | tee /tmp/apterrors
@@ -1136,12 +1233,12 @@ solveapterrors; echo -e "${CYAN}Comprobando si existen actualizaciones de paquet
 # Abort if repository downloads fail (possible mirror failure).
 grep -w '^W: Failed to fetch' /tmp/apterrors 2>&1 >/dev/null
 if [ $? -eq 0 ]; then
-   echo -e "${RED}\n[ERR] aptitude update error. Mirror sync in progress?${NC}" | tee -a /var/log/pkgsync.log
+   log_output_pkgsync echo -e "${RED}\n[ERR] aptitude update error. Mirror sync in progress?${NC}"
    exit 1
 fi
 
 # Upgrade software
-disable_failed_repositories; upgrade_packages | tee -a /var/log/pkgsync.log; enable_repositories
+disable_failed_repositories; upgrade_packages; enable_repositories
 
 if [ -x /usr/sbin/sinc_puppet ]; then
 
@@ -1154,9 +1251,9 @@ if [ -x /usr/sbin/sinc_puppet ]; then
       if [ $runned_sinc_puppet = false ]; then
          installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
          if version_ge $installed_version "2.7"; then
-            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f now | tee -a /var/log/pkgsync.log; fi
+            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f now; fi
          else
-            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then /usr/sbin/sinc_puppet -f | tee -a /var/log/pkgsync.log; fi
+            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f; fi
          fi
       fi
    fi
@@ -1165,7 +1262,6 @@ fi
 echo -e "${GREEN}Realizando pkgsync...${NC}"
 
 # Update the package lists
-# wait_while_locked; LC_ALL=C run_aptitude update > /tmp/apterrors 2>&1 >/dev/null
 wait_while_locked; check_apt_update
 
 # Get failed repositories
@@ -1174,10 +1270,10 @@ cat /tmp/apterrors | grep '^Err' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*"
 if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
    # Abortamos pkgsync si algún repositorio no se encuentra accesible
    if [ -s /tmp/failedrepositories ]; then
-      echo -e "${RED}\n[ERR] aptitude update error${NC}" | tee -a /var/log/pkgsync.log
-      echo "The following repositories fail:" | tee -a /var/log/pkgsync.log
-      cat /tmp/failedrepositories | tee -a /var/log/pkgsync.log
-      echo -e "${RED}      Aborting${NC}" | tee -a /var/log/pkgsync.log
+      log_output_pkgsync echo -e "${RED}\n[ERR] aptitude update error${NC}" 
+      log_output_pkgsync echo "The following repositories fail:"
+      log_output_pkgsync cat /tmp/failedrepositories
+      echo -e "${RED}      Aborting${NC}"
       exit 1
    fi
 elif [ $ABORT_ON_FAILED_REPOS = "no" ]; then
@@ -1212,7 +1308,7 @@ else
 fi
 
 # Si el valor de ENABLE es onlyupgrade, entonces tratamos de resolver errores de apt, actualizamos paquetes y finalizamos
-if [ "$ENABLE" == "onlyupgrade" ]; then
+if [ "$ENABLE" = "onlyupgrade" ]; then
    exit 0
 fi
 
@@ -1234,7 +1330,7 @@ if [ $AUTO_TEST_FILES = "yes" ]; then
    test_files; remove_packages_from_lists; merge_files
 fi
 
-run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+log_output_pkgsync run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 
 pkgs=$(find /etc/pkgsync/musthave /etc/pkgsync/musthave.ies /etc/pkgsync/musthave.d -type f -exec grep -h -w -F -f <(dpkg -l | awk '/^rc/ {print $2}') {} + 2>/dev/null | grep -v -w -F -f <(find /etc/pkgsync/maynothave /etc/pkgsync/maynothave.ies /etc/pkgsync/maynothave.d -type f -exec cat {} + 2>/dev/null | grep -E -v '^\s*($|#)') | sort -u)
 
@@ -1242,11 +1338,12 @@ if [ -n "$pkgs" ]; then
     echo "Se han encontrado paquetes en estado rc que deberían estar instalados:"
     echo "$pkgs"
     echo "Ejecutando nuevamente pkgsync"
-    run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto | tee -a /var/log/pkgsync.log
+    log_output_pkgsync run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 fi
 
-run_aptitude autoclean
-ensure_kernels;eliminar_dependencias
+log_output_pkgsync run_aptitude autoclean
+log_output_pkgsync ensure_kernels; log_output_pkgsync eliminar_dependencias
+log_output_pkgsync echo -e "${GREEN}Proceso concluido.${NC}"
 
 if [ $ABORT_ON_FAILED_REPOS = "no" ] && [ $DISABLED_FAILED_REPOS = true ]; then enable_repositories; fi
 

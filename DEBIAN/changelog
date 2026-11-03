@@ -1,3 +1,49 @@
+pkgsync (3.10) ubuntu; urgency=medium
+
+  * Modified pkgsync to create musthave.orphan file if missing
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Nov 2026 13:14:00 +0100
+
+pkgsync (3.08) ubuntu; urgency=medium
+
+  * Modify pkgsync to create mayhave.ies, maynothave.ies, and musthave.ies files if missing
+  * Added sample for /etc/default/pkgsync in /usr/share/doc/pkgsync/examples directory
+  * Moved mayhave, maynothave and musthave example files to directory for examples
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Nov 2026 12:29:00 +0100
+
+pkgsync (3.07) ubuntu; urgency=medium
+
+  * Modified /usr/local/sbin/pkgsync to let simulate with an without sinc_puppet
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Mon, 02 Nov 2026 07:16:00 +0100
+
+pkgsync (3.06) ubuntu; urgency=medium
+
+  * Updated /usr/local/sbin/softwareupdate to v1.22
+  * Added usr/local/sbin/remove-essential-package
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 30 Oct 2026 15:30:00 +0100
+
+pkgsync (3.04) ubuntu; urgency=medium
+
+  * Solved bug saving logs
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 29 Oct 2026 11:44:00 +0100
+
+pkgsync (3.03) ubuntu; urgency=medium
+
+  * Modified logs outputs
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 20 Oct 2026 12:09:00 +0100
+
+pkgsync (3.02) ubuntu; urgency=medium
+
+  * Improved test_files function in /usr/local/sbin/pkgsync. Now we can use 'musthave',
+    'mayhave', 'maynothave' and 'all' options to test selected files.
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 14 Oct 2026 18:04:00 +0100
+
 pkgsync (3.01) ubuntu; urgency=medium
 
   * Improved /usr/local/sbin/shim-repair script
