@@ -1,9 +1,37 @@
+pkgsync (3.14) ubuntu; urgency=medium
+
+  * Solved /usr/local/sbin/launchpad-getkeys bug
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 13 Nov 2026 11:34:00 +0100
+
+pkgsync (3.13) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 13 Nov 2026 11:09:00 +0100
+
+pkgsync (3.12) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/shim-repair code
+  * Upgraded install_shim_if_uefi function in /usr/local/sbin/pkgsync
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 12 Nov 2026 10:31:00 +0100
+
+pkgsync (3.11) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/list-last-available-kernels script to list last available
+    kernels on repositories
+  * Improved /usr/local/sbin/shim-repair script
+  * Added install_shim_if_uefi function to /usr/local/sbin/pkgsync
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 07 Nov 2026 11:00:00 +0100
+
 pkgsync (3.10) ubuntu; urgency=medium
 
   * Modified pkgsync to create musthave.orphan file if missing
   
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Nov 2026 13:14:00 +0100
- 
+
 pkgsync (3.08) ubuntu; urgency=medium
 
   * Modify pkgsync to create mayhave.ies, maynothave.ies, and musthave.ies files if missing
@@ -11,7 +39,7 @@ pkgsync (3.08) ubuntu; urgency=medium
   * Moved mayhave, maynothave and musthave example files to directory for examples
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Nov 2026 12:29:00 +0100
- 
+
 pkgsync (3.07) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to let simulate with an without sinc_puppet

@@ -8,7 +8,7 @@
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=3.10
+export VERSION=3.14
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -724,100 +724,152 @@ restore_ldconfig() {
     echo -e "$OK Proceso completado. ldconfig debería estar operativo."
 }
 
-install_shim_if_uefi() {
-    # Comprobar si el sistema usa UEFI
-    if [ ! -d /sys/firmware/efi ]; then
-        echo "Sistema no UEFI, no se requiere 'shim-signed'."
+get_esp_partition() {
+    # Priorizar la partición ya montada en /boot/efi si existe
+    local mounted_esp
+    mounted_esp=$(findmnt -rn -M /boot/efi -o SOURCE 2>/dev/null | head -n 1)
+    if [ -n "$mounted_esp" ] && [ -b "$mounted_esp" ]; then
+        echo "$mounted_esp"
         return 0
     fi
 
-    # Detectar estado de shim-signed (ii = instalado, rc = eliminado con configs)
-    PKG_STATUS=$(dpkg -l shim-signed 2>/dev/null | awk '/^(ii|rc)/ {print $1}')
+    # Buscar por GUID estándar de partición EFI System Partition (ESP)
+    lsblk -rpno NAME,PARTTYPE 2>/dev/null |
+        awk 'tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" {
+            print $1
+            exit
+        }'
+}
 
-    # Comprobar si hay ESP real
-    EFI_DISK=$(findmnt -n -o SOURCE /boot/efi 2>/dev/null | sed 's/[0-9]*$//')
+get_disk_by_id() {
+    local target_real
+    target_real=$(readlink -f "$1")
+    local link
 
-    if [ -z "$EFI_DISK" ]; then
-        # For testing purposes only
-        # echo "⚠ No se detectó disco EFI."
-
-        # Si shim-signed está instalado, desinstalarlo junto con dependencias esenciales
-        if [[ "$PKG_STATUS" == "ii" ]]; then
-            echo "'shim-signed' está instalado pero no hay ESP. Procediendo a desinstalar..."
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get remove --purge -y --allow-remove-essential shim-signed grub-efi-amd64-signed mokutil || true
-            unset DEBIAN_FRONTEND
-            echo "✔ 'shim-signed' desinstalado correctamente."
-        #else
-        #    echo "✔ 'shim-signed' no está instalado. No se realiza ninguna acción."
-        fi
-
-        return 0
-    fi
-
-    # Si shim-signed ya está instalado, no hacer nada
-    if [[ "$PKG_STATUS" == "ii" ]]; then
-        # For testing purposes only
-        # echo "'shim-signed' ya está instalado. No se realizará ninguna acción."
-        return 0
-    fi
-
-    # Si shim-signed no está instalado, proceder con instalación/reinstalación
-    echo "Disco EFI detectado: $EFI_DISK"
-    echo "'shim-signed' no está instalado. Preparando instalación manual con dependencias..."
-
-    # Preparar directorio temporal
-    TMPDIR=$(mktemp -d)
-    cd "$TMPDIR" || return 1
-
-    # Actualizar lista de paquetes
-    apt-get update -qq
-
-    # Obtener shim-signed y todas sus dependencias automáticamente
-    PACKAGES=$(LC_ALL=C apt-cache depends shim-signed  | awk '/Depends:/ {print $2}'  | grep -v '^<.*>$')
-    PACKAGES="shim-signed $PACKAGES"
-
-    echo "Descargando paquetes: $PACKAGES"
-    for pkg in $PACKAGES; do
-        if ! apt-get download "$pkg" >/dev/null 2>&1; then
-            echo "✖ Error descargando $pkg"
-            rm -rf "$TMPDIR"
-            return 1
+    for link in /dev/disk/by-id/*-part*; do
+        [ -e "$link" ] || continue
+        if [ "$(readlink -f "$link")" = "$target_real" ]; then
+            echo "$link"
+            return 0
         fi
     done
 
-    # Crear tmpfs temporal para evitar error 32 en post-install de GRUB
-    mkdir -p /var/lib/grub/esp
-    mount -t tmpfs tmpfs /var/lib/grub/esp || { echo "⚠ No se pudo montar tmpfs en /var/lib/grub/esp"; rm -rf "$TMPDIR"; return 1; }
-    ESP_TMPFS=1
+    # Fallback al dispositivo directo si no existe enlace en /dev/disk/by-id
+    echo "$1"
+}
 
-    echo "Ejecutando grub-install en modo no interactivo..."
-    grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck --no-floppy "$EFI_DISK" || {
-        echo "⚠ No se pudo ejecutar grub-install correctamente."
-    }
+update_grub_debconf() {
+    local efi_device="$1"
+    local owners
 
-    # Instalar paquetes descargados en modo no interactivo
-    export DEBIAN_FRONTEND=noninteractive
-    DEB_FILES=$(find "$TMPDIR" -maxdepth 1 -type f -name "*.deb")
-    dpkg -i $DEB_FILES || true
+    # Obtener propietarios actuales de grub-efi/install_devices en debconf + habituales
+    owners=$(
+        {
+            awk '/^Name: grub-efi\/install_devices$/{f=1; next} f && /^Owners:/{gsub(/,/," "); for(i=2;i<=NF;i++) print $i; f=0}' /var/cache/debconf/config.dat 2>/dev/null
+            printf '%s\n' "grub-efi-amd64" "grub-pc" "grub-efi-amd64-signed"
+        } | sort -u
+    )
 
-    # Resolver dependencias automáticamente
-    apt-get install -f -y
-    unset DEBIAN_FRONTEND
+    for owner in $owners; do
+        debconf-set-selections <<EOF
+$owner grub-efi/install_devices multiselect $efi_device
+$owner grub-efi/install_devices_empty boolean false
+EOF
+    done
+}
 
-    # Verificar instalación
-    if dpkg -s shim-signed >/dev/null 2>&1; then
-        echo "✔ 'shim-signed' y sus dependencias instaladas correctamente."
-    else
-        echo "✖ Falló la instalación de 'shim-signed'."
-        umount /var/lib/grub/esp
-        rm -rf "$TMPDIR"
-        return 1
+is_pkg_installed() {
+    local status
+    status=$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null)
+    [ "$status" = "install ok installed" ]
+}
+
+install_shim_if_uefi() {
+    local EFI_PARTITION EFI_MOUNTPOINT EFI_PARENT EFI_DISK EFI_BY_ID
+
+    EFI_PARTITION=$(get_esp_partition)
+
+    # Si no hay partición EFI (sistema Legacy/BIOS)
+    if [ -z "$EFI_PARTITION" ]; then
+        echo "Sistema no UEFI (sin partición ESP)."
+
+        if is_pkg_installed "shim-signed"; then
+            echo "'shim-signed' está instalado pero no hay ESP. Procediendo a desinstalar..."
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get remove --purge -y --allow-remove-essential shim-signed grub-efi-amd64-signed mokutil || true
+            apt-get autoremove -y
+            unset DEBIAN_FRONTEND
+            echo "✔ 'shim-signed' desinstalado correctamente."
+        else
+            echo "✔ 'shim-signed' no está instalado. No se realiza ninguna acción."
+        fi
+        return 0
     fi
 
-    # Limpiar temporales
-    rm -rf "$TMPDIR"
-    [ "$ESP_TMPFS" -eq 1 ] && umount /var/lib/grub/esp && echo "⚠ Desmontado tmpfs temporal en /var/lib/grub/esp"
+    # Si shim-signed y grub-efi-amd64-signed ya están completamente instalados y configurados
+    if is_pkg_installed "shim-signed" && is_pkg_installed "grub-efi-amd64-signed"; then
+        echo "'shim-signed' ya está instalado correctamente. No se realizará ninguna acción."
+        return 0
+    fi
+
+    # Asegurar que la partición EFI esté montada
+    EFI_MOUNTPOINT=$(findmnt -rn -S "$EFI_PARTITION" -o TARGET 2>/dev/null | head -n 1)
+    if [ -z "$EFI_MOUNTPOINT" ]; then
+        EFI_MOUNTPOINT="/boot/efi"
+        mkdir -p "$EFI_MOUNTPOINT"
+        if ! mount "$EFI_PARTITION" "$EFI_MOUNTPOINT"; then
+            echo "✖ ERROR: No se pudo montar la partición EFI ($EFI_PARTITION) en $EFI_MOUNTPOINT." >&2
+            return 1
+        fi
+    fi
+
+    # Obtener el disco padre de la partición EFI
+    EFI_PARENT=$(lsblk -no PKNAME "$EFI_PARTITION" 2>/dev/null | head -n 1)
+    if [ -n "$EFI_PARENT" ]; then
+        EFI_DISK="/dev/$EFI_PARENT"
+    else
+        EFI_DISK="$EFI_PARTITION"
+    fi
+
+    echo "Disco EFI detectado: $EFI_DISK (Partición: $EFI_PARTITION montada en $EFI_MOUNTPOINT)"
+
+    # Desmontar posible tmpfs residual en /var/lib/grub/esp de ejecuciones anteriores
+    if mountpoint -q /var/lib/grub/esp 2>/dev/null; then
+        umount /var/lib/grub/esp || {
+            echo "✖ ERROR: No se pudo desmontar /var/lib/grub/esp." >&2
+            return 1
+        }
+    fi
+
+    # Actualizar debconf con el by-id real de la partición EFI actual
+    EFI_BY_ID=$(get_disk_by_id "$EFI_PARTITION")
+    echo "Actualizando debconf (grub-efi/install_devices) -> $EFI_BY_ID"
+    update_grub_debconf "$EFI_BY_ID"
+
+    echo "Ejecutando grub-install en modo no interactivo..."
+    if ! grub-install --target=x86_64-efi --efi-directory="$EFI_MOUNTPOINT" --recheck --no-floppy "$EFI_DISK"; then
+        echo "⚠ Advertencia: grub-install devolvió un error; se intentará completar vía dpkg/apt." >&2
+    fi
+
+    # Configurar paquetes pendientes e instalar shim-signed
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+
+    if ! dpkg --configure -a || ! apt-get install -y shim-signed grub-efi-amd64-signed; then
+        echo "✖ Falló la instalación o configuración de 'shim-signed'." >&2
+        unset DEBIAN_FRONTEND
+        return 1
+    fi
+    unset DEBIAN_FRONTEND
+
+    # Verificación estricta de estado
+    if is_pkg_installed "shim-signed" && is_pkg_installed "grub-efi-amd64-signed"; then
+        echo "✔ 'shim-signed' y sus dependencias instaladas correctamente."
+        return 0
+    else
+        echo "✖ 'shim-signed' no quedó correctamente configurado." >&2
+        return 1
+    fi
 }
 
 solveapterrors() {

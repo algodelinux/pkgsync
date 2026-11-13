@@ -1,0 +1,30 @@
+#!/bin/bash
+# -------------------------------------------------------------------------------------------
+# script: list-last-available-kernels
+# Author:  Esteban M. Navas Martín
+# Date:    09-02-2024
+# Ver:     05-11-2026
+#
+# Purpose: List last available kernels of installed version
+# -------------------------------------------------------------------------------------------
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
+KERNEL_VERSION=$(uname -r | cut -d'.' -f1,2)
+
+echo -e "Last available kernels on repositories:${GREEN}"
+
+KERNELS=$(apt-cache search "linux-image-${KERNEL_VERSION}" |
+    grep 'generic' |
+    awk '{print $1}' |
+    sort -V -r)
+
+if [ -n "$1" ]; then
+    KERNELS=$(echo "$KERNELS" | head -n "$1")
+fi
+
+echo "$KERNELS"
+
+echo -e "${NC}"
