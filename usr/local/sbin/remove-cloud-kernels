@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# remove-cloud-kernels - Elimina kernels cloud
+# 2026 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# Last update: 21/11/2026
+set -euo pipefail
+
+# Comprobar que se ejecuta como root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "Error: este script debe ejecutarse como root." >&2
+    exit 1
+fi
+
+export DEBIAN_FRONTEND=noninteractive
+
+# --- Detectar kernels de nube/GPU --------------------------------------
+# Se buscan TODOS los paquetes "linux-*" del sabor indicado (image, headers,
+# modules, modules-extra, firmwares y metapaquetes), no solo linux-image-*,
+# para no dejar restos huérfanos tras la purga.
+# Se excluye expresamente el kernel EN EJECUCION para no dejar el sistema
+# sin kernel arrancable.
+FLAVORS='aws|azure|gcp|oracle|nvidia|iotg|lowlatency'
+
+# Release del kernel en ejecución (p. ej. 6.8.0-45-generic): nunca se purga.
+running_release=$(uname -r)
+
+mapfile -t kernels < <(
+    dpkg-query -W -f='${binary:Package}\n' 2>/dev/null \
+    | grep -E "^linux-(image|image-unsigned|headers|modules|modules-extra|buildinfo|tools|cloud-tools)[-A-Za-z0-9.]*-(${FLAVORS})$|^linux-(${FLAVORS})(-[a-z0-9.-]+)?$" \
+    | grep -v -- "-${running_release//./\\.}$" || true
+)
+
+if [ "${#kernels[@]}" -eq 0 ]; then
+    cat <<EOF
+======================================================================
+ No se han encontrado kernels problemáticos instalados en este equipo.
+ Patrones buscados: linux-*-aws, linux-*-azure, linux-*-gcp,
+                    linux-*-oracle, linux-*-nvidia, linux-*-iotg,
+                    linux-*-lowlatency
+ Ningún paquete con esos sabores (excluido el kernel en ejecución:
+ ${running_release}).
+
+ El script no realiza ninguna acción.
+ $(lsb_release -ds 2>/dev/null || head -n1 /etc/os-release) - $(hostname)
+======================================================================
+EOF
+    exit 0
+fi
+
+# --- Sincronizar hora por internet -------------------------------------
+# Solo se corrige el reloj si la desviación supera 60 segundos; una
+# desviación menor es normal y la gestiona NTP.
+get_http_date() {
+    local server fecha
+    for server in archive.ubuntu.com security.ubuntu.com www.google.com; do
+        fecha=$(curl -sI --max-time 5 "http://$server" 2>/dev/null \
+                | awk 'tolower($1)=="date:"{$1="";sub(/^ +/,"");print}')
+        [ -n "$fecha" ] && { printf '%s\n' "$fecha"; return 0; }
+    done
+    return 1
+}
+
+if fecha_http=$(get_http_date); then
+    now=$(date -u +%s)
+    net=$(date -u -d "$fecha_http" +%s 2>/dev/null || true)
+
+    if [ -n "$net" ] && [ "$((now > net ? now - net : net - now))" -gt 60 ]; then
+        echo "Reloj del sistema: $(date -u)"
+        echo "Hora de internet:  $(date -u -d "$fecha_http")"
+        echo "-> Corrigiendo el reloj del sistema..."
+        date -s "$fecha_http" >/dev/null 2>&1 || true
+        hwclock -w 2>/dev/null || true
+        timedatectl set-ntp true 2>/dev/null || true
+    else
+        echo "El reloj del sistema está suficientemente sincronizado: $(date -u)"
+    fi
+else
+    echo "Aviso: no se pudo obtener la hora por internet. Se continúa con el reloj actual." >&2
+fi
+
+# --- Purgar kernels de nube/GPU ----------------------------------------
+echo "Se van a purgar los siguientes paquetes:"
+printf '  %s\n' "${kernels[@]}"
+apt-get purge -y -q "${kernels[@]}"
+apt-get autoremove -y -q --purge
+
+# --- Importar claves de repositorios Launchpad --------------------------
+GETKEYS="/usr/local/sbin/launchpad-getkeys"
+if [ -x "$GETKEYS" ]; then
+    echo "Ejecutando $GETKEYS..."
+    "$GETKEYS"
+else
+    echo "Aviso: $GETKEYS no existe o no es ejecutable. Se continúa sin importar claves." >&2
+fi
+
+# --- Actualizar paquetes e instalar el kernel genérico ------------------
+echo "Actualizando índices de apt..."
+apt-get update
+
+echo "Actualizando los paquetes del sistema..."
+apt-get upgrade -y -q
+
+echo "Instalando el kernel linux-generic..."
+apt-get install -y -q linux-generic
+
+# --- Sincronizar paquetes con pkgsync ----------------------------------
+PKGSYNC="/usr/local/sbin/pkgsync"
+if [ -x "$PKGSYNC" ]; then
+    echo "Ejecutando $PKGSYNC..."
+    "$PKGSYNC"
+    echo "Hecho."
+else
+    echo "Aviso: $PKGSYNC no existe o no es ejecutable. No se ejecuta pkgsync." >&2
+fi

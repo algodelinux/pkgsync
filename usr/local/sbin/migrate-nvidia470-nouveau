@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# ------------------------------------------------------------
+# script:  /usr/local/sbin/migrate-nvidia470-nouveau
+# Author:  Esteban M. Navas Martín
+# Date:    21/11/2026
+# Ver:     1.0
+#
+# Purpose: migrar a nouveau los equipos con GPU antigua que usan el
+#          driver nvidia-470 (legacy), que no compila contra kernels
+#          recientes (p. ej. serie 7.0). Purga los paquetes 470,
+#          limpia blacklists de nouveau, repara dpkg si quedó a medio
+#          configurar y actualiza las listas de pkgsync para que el
+#          driver no se reinstale en el siguiente ciclo.
+#
+# Uso:
+#   migrate-nvidia470-nouveau            modo interactivo (pide confirmación)
+#   migrate-nvidia470-nouveau -n         simula y no toca nada
+#   migrate-nvidia470-nouveau -y         no preguntas, ejecuta directo
+# ------------------------------------------------------------
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+NC='\033[0m'
+
+LOG_FILE="/var/log/migra-nouveau.log"
+DRY_RUN=false
+ASSUME_YES=false
+
+log()    { echo -e "$@" | tee -a "$LOG_FILE"; }
+drymsg()  { echo -e "${YELLOW}[DRY-RUN]${NC} $@"; }
+
+usage() {
+    cat <<EOF
+Uso: $(basename "$0") [-n|-y|-h]
+
+  -n, --dry-run   simula: muestra qué haría sin tocar nada
+  -y, --yes       ejecuta sin pedir confirmación
+  -h, --help      muestra esta ayuda
+
+Migra el driver nvidia-470 (legacy) a nouveau: purga los paquetes 470,
+reactiva nouveau, repara dpkg y.actualiza las listas de pkgsync.
+EOF
+}
+
+# ------------------------------------------------------------ opciones
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -n|--dry-run) DRY_RUN=true; shift ;;
+        -y|--yes)     ASSUME_YES=true; shift ;;
+        -h|--help)    usage; exit 0 ;;
+        *) echo -e "${RED}Opción desconocida: $1${NC}" >&2; usage; exit 1 ;;
+    esac
+done
+
+if [ "$(id -u)" -ne 0 ]; then
+    echo -e "${RED}Error: ejecute este script como root (sudo).${NC}" >&2
+    exit 1
+fi
+
+if [ "$DRY_RUN" = true ]; then
+    mkdir -p /var/log
+    :>>"$LOG_FILE"
+fi
+
+# ------------------------------------------------------------ deteccion
+# Paquetes nvidia de la rama 470 en cualquier estado (instalado, rc,
+# a medio configurar...) y cualquier proveedor (nvidia-*, libnvidia-*).
+get_nvidia470_pkgs() {
+   local pkg extras
+   pkg=$(dpkg-query -W -f='${binary:Package}\t${db:Status-Abbrev}\n' 2>/dev/null \
+        | awk -F'\t' '$1 ~ /nvidia/ && $1 ~ /[-_.]470([-.:_a-z0-9]*|)$/ {print $1}')
+   # incluir también los metapaquetes transicionales conocidos
+   extras=$(dpkg-query -W -f='${binary:Package}\n' 'nvidia-driver-470*' 2>/dev/null || true)
+   { echo "$pkg"; echo "$extras"; } | grep -v '^$' | sort -u
+}
+
+NVIDIA_PKGS="$(get_nvidia470_pkgs)"
+
+if [ -z "$NVIDIA_PKGS" ]; then
+    log "${GREEN}No hay paquetes nvidia-470 instalados en este equipo. Nada que migrar.${NC}"
+    exit 0
+fi
+
+log "${BLUE}Equipo:$(hostname) - $(lsb_release -ds 2>/dev/null || head -n1 /etc/os-release)${NC}"
+if command -v lspci >/dev/null 2>&1; then
+    gpu=$(lspci 2>/dev/null | grep -i 'vga\|3d controller' | grep -i nvidia || echo "GPU NVIDIA no visible en lspci")
+    log "GPU detectada: $gpu"
+fi
+log "Paquetes nvidia-470 encontrados:"
+echo "$NVIDIA_PKGS" | tee -a "$LOG_FILE"
+
+echo "$NVIDIA_PKGS" | grep -q "nvidia-dkms" && DKMS_HAY=true || DKMS_HAY=false
+kernel_roto=$(dpkg-query -W -f='${Package}\t${db:Status-Abbrev}\n' 2>/dev/null \
+              | awk -F'\t' '$1 ~ /^linux-(image|headers|modules)/ && $2 ~ /^(iF|iU|ri|ic)/ {print $1}')
+if [ -n "$kernel_roto" ]; then
+    log "${YELLOW}Hay paquetes de kernel a medio configurar (probablemente por el fallo de dkms/nvidia):${NC}"
+    echo "$kernel_roto" | tee -a "$LOG_FILE"
+fi
+
+# ------------------------------------------------------------ confirmacion
+if [ "$ASSUME_YES" = false ]; then
+    echo ""
+    echo -e "${YELLOW}Se va a migrar este equipo del driver nvidia-470 a nouveau.${NC}"
+    echo -e "${YELLOW}El driver propietario deja de usarse y no habrá CUDA; si la GPU se usa para 3D, revisa el rendimiento tras el cambio.${NC}"
+    read -p "¿Desea proceder con la migración? (s/N): " confirm
+    if ! [[ "$confirm" =~ ^[sS]$ ]]; then
+        echo "Operación cancelada."
+        exit 0
+    fi
+fi
+
+# ------------------------------------------------------------ 1. purge
+log "${BLUE}[1/5] Purgando paquetes nvidia-470...${NC}"
+if [ "$DRY_RUN" = true ]; then
+    drymsg "apt-get purge -y $NVIDIA_PKGS"
+else
+    # shellcheck disable=SC2086
+    apt-get purge -y $NVIDIA_PKGS 2>&1 | tee -a "$LOG_FILE" || true
+fi
+
+# ------------------------------------------------------------ 2. blacklists
+log "${BLUE}[2/5] Comprobando blacklists de nouveau...${NC}"
+if [ "$DRY_RUN" = true ]; then
+    grep -rls 'blacklist.*nouveau' /etc/modprobe.d/ /lib/modprobe.d/ 2>/dev/null \
+        | sed 's/^/[DRY-RUN] se actualizaría: /' | tee -a "$LOG_FILE"
+else
+    # Tras el purge, los ficheros del paquete desaparecen solos; quedan
+    # solo los creados a mano u otros paquetes. Se comentan con backup.
+    for f in $(grep -rls 'blacklist.*nouveau' /etc/modprobe.d/ 2>/dev/null); do
+        cp -n "$f" "$f.pre-nouveau"
+        sed -i 's@^\([[:blank:]]*\)blacklist[[:blank:]]\+nouveau[[:blank:]]*$@\1#blacklist nouveau # reactivado por migra-nouveau@' "$f"
+        sed -i 's@^\([[:blank:]]*\)options[[:blank:]]\+nouveau[[:blank:]].*$@#\0 # comentado por migra-nouveau@' "$f"
+        log "${YELLOW}Comentado el bloqueo de nouveau en $f (copia .pre-nouveau)${NC}"
+    done
+fi
+
+# ------------------------------------------------------------ 3. dpkg
+if [ "$DKMS_HAY" = true ] || [ -n "$kernel_roto" ]; then
+    log "${BLUE}[3/5] Reparando paquetes de dpkg a medio configurar...${NC}"
+    if [ "$DRY_RUN" = true ]; then
+        drymsg "dpkg --configure -a && apt-get -f install -y"
+    else
+        dpkg --configure -a 2>&1 | tee -a "$LOG_FILE" || true
+        apt-get -f install -y 2>&1 | tee -a "$LOG_FILE" || true
+    fi
+fi
+
+# ------------------------------------------------------------ 4. initramfs/grub
+log "${BLUE}[4/5] Regenerando initramfs y grub...${NC}"
+if [ "$DRY_RUN" = true ]; then
+    drymsg "update-initramfs -u; update-grub; rm -f /var/crash/nvidia-dkms-470.0.crash"
+else
+    update-initramfs -u 2>&1 | tee -a "$LOG_FILE" || true
+    update-grub 2>&1 | tee -a "$LOG_FILE" || true
+    rm -f /var/crash/nvidia-dkms-470.0.crash
+fi
+
+# ------------------------------------------------------------ 5. pkgsync
+log "${BLUE}[5/5] Actualizando listas de pkgsync para no reinstalar el driver...${NC}"
+if [ -d /etc/pkgsync ]; then
+    for f in /etc/pkgsync/musthave /etc/pkgsync/musthave.ies /etc/pkgsync/musthave.d/*; do
+        [ -f "$f" ] || continue
+        if grep -qE '^[[:blank:]]*nvidia[-.a-z0-9]*470' "$f"; then
+            if [ "$DRY_RUN" = true ]; then
+                drymsg "comentar nvidia-470 en $f"
+            else
+                cp -n "$f" "$f.pre-nouveau"
+                # Delimitador @ porque el patrón no lo contiene
+                sed -i -E 's@^([[:blank:]]*)(nvidia[-.a-z0-9]*470[-.a-z0-9-]*)([[:blank:]]*($|#))@\1#\2\3@' "$f"
+                log "${YELLOW}Comentado nvidia-470 en $f (copia .pre-nouveau)${NC}"
+            fi
+        fi
+    done
+
+    MAYNOTHAVE=/etc/pkgsync/maynothave
+    for pkg in $NVIDIA_PKGS; do
+        if grep -qxF "$pkg" "$MAYNOTHAVE" 2>/dev/null; then continue; fi
+        if [ "$DRY_RUN" = true ]; then
+            drymsg "añadir $pkg a $MAYNOTHAVE"
+        else
+            echo "$pkg" >> "$MAYNOTHAVE"
+        fi
+    done
+fi
+
+# ------------------------------------------------------------ resumen
+log "${GREEN}Proceso concluido.${NC}"
+if [ "$DRY_RUN" = true ]; then
+    log "${YELLOW}Modo simulación: no se ha modificado nada. Ejecute sin -n para aplicar.${NC}"
+    exit 0
+fi
+
+log "Comprobaciones recomendadas:"
+log "  dkms status          # el nvidia 470 ya no debe aparecer"
+log "  grep -rs nouveau /etc/modprobe.d/ /lib/modprobe.d/"
+log "  Reiniciar y verificar: lsmod | grep nouveau"
+log "  Registro completo en $LOG_FILE"
+echo -e "${BLUE}IMPORTANTE: el driver nouveau se cargará tras reiniciar el equipo.${NC}"

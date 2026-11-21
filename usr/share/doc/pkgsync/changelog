@@ -1,9 +1,70 @@
+pkgsync (3.16) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/remove-cloud-kernels: protect the running kernel
+    (uname -r), purge whole cloud kernel families, add 60s clock tolerance and
+    DEBIAN_FRONTEND=noninteractive
+  * Improved /usr/local/sbin/solve-apt-errors: apt-get download now runs into a
+    temp directory (it always downloads to the current one), killprocess now uses
+    seconds (ps -o etimes=), unlock_dpkg also covers apt-get and unattended-upgrade,
+    temp dirs cleaned via subshell+trap, conditional LC_ALL restore, purge_cloud_kernels
+    uses is_cloud_kernel as the only criterion to purge cloud kernels, new safe_autoremove
+    function that simulates before purging and protects base packages, quiet second pass
+  * Improved /usr/local/sbin/pkgsync: replaced direct path globbing with find where
+    set -o noglob prevented expansion, fixed remove_packages_from_lists (-tr) broken by
+    sed '|' delimiter, killprocess in seconds, --simulate no longer launches sinc_puppet,
+    run_aptitude no longer truncates removefromlists.log, wait_while_locked now has timeout
+  * Improved /usr/local/sbin/install-kernel: new pkg_available function checks every extra
+    package with apt-cache policy (linux-modules-extra does not exist on 7.0 series),
+    numeric selection validation, runs as root without sudo
+  * Improved /usr/local/sbin/purge-old-kernels: kernels are now listed from dpkg-query
+    instead of /boot files, keeps exactly N kernels including the running one (no more
+    silent no-ops when vmlinuz files are missing), purges series meta packages only when
+    the series becomes empty, protected /lib/modules cleanup, added --dry-run and --keep
+    validation
+  * Added /usr/local/sbin/migrate-nvidia470-nouveau script to migrate machines with
+    legacy nvidia-470 driver to nouveau, updating pkgsync package lists
+
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Sat, 21 Nov 2026 06:10:00 +0100
+pkgsync (3.15) ubuntu; urgency=medium
+
+  * Added usr/local/sbin/remove-cloud-kernels script. 
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Wed, 18 Nov 2026 15:57:00 +0100
+
+pkgsync (3.14) ubuntu; urgency=medium
+
+  * Solved /usr/local/sbin/launchpad-getkeys bug
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 13 Nov 2026 11:34:00 +0100
+
+pkgsync (3.13) ubuntu; urgency=medium
+
+  * Upgraded /usr/local/sbin/launchpad-getkeys
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Fri, 13 Nov 2026 11:09:00 +0100
+
+pkgsync (3.12) ubuntu; urgency=medium
+
+  * Improved /usr/local/sbin/shim-repair code
+  * Upgraded install_shim_if_uefi function in /usr/local/sbin/pkgsync
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 12 Nov 2026 10:31:00 +0100
+
+pkgsync (3.11) ubuntu; urgency=medium
+
+  * Added /usr/local/sbin/list-last-available-kernels script to list last available
+    kernels on repositories
+  * Improved /usr/local/sbin/shim-repair script
+  * Added install_shim_if_uefi function to /usr/local/sbin/pkgsync
+  
+ -- Esteban M. Navas Martín <algodelinux@gmail.com>  Thu, 07 Nov 2026 11:00:00 +0100
+
 pkgsync (3.10) ubuntu; urgency=medium
 
   * Modified pkgsync to create musthave.orphan file if missing
   
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Nov 2026 13:14:00 +0100
- 
+
 pkgsync (3.08) ubuntu; urgency=medium
 
   * Modify pkgsync to create mayhave.ies, maynothave.ies, and musthave.ies files if missing
@@ -11,7 +72,7 @@ pkgsync (3.08) ubuntu; urgency=medium
   * Moved mayhave, maynothave and musthave example files to directory for examples
 
  -- Esteban M. Navas Martín <algodelinux@gmail.com>  Tue, 03 Nov 2026 12:29:00 +0100
- 
+
 pkgsync (3.07) ubuntu; urgency=medium
 
   * Modified /usr/local/sbin/pkgsync to let simulate with an without sinc_puppet

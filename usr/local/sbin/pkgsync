@@ -3,12 +3,13 @@
 # pkgsync - Automated package synchronization tool
 # 2004-2007 Steinar H. Gunderson <sgunderson@bigfoot.com>.
 # 2013-2026 Esteban M. Navas Martín <algodelinux@gmail.com>.
+# Last update: 21/11/2026
 #
 
 set -e
 set -o noglob
 export DEBIAN_FRONTEND=noninteractive
-export VERSION=3.10
+export VERSION=3.16
 
 RED='\e[0;31m'
 GREEN='\e[0;32m'
@@ -20,7 +21,6 @@ INFO="${CYAN}[INFO]${NC}"
 OK="${GREEN}[✔]${NC}"
 WARN="${YELLOW}[!]${NC}"
 FAIL="${RED}[✖]${NC}"
-DIR="${CYAN}[DIR]${NC}"
 LOG="${CYAN}[LOG]${NC}"
 
 log_output_pkgsync() {
@@ -38,6 +38,11 @@ convert_seconds() {
     if ! [[ $SEGUNDOS =~ ^[0-9]+$ ]]; then
         echo "Error: El parámetro debe ser un número entero positivo."
         return 1
+    fi
+
+    if [ "$SEGUNDOS" -eq 0 ]; then
+        echo "0 segundos"
+        return 0
     fi
 
     # Calcular los valores
@@ -73,8 +78,8 @@ print_help () {
 	echo "  -t,   --test-files                      test all pkgsync files"
 	echo "  -tall --test-files all                  test all pkgsync files"
 	echo "  -tmusthave --test-files musthave        test musthave files"
-	echo "  -tmaythave --test-files mayhave         test mayhave files"
-	echo "  -tmaynothave --test-files maynothave    test maynothave files"
+	echo "  -tmayhave --test-files mayhave          test mayhave files"
+	echo "  -tmaynothave --test-files maynothave   test maynothave files"
 	echo "  -tr,  --test-files r                    test and remove packages from pkgsync files lists"
 	echo "  -d,   --delete-files                    delete all pkgsync files"
 	echo "  -b,   --build-files                     build musthave and create empty mayhave and maynothave if they don't exist"
@@ -95,6 +100,8 @@ print_help () {
 
 test_files () {
   set +e
+  local IFS=$'\n'
+  mkdir -p /var/log/pkgsync
   :>/var/log/pkgsync/removefromlists.log
 
   local modo="${1:-all}"
@@ -126,12 +133,14 @@ test_files () {
   for fichero in $(find /etc/pkgsync -type f "${filtro_modo[@]}" -not -name "*.all" -not -name "*.bak*" -not -name "*.[[:digit:]]*"); do
       if [ -s "$fichero" ]; then
          for linea in $(sed '/^[[:blank:]]*#/d;s/#.*//;' "$fichero"); do
-            paquete=$(echo "$linea" | cut -f1 -d" ")
-            echo "Checking $fichero: $paquete"
+            paquete=$(echo "$linea" | awk '{print $1}')
 
-            LC_ALL=C apt-cache --quiet=0 policy "$paquete" 2>&1 | tr -d " " | grep -e 'Candidate:(none)' -e 'N:Unabletolocatepackage' 2>&1>/dev/null
+            # Ignorar líneas vacías, meta-paquetes especiales, debtags y expresiones con comodines
+            if [ -z "$paquete" ] || [ "$paquete" = "meta:current-kernel" ] || [[ "$paquete" == debtags:* ]] || echo "$paquete" | grep -Eq '[][*?()|~]'; then
+               continue
+            fi
 
-            if [ $? -eq 0 ]; then
+            if LC_ALL=C apt-cache --quiet=0 policy "$paquete" 2>&1 | tr -d " " | grep -q -e 'Candidate:(none)' -e 'N:Unabletolocatepackage'; then
                echo -e "Package $paquete in file $fichero isn't in repositories" | tee -a /var/log/pkgsync/removefromlists.log
             fi
          done
@@ -152,17 +161,28 @@ delete_files () {
 }
 
 remove_packages_from_lists () {
+  mkdir -p /var/log/pkgsync
   :>/var/log/pkgsync/removedfromlists.log
 
   if [ -s /var/log/pkgsync/removefromlists.log ]; then
-     while read linea; do
-        paquete=$(echo $linea | cut -f2 -d" ")
-        fichero=$(echo $linea | cut -f5 -d" ")
+     local paquete fichero paquete_escaped
+     while IFS= read -r linea; do
+        # Líneas con el formato:
+        #   Package <paquete> in file <fichero> isn't in repositories
+        # Un parseo por regex tolera rutas con espacios mejor que cut -d" "
+        set -- $(echo "$linea" | sed -n 's/^Package \([^ ]*\) in file \(.*\) isn.t in repositories$/\1 \2/p')
+        paquete="$1"; fichero="$2"
+
+        [ -z "$paquete" ] && continue
+        [ ! -f "$fichero" ] && continue
 
         echo -e "Removed package $paquete from file $fichero" | tee -a /var/log/pkgsync/removedfromlists.log
 
-        # Comentamos la línea que contiene el nombre del paquete
-        sed -i "s|^$paquete|#$paquete|" $fichero
+        # Comentamos únicamente la línea que contiene exactamente ese nombre de paquete.
+        # IMPORTANTE: usar un delimitador distinto de '|' porque el patrón
+        # contiene '|', así sed no puede parsear la expresión (bug corregido).
+        paquete_escaped=$(printf '%s\n' "$paquete" | sed 's/[][\\.*^$(){}?+|\/]/\\&/g')
+        sed -i -E "s@^([[:blank:]]*)(${paquete_escaped})([[:blank:]]*($|#))@\1#\2\3@" "$fichero"
      done < /var/log/pkgsync/removefromlists.log
 
      if [ -s /var/log/pkgsync/removedfromlists.log ]; then
@@ -176,34 +196,47 @@ remove_packages_from_lists () {
 disable_failed_repositories () {
   # Deshabilitamos los repositorios que fallan de /etc/apt/sources.list.d
   if [ -s /tmp/failedrepositories ]; then
-     while read repository; do
-       failedfilerepository=$(find /etc/apt/sources.list.d/ -iname "*.list" -exec grep -H "$repository" {} \; | cut -f1 -d":")
-       mv $failedfilerepository $failedfilerepository.disabled
-     done </tmp/failedrepositories
+     while IFS= read -r repository; do
+       [ -z "$repository" ] && continue
+       while IFS= read -r failedfilerepository; do
+         [ -f "$failedfilerepository" ] && mv -f "$failedfilerepository" "${failedfilerepository}.disabled"
+       done < <(find /etc/apt/sources.list.d/ -maxdepth 1 -iname "*.list" -exec grep -F -H "$repository" {} + 2>/dev/null | cut -d: -f1 | sort -u)
+     done < /tmp/failedrepositories
   fi
 }
 
 enable_repositories () {
   # Habilitamos los repositorios deshabilitados en /etc/apt/sources.list.d
-  for file in $(find /etc/apt/sources.list.d/ -iname "*.disabled"); do
-    [ -f $file ] && mv -f "$file" "${file%%.disabled}"
-  done
+  while IFS= read -r file; do
+    [ -f "$file" ] && mv -f "$file" "${file%.disabled}"
+  done < <(find /etc/apt/sources.list.d/ -maxdepth 1 -iname "*.disabled" 2>/dev/null)
 }
 
 wait_while_locked () {
-   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
+   if [ -x /usr/local/sbin/wait_for_apt_or_dpkg ]; then
+      timeout "$AFTER_TIMEOUT" /usr/local/sbin/wait_for_apt_or_dpkg || true
+   else
+      # Sin el auxiliar externo también limitamos la espera (evita colgarse
+      # indefinidamente si un proceso mantiene el lock para siempre)
+      timeout "$AFTER_TIMEOUT" bash -c '
+         locks=(/var/lib/apt/lists/lock /var/lib/dpkg/lock /var/lib/dpkg/lock-frontend)
+         if lsof "${locks[@]}" >/dev/null 2>&1; then
+            echo -e "\033[33mEsperando mientras se actualizan índices o paquetes...\033[0m"
+         fi
+         while lsof "${locks[@]}" >/dev/null 2>&1; do sleep 1; done
+      ' || true
+   fi
 }
 
 # Largely adapted from /usr/lib/getopt/parse.bash
 parse_options () {
-	TEMP=`getopt -o hvft::dbkescCpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,clean-and-purge,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@"`
+	TEMP=$(getopt -o hvft::dbkescCpngiSR:: --long help,version,force,test-files::,delete-files,build-files,keep-unused,ensure-essential,simulate,clean,clean-and-purge,purge-old-kernels,no-sincpuppet,get-keys,ignore-failed-repos,shutdown,reboot:: -n 'pkgsync' -- "$@")
 
         if [ $? != 0 ] ; then echo -e "${RED}Terminating...${NC}" >&2 ; exit 1 ; fi
 
 	eval set -- "$TEMP"
 
 	APTITUDE_ARGS="-y -q -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold"
-	GLOB_STYLE="aptitude"
 
 	while :; do
 		case "$1" in
@@ -260,7 +293,7 @@ parse_options () {
                                 esac
 				;;
 			-t|--test-files)
-				modo="${2:-all}" # Si $2 está vacío, asigna "all"
+				local modo="${2:-all}" # Si $2 está vacío, asigna "all"
 
 				case "$modo" in
 				   all|musthave|mayhave|maynothave)
@@ -290,7 +323,7 @@ parse_options () {
 				exit 0
 				;;
 			-v|--version)
-				echo "$(basename $0) $VERSION"
+				echo "$(basename "$0") $VERSION"
 				exit 0
 				;;
 			--)
@@ -310,9 +343,8 @@ readpkgs () {
 }
 
 getpkgs () {
-	IFS="
-"
-	for pkg in $( readpkgs $1 ); do
+	local IFS=$'\n'
+	for pkg in $( readpkgs "$1" ); do
 		# if the line starts with "debtags:", it's a debtags expression,
 		# so run it through debtags.
 		if echo "$pkg" | grep -Eq '^debtags:'; then
@@ -343,16 +375,15 @@ getpkgs () {
 
 list_essential_packages() {
   # Priorities for build a list of essential packages
-  priorities=(required important standard)
-
-  for priority in "${priorities[@]}"; do
+  local priority
+  for priority in required important standard; do
     dpkg-query -W --showformat='${Package}\t${Priority}\n' | grep "$priority$" | sed "s/\t$priority//g" | sort
   done
 }
 
 merge_files() {
-  if [ $ENSURE_ESSENTIAL = "yes" ]; then
-     list_essential_packages >> /tmp/essential_packages
+  if [ "$ENSURE_ESSENTIAL" = "yes" ]; then
+     list_essential_packages > /tmp/essential_packages
   else
      :> /tmp/essential_packages
   fi
@@ -362,19 +393,27 @@ merge_files() {
   sort -u -o /etc/pkgsync/maynothave.all $MAYNOTHAVE /etc/pkgsync/maynothave.ies $(find /etc/pkgsync/maynothave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
   sort -u -o /etc/pkgsync/mayhave.all $MAYHAVE /etc/pkgsync/mayhave.ies $(find /etc/pkgsync/mayhave.d -mindepth 1 -maxdepth 1 -type f 2>/dev/null)
 
-  # Remove empty lines, blank spaces, tabs and comments
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d;s/#.*//;' /etc/pkgsync/musthave.all
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d;s/#.*//;' /etc/pkgsync/mayhave.all
-  sed -i 's/^ *//; s/ *$//; /^$/d; /^\s*$/d; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d;s/#.*//;' /etc/pkgsync/maynothave.all
+  # Remove empty lines, blank spaces, tabs and comments, y reordenar con
+  # LC_ALL=C para que comm funcione correctamente
+  local f
+  for f in /etc/pkgsync/musthave.all /etc/pkgsync/mayhave.all /etc/pkgsync/maynothave.all; do
+     sed -i 's/^ *//; s/ *$//; s/^\t*//; s/\t*$//; s/#.*//; /^[[:blank:]]*#/d; /^\s*$/d;' "$f"
+     LC_ALL=C sort -u -o "$f" "$f"
+  done
+
+  sed 's/^ *//; s/ *$//; s/^\t*//; s/\t*$//; /^[[:blank:]]*#/d; s/#.*//; /^$/d' /etc/pkgsync/musthave.orphan | LC_ALL=C sort -u > /tmp/musthave.orphan.sorted
 
   # Remove maynothave.all and musthave.orphan packages from musthave.all
-  comm -23 /etc/pkgsync/musthave.all /etc/pkgsync/musthave.orphan > /tmp/musthave.all
-  comm -23 /tmp/musthave.all /etc/pkgsync/maynothave.all > /etc/pkgsync/musthave.all
+  LC_ALL=C comm -23 /etc/pkgsync/musthave.all /tmp/musthave.orphan.sorted > /tmp/musthave.all.tmp
+  LC_ALL=C comm -23 /tmp/musthave.all.tmp /etc/pkgsync/maynothave.all > /etc/pkgsync/musthave.all
+  rm -f /tmp/musthave.orphan.sorted /tmp/musthave.all.tmp
 }
 
 simulate() {
 
-  if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f now; fi
+  # En modo simulación NO se lanza sinc_puppet: sería una acción real
+  # (ejecuta puppet) en lo que debe ser una pasada de solo lectura.
+  # El resto (merge y aptitude -s) no modifica el sistema de paquetes.
 
   # Merge files
   merge_files
@@ -385,18 +424,9 @@ simulate() {
   maynothave_remove=$( getpkgs /etc/pkgsync/maynothave.all | sort -u | sed "s/$/-/" )
   mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m/" )
 
+  # shellcheck disable=SC2086
   log_output_pkgsync run_aptitude full-upgrade -s '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto
 
-}
-
-wait_for_apt_or_dpkg() {
-  # Esperamos mientras se esté realizando una actualización de índices o una actualización de paquetes
-  if [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; then
-     echo -e "${YELLOW}Esperando mientras se actualizan índices o paquetes...${NC}"
-  fi
-  while [ $(lsof /var/lib/apt/lists/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock 2>/dev/null | awk '{print $1}' | tail -1) ] || [ $(lsof /var/lib/dpkg/lock-frontend 2>/dev/null | awk '{print $1}' | tail -1) ]; do
-     sleep 1
-  done
 }
 
 wait_for_sinc_puppet() {
@@ -411,7 +441,7 @@ wait_for_sinc_puppet() {
     fi
 
     # Comprobar si sinc_puppet está corriendo
-    pids=$(pgrep sinc_puppet)
+    pids=$(pgrep sinc_puppet || true)
     if [[ -n "$pids" ]]; then
         echo -e "${YELLOW}Esperando a que termine sinc_puppet...${NC}"
         runned_sinc_puppet=true
@@ -420,18 +450,21 @@ wait_for_sinc_puppet() {
     # Bucle de espera
     while [[ -n "$pids" ]]; do
         sleep 1
-        ((elapsed++))
-        pids=$(pgrep sinc_puppet)
+        ((elapsed++)) || true
+        pids=$(pgrep sinc_puppet || true)
 
         if [[ $timeout_seconds -gt 0 && $elapsed -ge $timeout_seconds ]]; then
             if [[ -n "$pids" ]]; then
                 echo -e "${RED}Timeout alcanzado esperando a sinc_puppet ($timeout_min min). Matando proceso(s)...${NC}"
-                kill -TERM $pids 2>/dev/null
+                # shellcheck disable=SC2086
+                kill -TERM $pids 2>/dev/null || true
                 sleep 2
-                pids=$(pgrep sinc_puppet)
+                pids=$(pgrep sinc_puppet || true)
                 if [[ -n "$pids" ]]; then
                     echo -e "${RED}Proceso(s) persistente(s), usando kill -KILL...${NC}"
-                    kill -KILL $pids 2>/dev/null
+                    # shellcheck disable=SC2086
+                    kill -KILL $pids 2>/dev/null || true
+                    pids=$(pgrep sinc_puppet || true)
                 fi
             fi
             break
@@ -448,28 +481,37 @@ wait_for_sinc_puppet() {
 
 run_aptitude() {
 
-  if [[ $@ == *full-upgrade* ]]; then
-     :> /var/log/pkgsync/removefromlists.log
+  if [[ "$*" == *full-upgrade* ]]; then
+     mkdir -p /var/log/pkgsync
+     # No truncamos removefromlists.log aquí: si AUTO_TEST_FILES ya generó
+     # resultados, un :> los borraría. Creamos/tocamos el fichero y añadimos.
+     touch /var/log/pkgsync/removefromlists.log
 
-     COMMAND="aptitude $APTITUDE_ARGS $@"
+     # shellcheck disable=SC2086
+     COMMAND="aptitude $APTITUDE_ARGS $*"
 
-     # Bucle para reintentar el comando mientras haya errores
+     # Bucle para reintentar el comando mientras haya paquetes inexistentes
      retry=1
      while [ $retry -eq 1 ]; do
-         echo RUNNING: $COMMAND
-         wait_while_locked; LC_ALL=C $COMMAND | tee /tmp/apterrors
+         echo "RUNNING: $COMMAND"
+         # shellcheck disable=SC2086
+         wait_while_locked; LC_ALL=C $COMMAND | tee /tmp/apterrors || true
 
-         problematic_package=$(grep 'Couldn'\''t find any package' /tmp/apterrors | cut -d'"' -f2)
+         problematic_package=$(grep -m 1 'Couldn'\''t find any package' /tmp/apterrors | cut -d'"' -f2)
 
          if [ -n "$problematic_package" ]; then
             echo -e "Package $problematic_package isn't in repositories" | tee -a /var/log/pkgsync/removefromlists.log
-            COMMAND=$(echo "$COMMAND" | sed "s/${problematic_package}[^[:space:]]*//" | tr -s ' ')
+            problematic_package_escaped=$(printf '%s\n' "$problematic_package" | sed 's/[][\\.*^$(){}?+|\/]/\\&/g')
+            # shellcheck disable=SC2086
+            COMMAND=$(echo "$COMMAND" | sed -E "s/(^|[[:space:]])${problematic_package_escaped}[^[:space:]]*/\1/g" | tr -s ' ')
          else
             retry=0
          fi
      done
   else
-     echo RUNNING: aptitude $APTITUDE_ARGS "$@"
+     # shellcheck disable=SC2086
+     echo "RUNNING: aptitude $APTITUDE_ARGS $*"
+     # shellcheck disable=SC2086
      wait_while_locked; aptitude $APTITUDE_ARGS "$@"
   fi
 
@@ -491,19 +533,27 @@ filter() {
 function version_ge() { test "$(echo "$@" | tr " " "\n" | sort -rV | head -n 1)" == "$1"; }
 
 killprocess() {
+   # $1 = proceso, $2 = segundos máximos de vida antes de matarlo
+   # (antes usaba fechas lstart y comparaba MINUTOS contra lo que le
+   # pasaban en SEGUNDOS: un proceso podía vivir horas sin ser matado)
+   local pid etime
+   pid=$(pgrep -o "$1" 2>/dev/null)
+   [ -n "$pid" ] || return 0
+   etime=$(ps -o etimes= -p "$pid" 2>/dev/null)
+   [ -n "$etime" ] && [ "$etime" -gt "$2" ] && pkill -9 "$1" 2>/dev/null || true
+}
 
-   updatehour=$(ps aux|grep $1 | grep -v grep | head -1 | awk '{print $9}')
-   if [ -n $updatehour ]; then
-      timestampupdate=$(date -d "$updatehour" +'%s')
-      timestampnow=$(date +'%s')
-      diference=$(($timestampnow - $timestampupdate))
-      minutesfromupdate=$(($diference / 60))
+# Release y criterio de kernel de nube/GPU: los mecanismos de reparación
+# no deben reinstalar kernels de nube, y jamás se toca el kernel en ejecución.
+RUNNING_RELEASE=$(uname -r)
 
-      if [ "$minutesfromupdate" -gt "$2" ]; then
-         # Matamos proceso
-         pkill -9 $1 2>/dev/null
-      fi
-   fi
+is_running_kernel_pkg() { [[ "$1" = *-"$RUNNING_RELEASE" ]]; }
+
+is_cloud_kernel() {
+   local pkg="${1%%:*}"
+   [[ "$pkg" =~ ^linux-(aws|azure|gcp|oracle|nvidia|iotg|intel-iotg|lowlatency)([-a-z0-9.]*)?$ ]] && return 0
+   [[ "$pkg" =~ ^linux-(image|image-unsigned|modules|modules-extra|headers|buildinfo|unsigned)[-a-z0-9.]*-(aws|azure|gcp|oracle|nvidia|iotg|intel-iotg|lowlatency)($|-[0-9][a-z0-9.+-]*)$ ]] && return 0
+   return 1
 }
 
 check_apt_update() {
@@ -527,9 +577,10 @@ check_apt_update() {
     elif [ -f "$SRC_CACHE" ]; then
         LATEST_CACHE="$SRC_CACHE"
     else
+        :> /tmp/failedrepositories
         echo -e "${GREEN}No se encontraron archivos de caché de apt. Ejecutando 'apt-get update'...${NC}"
-        apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
-        return
+        LC_ALL=C apt-get update 2>&1 | tee /tmp/apt_update.log | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" | sort -u > /tmp/failedrepositories || true
+        return 0
     fi
 
     # Calcular antigüedad
@@ -545,57 +596,44 @@ check_apt_update() {
 
     # Decidir si ejecutar apt-get update
     if [ "$AGE" -gt "$THRESHOLD_FOR_APT_UPDATE" ]; then
+        :> /tmp/failedrepositories
         echo -e "${GREEN}Han pasado ${AGE_HUMAN} desde la última actualización. Ejecutando 'apt-get update'...${NC}"
-        apt-get update 2>&1 | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
-    #else
-    #    echo -e "${GREEN}No es necesario ejecutar 'apt-get update'. Última ejecución hace ${AGE_HUMAN}.${NC}"
+        LC_ALL=C apt-get update 2>&1 | tee /tmp/apt_update.log | grep '^Err:' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" | sort -u > /tmp/failedrepositories || true
     fi
 }
 
 unlock_dpkg() {
     local TIME_MINUTES="${1:-5}"
     local FOUND=0
+    local PID ETIMES COMM ARGS minutes ACTION_DESC
 
-    # Para propósitos de prueba
     log_output_solve_apt_errors echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}"
 
-    ps -eo pid,etime,comm,args --sort=etime | while read -r PID ETIME COMM ARGS; do
-        # Solo dpkg o apt
-        if [[ "$COMM" != "dpkg" && "$COMM" != "apt" ]]; then
-            continue
-        fi
+    while read -r PID ETIMES COMM ARGS; do
+        # Solo procesos de gestión de paquetes (falta apt-get y
+        # unattended-upgrade, y ambos son habituales en servidores)
+        case "$COMM" in
+            dpkg|apt|apt-get|unattended-upgrade) ;;
+            *) continue ;;
+        esac
 
-        # Convertir ETIME a minutos aproximados
-        minutes=0
-        if [[ $ETIME =~ - ]]; then
-            # D-HH:MM o D-HH:MM:SS
-            IFS=- read -r DAYS TIME_PART <<< "$ETIME"
-            IFS=: read -r H M S <<< "$TIME_PART:0:0"
-            minutes=$((DAYS*24*60 + H*60 + M))
-        else
-            # HH:MM:SS o MM:SS
-            IFS=: read -r H M S <<< "$ETIME:0:0"
-            H=${H:-0}
-            M=${M:-0}
-            minutes=$((H*60 + M))
-        fi
+        minutes=$((10#$ETIMES / 60))
 
         if [ "$minutes" -ge "$TIME_MINUTES" ]; then
             FOUND=1
-            # Identificar si está configurando un paquete
             ACTION_DESC="bloqueado"
             [[ "$ARGS" == *"--configure"* ]] && ACTION_DESC="configurando paquetes"
 
             log_output_solve_apt_errors echo -e "${RED}Proceso $PID ($COMM) $ACTION_DESC lleva $minutes minutos. Terminando...${NC}"
 
-            kill -TERM "$PID" 2>/dev/null
+            kill -TERM "$PID" 2>/dev/null || true
             sleep 2
-            if ps -p "$PID" > /dev/null; then
+            if ps -p "$PID" > /dev/null 2>&1; then
                 log_output_solve_apt_errors echo "Proceso $PID no terminó, forzando KILL..."
-                kill -KILL "$PID" 2>/dev/null
+                kill -KILL "$PID" 2>/dev/null || true
             fi
         fi
-    done
+    done < <(ps -eo pid,etimes,comm,args --sort=etimes)
 
     # Mensaje si no se encontraron procesos
     if [ "$FOUND" -eq 0 ]; then
@@ -626,23 +664,27 @@ reinstall_broken_dpkg() {
     echo "Paquetes con archivos .list faltantes:"
     printf '%s\n' "${BROKEN_PACKAGES[@]}"
 
-    # Reinstalar paquetes automáticamente
+    # Reinstalar paquetes automáticamente (sin sudo: el script ya corre como root)
     echo "Reinstalando paquetes..."
     check_apt_update
-    sudo apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
+    wait_while_locked
+    apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}" || true
     echo "Reinstalación completada."
 }
 
 restore_ldconfig() {
-    TMPDIR="/tmp/libc-bin-restore"
+    local TMPDIR="/tmp/libc-bin-restore"
     mkdir -p "$TMPDIR"
 
     # Comprobación inicial
     if command -v ldconfig >/dev/null 2>&1; then
+        rm -rf "$TMPDIR"
         return 0
     fi
 
     echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
+
+    local DISTRO VERSION_ID ARCH REPO PKG_VER PKG_VER_NO_EPOCH PKG_URL PKG_NAME PKG_PATH
 
     # Detectar distribución y versión
     if [ -f /etc/os-release ]; then
@@ -657,9 +699,6 @@ restore_ldconfig() {
     ARCH=$(dpkg --print-architecture)
     echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
 
-    # Obtener URL del paquete libc-bin
-    echo -e "$INFO Buscando paquete libc-bin adecuado..."
-
     case "$DISTRO" in
         ubuntu)
             REPO="http://archive.ubuntu.com/ubuntu"
@@ -673,179 +712,231 @@ restore_ldconfig() {
             ;;
     esac
 
-    PKG_VER=$(LC_ALL=C apt-cache policy libc-bin 2>/dev/null | grep "Candidate:" | awk '{print $2}' || true)
+    PKG_VER=$(LC_ALL=C apt-cache policy libc-bin 2>/dev/null | awk '/Candidate:/ {print $2}')
 
-    if [ -z "$PKG_VER" ]; then
+    if [ -z "$PKG_VER" ] || [ "$PKG_VER" = "(none)" ]; then
         echo -e "$WARN No se pudo determinar versión de libc-bin con apt-cache, usando fallback..."
-        PKG_URL=$(
-            curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
-            | gunzip -c 2>/dev/null \
-            | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}'
-        )
+        local RELPATH
+        RELPATH=$(curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
+                  | gunzip -c 2>/dev/null \
+                  | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}')
+        # El índice devuelve una ruta relativa (pool/...): hay que prefijar el repositorio
+        [ -n "$RELPATH" ] && PKG_URL="${REPO}/${RELPATH}"
     else
-        PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${PKG_VER}_${ARCH}.deb"
+        PKG_VER_NO_EPOCH="${PKG_VER#*:}"
+        PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${PKG_VER_NO_EPOCH}_${ARCH}.deb"
+    fi
+
+    if [ -z "$PKG_URL" ]; then
+        echo -e "$FAIL No se pudo obtener la URL de libc-bin."
+        rm -rf "$TMPDIR"
+        return 1
     fi
 
     PKG_NAME=$(basename "$PKG_URL")
     PKG_PATH="$TMPDIR/$PKG_NAME"
 
     echo -e "$LOG Descargando $PKG_NAME ..."
-    wget -q -O "$PKG_PATH" "$PKG_URL"
+    if ! curl -fsSL -o "$PKG_PATH" "$PKG_URL"; then
+        echo -e "$FAIL No se pudo descargar $PKG_NAME."
+        rm -rf "$TMPDIR"
+        return 1
+    fi
 
     # Extraer ldconfig
     echo -e "$INFO Extrayendo paquete..."
     dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
 
     if [ ! -f "$TMPDIR/extracted/sbin/ldconfig" ]; then
-        echo -e "$FAIL No se encontró ldconfig dentro del paquete descargado."
+        echo -e "${FAIL}No se encontró ldconfig dentro del paquete descargado."
+        rm -rf "$TMPDIR"
         return 1
     fi
 
-    echo -e "$INFO Copiando ldconfig a /sbin ..."
-    cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/
+    echo -e "${INFO}Copiando ldconfig a /sbin ..."
+    cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/ldconfig
     chmod 755 /sbin/ldconfig
 
     # Verificación y reparación
-    echo -e "$INFO Verificando funcionamiento..."
+    echo -e "${INFO}Verificando funcionamiento..."
     if /sbin/ldconfig -p >/dev/null 2>&1; then
         echo -e "$OK ldconfig restaurado correctamente."
     else
         echo -e "$WARN ldconfig copiado pero no parece funcional."
     fi
 
-    echo -e "$INFO Reinstalando libc-bin y reparando dependencias..."
+    echo -e "${INFO}Reinstalando libc-bin y reparando dependencias..."
+    wait_while_locked
     apt-get install --reinstall -y libc-bin || true
+    wait_while_locked
     apt-get -f install -y || true
 
     # Limpieza
-    echo -e "$INFO Limpiando archivos temporales..."
+    echo -e "${INFO}Limpiando archivos temporales..."
     rm -rf "$TMPDIR"
 
     echo -e "$OK Proceso completado. ldconfig debería estar operativo."
 }
 
-install_shim_if_uefi() {
-    # Comprobar si el sistema usa UEFI
-    if [ ! -d /sys/firmware/efi ]; then
-        echo "Sistema no UEFI, no se requiere 'shim-signed'."
+get_esp_partition() {
+    # Priorizar la partición ya montada en /boot/efi si existe
+    local mounted_esp
+    mounted_esp=$(findmnt -rn -M /boot/efi -o SOURCE 2>/dev/null | head -n 1)
+    if [ -n "$mounted_esp" ] && [ -b "$mounted_esp" ]; then
+        echo "$mounted_esp"
         return 0
     fi
 
-    # Detectar estado de shim-signed (ii = instalado, rc = eliminado con configs)
-    PKG_STATUS=$(dpkg -l shim-signed 2>/dev/null | awk '/^(ii|rc)/ {print $1}')
+    # Buscar por GUID estándar de partición EFI System Partition (ESP)
+    lsblk -rpno NAME,PARTTYPE 2>/dev/null |
+        awk 'tolower($2) == "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" {
+            print $1
+            exit
+        }'
+}
 
-    # Comprobar si hay ESP real
-    EFI_DISK=$(findmnt -n -o SOURCE /boot/efi 2>/dev/null | sed 's/[0-9]*$//')
+get_disk_by_id() {
+    local target_real
+    target_real=$(readlink -f "$1")
+    local link
 
-    if [ -z "$EFI_DISK" ]; then
-        # For testing purposes only
-        # echo "⚠ No se detectó disco EFI."
+    #find sin depender de noglob: con `set -o noglob` el patrón *-part*
+    #no se expande y el bucle nunca encontraba los enlaces (bug corregido)
+    while IFS= read -r link; do
+        [ -e "$link" ] || continue
+        if [ "$(readlink -f "$link")" = "$target_real" ]; then
+            echo "$link"
+            return 0
+        fi
+    done < <(find /dev/disk/by-id -maxdepth 1 -name '*-part*' 2>/dev/null)
 
-        # Si shim-signed está instalado, desinstalarlo junto con dependencias esenciales
-        if [[ "$PKG_STATUS" == "ii" ]]; then
+    # Fallback al dispositivo directo si no existe enlace en /dev/disk/by-id
+    echo "$1"
+}
+
+update_grub_debconf() {
+    local efi_device="$1"
+    local owner
+
+    for owner in $( {
+            awk '/^Name: grub-efi\/install_devices$/{f=1; next} f && /^Owners:/{gsub(/,/," "); for(i=2;i<=NF;i++) print $i; f=0}' /var/cache/debconf/config.dat 2>/dev/null
+            printf '%s\n' "grub-efi-amd64" "grub-pc" "grub-efi-amd64-signed"
+        } | sort -u ); do
+        debconf-set-selections <<EOF
+$owner grub-efi/install_devices multiselect $efi_device
+$owner grub-efi/install_devices_empty boolean false
+EOF
+    done
+}
+
+is_pkg_installed() {
+    local status
+    status=$(dpkg-query -W -f='${Status}' "$1" 2>/dev/null)
+    [ "$status" = "install ok installed" ]
+}
+
+install_shim_if_uefi() {
+    local EFI_PARTITION EFI_MOUNTPOINT EFI_PARENT EFI_DISK EFI_BY_ID
+
+    EFI_PARTITION=$(get_esp_partition)
+
+    # Si no hay partición EFI (sistema Legacy/BIOS)
+    if [ -z "$EFI_PARTITION" ]; then
+        echo "Sistema no UEFI (sin partición ESP)."
+
+        if is_pkg_installed "shim-signed"; then
             echo "'shim-signed' está instalado pero no hay ESP. Procediendo a desinstalar..."
             export DEBIAN_FRONTEND=noninteractive
             apt-get remove --purge -y --allow-remove-essential shim-signed grub-efi-amd64-signed mokutil || true
-            unset DEBIAN_FRONTEND
+            apt-get autoremove -y || true
             echo "✔ 'shim-signed' desinstalado correctamente."
-        #else
-        #    echo "✔ 'shim-signed' no está instalado. No se realiza ninguna acción."
+        else
+            echo "✔ 'shim-signed' no está instalado. No se realiza ninguna acción."
         fi
-
         return 0
     fi
 
-    # Si shim-signed ya está instalado, no hacer nada
-    if [[ "$PKG_STATUS" == "ii" ]]; then
-        # For testing purposes only
-        # echo "'shim-signed' ya está instalado. No se realizará ninguna acción."
+    # Si shim-signed y grub-efi-amd64-signed ya están completamente instalados y configurados
+    if is_pkg_installed "shim-signed" && is_pkg_installed "grub-efi-amd64-signed"; then
+        echo "'shim-signed' ya está instalado correctamente. No se realizará ninguna acción."
         return 0
     fi
 
-    # Si shim-signed no está instalado, proceder con instalación/reinstalación
-    echo "Disco EFI detectado: $EFI_DISK"
-    echo "'shim-signed' no está instalado. Preparando instalación manual con dependencias..."
-
-    # Preparar directorio temporal
-    TMPDIR=$(mktemp -d)
-    cd "$TMPDIR" || return 1
-
-    # Actualizar lista de paquetes
-    apt-get update -qq
-
-    # Obtener shim-signed y todas sus dependencias automáticamente
-    PACKAGES=$(LC_ALL=C apt-cache depends shim-signed  | awk '/Depends:/ {print $2}'  | grep -v '^<.*>$')
-    PACKAGES="shim-signed $PACKAGES"
-
-    echo "Descargando paquetes: $PACKAGES"
-    for pkg in $PACKAGES; do
-        if ! apt-get download "$pkg" >/dev/null 2>&1; then
-            echo "✖ Error descargando $pkg"
-            rm -rf "$TMPDIR"
+    # Asegurar que la partición EFI esté montada
+    EFI_MOUNTPOINT=$(findmnt -rn -S "$EFI_PARTITION" -o TARGET 2>/dev/null | head -n 1)
+    if [ -z "$EFI_MOUNTPOINT" ]; then
+        EFI_MOUNTPOINT="/boot/efi"
+        mkdir -p "$EFI_MOUNTPOINT"
+        if ! mount "$EFI_PARTITION" "$EFI_MOUNTPOINT"; then
+            echo "✖ ERROR: No se pudo montar la partición EFI ($EFI_PARTITION) en $EFI_MOUNTPOINT." >&2
             return 1
         fi
-    done
+    fi
 
-    # Crear tmpfs temporal para evitar error 32 en post-install de GRUB
-    mkdir -p /var/lib/grub/esp
-    mount -t tmpfs tmpfs /var/lib/grub/esp || { echo "⚠ No se pudo montar tmpfs en /var/lib/grub/esp"; rm -rf "$TMPDIR"; return 1; }
-    ESP_TMPFS=1
+    # Obtener el disco padre de la partición EFI
+    EFI_PARENT=$(lsblk -no PKNAME "$EFI_PARTITION" 2>/dev/null | head -n 1)
+    if [ -n "$EFI_PARENT" ]; then
+        EFI_DISK="/dev/$EFI_PARENT"
+    else
+        EFI_DISK="$EFI_PARTITION"
+    fi
+
+    echo "Disco EFI detectado: $EFI_DISK (Partición: $EFI_PARTITION montada en $EFI_MOUNTPOINT)"
+
+    # Desmontar posible tmpfs residual en /var/lib/grub/esp de ejecuciones anteriores
+    if mountpoint -q /var/lib/grub/esp 2>/dev/null; then
+        umount /var/lib/grub/esp || {
+            echo "✖ ERROR: No se pudo desmontar /var/lib/grub/esp." >&2
+            return 1
+        }
+    fi
+
+    # Actualizar debconf con el by-id real de la partición EFI actual
+    EFI_BY_ID=$(get_disk_by_id "$EFI_PARTITION")
+    echo "Actualizando debconf (grub-efi/install_devices) -> $EFI_BY_ID"
+    update_grub_debconf "$EFI_BY_ID"
 
     echo "Ejecutando grub-install en modo no interactivo..."
-    grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck --no-floppy "$EFI_DISK" || {
-        echo "⚠ No se pudo ejecutar grub-install correctamente."
-    }
+    if ! wait_while_locked; then true; fi
+    if ! grub-install --target=x86_64-efi --efi-directory="$EFI_MOUNTPOINT" --recheck --no-floppy "$EFI_DISK"; then
+        echo "⚠ Advertencia: grub-install devolvió un error; se intentará completar vía dpkg/apt." >&2
+    fi
 
-    # Instalar paquetes descargados en modo no interactivo
+    # Configurar paquetes pendientes e instalar shim-signed
     export DEBIAN_FRONTEND=noninteractive
-    DEB_FILES=$(find "$TMPDIR" -maxdepth 1 -type f -name "*.deb")
-    dpkg -i $DEB_FILES || true
+    apt-get update -qq || true
+    wait_while_locked
 
-    # Resolver dependencias automáticamente
-    apt-get install -f -y
-    unset DEBIAN_FRONTEND
-
-    # Verificar instalación
-    if dpkg -s shim-signed >/dev/null 2>&1; then
-        echo "✔ 'shim-signed' y sus dependencias instaladas correctamente."
-    else
-        echo "✖ Falló la instalación de 'shim-signed'."
-        umount /var/lib/grub/esp
-        rm -rf "$TMPDIR"
+    if ! dpkg --configure -a || ! apt-get install -y shim-signed grub-efi-amd64-signed; then
+        echo "✖ Falló la instalación o configuración de 'shim-signed'." >&2
         return 1
     fi
 
-    # Limpiar temporales
-    rm -rf "$TMPDIR"
-    [ "$ESP_TMPFS" -eq 1 ] && umount /var/lib/grub/esp && echo "⚠ Desmontado tmpfs temporal en /var/lib/grub/esp"
+    # Verificación estricta de estado
+    if is_pkg_installed "shim-signed" && is_pkg_installed "grub-efi-amd64-signed"; then
+        echo "✔ 'shim-signed' y sus dependencias instaladas correctamente."
+        return 0
+    else
+        echo "✖ 'shim-signed' no quedó correctamente configurado." >&2
+        return 1
+    fi
 }
 
 solveapterrors() {
   set +e
 
-  idioma=$LC_ALL
+  idioma=${LC_ALL:-}
   export LC_ALL=C
 
-  TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
-  TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
-
-  case "$TIMEOUT_UNITS" in
-     "s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER
-           ;;
-     "m")  AFTER_TIMEOUT=$(($TIMEOUT_NUMBER * 60))
-           ;;
-     "h")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 3600))
-           ;;
-     "d")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 86400))
-           ;;
-  esac
-
   # Matamos procesos detenidos
-  stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
-  if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
+  stopped_processes=$(ps -eo pid,stat,comm | awk '$2 ~ /^T/ && $3 !~ /^(ps|awk)$/ {print $1}')
+  if [ -n "$stopped_processes" ]; then
+     # shellcheck disable=SC2086
+     kill -9 $stopped_processes 2>/dev/null || true
+  fi
 
   # Esperamos a que termine sinc_puppet o lo matamos si ha transcurrido el timeout
-  wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET"
+  wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET" || true
 
   # Buscamos procesos dpkg/apt detenidos más de 6 minutos
   unlock_dpkg 6
@@ -857,54 +948,64 @@ solveapterrors() {
   install_shim_if_uefi
 
   # Tratamos de instalar paquetes en estado ic
-  wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
-  if [ "$incomplete_packages" ]; then
+  wait_while_locked; incomplete_packages=$(dpkg -l | awk '/^ic/ {print $2}')
+  if [ -n "$incomplete_packages" ]; then
      echo -e "${GREEN}Tratando de reparar paquetes en estado ^ic.${NC}"
 
      for packagename in $incomplete_packages; do
-         wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $packagename
-         if [ $? -ne 0 ]; then
-            wait_while_locked; dpkg --purge --force-all $packagename
-         fi
+        wait_while_locked
+        if ! run_aptitude -y install "$packagename"; then
+           wait_while_locked; dpkg --purge --force-all "$packagename"
+        fi
      done
   fi
 
   # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
-  wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
-  if [ "$very_bad_state_packages" ]; then
+  wait_while_locked; very_bad_state_packages=$(dpkg -l | awk '/^.HR/ {print $2}')
+  if [ -n "$very_bad_state_packages" ]; then
      echo -e "${GREEN}Tratando de reparar paquetes en muy mal estado.${NC}"
 
      for packagename in $very_bad_state_packages; do
-         mv /var/lib/dpkg/info/$packagename.* /tmp/
-         wait_while_locked; dpkg --purge --force-all $packagename
-         wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $packagename
-         if [ $? -ne 0 ]; then
-            wait_while_locked; dpkg --purge --force-all $packagename
-         fi
+        # OJO: hay `set -o noglob`, así que "paquete".* NO se expande;
+        # usamos find para mover los ficheros de info realmente.
+        find /var/lib/dpkg/info -maxdepth 1 -name "${packagename}.*" -exec mv {} /tmp/ \; 2>/dev/null
+        wait_while_locked; dpkg --purge --force-all "$packagename"
+        wait_while_locked
+        if ! is_cloud_kernel "$packagename" || is_running_kernel_pkg "$packagename"; then
+           if ! run_aptitude -y install "$packagename"; then
+              wait_while_locked; dpkg --purge --force-all "$packagename"
+           fi
+        else
+           echo "Paquete $packagename es un kernel de nube/GPU: no se reinstala."
+        fi
      done
   fi
 
   # Desinstalamos paquetes en estado de inconsistencia
-  wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
-  if [ "$inconsistent_packages" ]; then
+  wait_while_locked; inconsistent_packages=$(dpkg -l | awk '/^iU/ {print $2}')
+  if [ -n "$inconsistent_packages" ]; then
      echo -e "${GREEN}Tratando de reparar paquetes en estado ^iU.${NC}"
 
      for packagename in $inconsistent_packages; do
-         mv /var/lib/dpkg/info/$packagename.* /tmp/
-         wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename
+        find /var/lib/dpkg/info -maxdepth 1 -name "${packagename}.*" -exec mv {} /tmp/ \; 2>/dev/null
+        wait_while_locked; dpkg --remove --force-remove-reinstreq "$packagename"
      done
   fi
 
   # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
-  wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-  if [ "$bad_packages" ]; then
+  wait_while_locked; bad_packages=$(dpkg -l | awk '/^(iF|ri)/ {print $2}')
+  if [ -n "$bad_packages" ]; then
      echo -e "${GREEN}Tratando de reinstalar paquetes en estado ^iF o ^ri.${NC}"
-     wait_while_locked; run_aptitude -y install -o Dpkg::Options::="--force-confold" $bad_packages
-     wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-     if [ "$bad_packages" ]; then
-        wait_while_locked; run_aptitude remove -y $bad_packages
-        if [ $? -ne 0 ]; then
-           wait_while_locked; dpkg --purge --force-all $bad_packages
+     # shellcheck disable=SC2086
+     wait_while_locked; run_aptitude -y install $bad_packages
+     wait_while_locked; bad_packages=$(dpkg -l | awk '/^(iF|ri)/ {print $2}')
+     if [ -n "$bad_packages" ]; then
+        wait_while_locked
+        # shellcheck disable=SC2086
+        if ! apt-get remove -y $bad_packages; then
+           wait_while_locked
+           # shellcheck disable=SC2086
+           dpkg --purge --force-all $bad_packages
         fi
      fi
   fi
@@ -912,40 +1013,59 @@ solveapterrors() {
   wait_while_locked; apt-get check 1>/dev/null 2>/tmp/apterrors
 
   if [ -s /tmp/apterrors ]; then
-     if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-        if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
-        if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
-        if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+     if grep -q 'Unable to acquire the dpkg frontend lock' /tmp/apterrors; then
+        pgrep aptitude >/dev/null && killprocess aptitude "$AFTER_TIMEOUT"
+        pgrep apt-get  >/dev/null && killprocess apt-get  "$AFTER_TIMEOUT"
+        pgrep dpkg     >/dev/null && killprocess dpkg     "$AFTER_TIMEOUT"
      fi
 
-     grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; run_aptitude -yf install; wait_while_locked; dpkg --configure -a
-     grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; run_aptitude -yf install
-     grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; check_apt_update; wait_while_locked; dpkg --configure -a; wait_while_locked; run_aptitude -yf install
+     if grep -q "Unmet dependencies." /tmp/apterrors; then
+        wait_while_locked; dpkg --configure -a
+        wait_while_locked; apt-get -f install -y
+     fi
+
+     if grep -q "dpkg was interrupted" /tmp/apterrors; then
+        wait_while_locked; dpkg --configure -a
+        wait_while_locked; apt-get -f install -y
+     fi
+
+     if grep -qE 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors; then
+        rm -rf /var/lib/apt/lists/* 2>/dev/null || true
+        wait_while_locked; check_apt_update
+        wait_while_locked; dpkg --configure -a
+        wait_while_locked; apt-get -f install -y
+     fi
   fi
 
   # Reinstalamos paquetes con ficheros .list faltantes
   reinstall_broken_dpkg
 
   # Aseguramos la actualización de pkgsync
-  wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && run_aptitude -yf install pkgsync
+  wait_while_locked
+  if apt list --upgradable 2>/dev/null | grep -q '^pkgsync/'; then
+     run_aptitude -y install pkgsync
+  fi
 
-  export LC_ALL=$idioma
-}
-
-is_proxmox() {
-    command -v pveversion &>/dev/null && [[ -d /etc/pve ]]
+  # Restauramos el idioma original (sin exportar un valor vacío si no existía)
+  if [ -n "$idioma" ]; then
+     export LC_ALL="$idioma"
+  else
+     unset LC_ALL
+  fi
+  set -e
 }
 
 ensure_kernels() {
-  if [ $PURGE_OLD_KERNELS = "yes" ]; then
-     echo "APT::NeverAutoRemove::KernelCount \"$KEEP_LAST_KERNELS\";" | sudo tee /etc/apt/apt.conf.d/99kernel-count
+  if [ "$PURGE_OLD_KERNELS" = "yes" ]; then
+     echo "APT::NeverAutoRemove::KernelCount \"$KEEP_LAST_KERNELS\";" > /etc/apt/apt.conf.d/99kernel-count
 
-     NUM_INSTALLED_KERNELS=$(find /boot -name "vmlinuz-*" | sed -e "s/^\/boot\/vmlinuz-//" | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
+     # Excluir los kernels de nube del conteo antes de decidir si hay demasiados
+     NUM_INSTALLED_KERNELS=$(find /boot -name "vmlinuz-*" | sed -e "s/^\/boot\/vmlinuz-//" | grep -Ev -- '-(aws|azure|gcp|oracle|nvidia|iotg|lowlatency|intel-iotg)$' | awk -F'[.-]' '{print $1"\t"$2"\t"$3"\t"$4"\t"$0}' | sort -k1 -k2 -k3 -k4 -n | cut -f5 | wc -l)
 
      if [[ "$NUM_INSTALLED_KERNELS" -gt "$KEEP_LAST_KERNELS" ]]; then
         # Eliminar kernels antiguos siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/purge-old-kernels
         if [ -x /usr/local/sbin/purge-old-kernels ]; then
-           wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep $KEEP_LAST_KERNELS -qy
+           wait_while_locked; /usr/local/sbin/purge-old-kernels -s --keep "$KEEP_LAST_KERNELS" -qy
         fi
      fi
   fi
@@ -953,25 +1073,28 @@ ensure_kernels() {
 
 launchpad_getkeys() {
   # Obtener claves de repositorios siempre y cuando se haya elegido esta opción y se encuentre /usr/local/sbin/launchpad-getkeys
-  options=""
+  local options=""
 
-  if [ $LAUNCHPAD_GETKEYS = "yes" ] && [ -x /usr/local/sbin/launchpad-getkeys ]; then
+  if [ "$LAUNCHPAD_GETKEYS" = "yes" ] && [ -x /usr/local/sbin/launchpad-getkeys ]; then
      [ -n "$LAUNCHPAD_GETKEYS_PROXY" ] && options+=" -p $LAUNCHPAD_GETKEYS_PROXY"
-     [ $LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS = "yes" ] && options+=" -r"
+     [ "$LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS" = "yes" ] && options+=" -r"
 
-     launchpad-getkeys $options
+     # shellcheck disable=SC2086
+     /usr/local/sbin/launchpad-getkeys $options || true
   fi
 }
 
 eliminar_dependencias() {
-  uninstalled_packages=$(dpkg -l| grep ^rc | awk '{print $2}')
+  uninstalled_packages=$(dpkg -l | grep ^rc | awk '{print $2}')
 
   if [ -n "$uninstalled_packages" ]; then
-     if [ $CLEAN = "yes" ]; then
+     if [ "$CLEAN" = "yes" ]; then
         # Eliminar paquetes desinstalados
+        # shellcheck disable=SC2086
         run_aptitude -y remove --purge-unused $uninstalled_packages
-     elif [ $CLEAN = "purge" ]; then
+     elif [ "$CLEAN" = "purge" ]; then
         # Eliminar paquetes desinstalados y eliminar sus ficheros de configuración
+        # shellcheck disable=SC2086
         run_aptitude -y purge $uninstalled_packages
      fi
   fi
@@ -980,79 +1103,97 @@ eliminar_dependencias() {
 }
 
 apagar_equipo() {
-  # Apagar el equipo si el usuario pasó el parámetro -S
-  if [ $SHUTDOWN = true ] || [ $AUTOSHUTDOWN = true ]; then wait_while_locked;/sbin/poweroff; fi
+  if [ "$SHUTDOWN" = true ] || [ "$AUTOSHUTDOWN" = true ]; then wait_while_locked; /sbin/poweroff; fi
 }
 
 reiniciar_equipo() {
-  # Reiniciar el equipo si el usuario pasó el parámetro -R
-  if [ $REBOOT = true ] || [ $AUTOREBOOT = true ]; then wait_while_locked;/sbin/reboot; fi
+  if [ "$REBOOT" = true ] || [ "$AUTOREBOOT" = true ]; then wait_while_locked; /sbin/reboot; fi
 }
 
 check_auto_shutdown() {
+  local time horaini horafin
   time=$(date +%H%M)
 
-  if [ -n "$AUTOMATIC_SHUTDOWN_BETWEEN" ]; then
-     (echo "$AUTOMATIC_SHUTDOWN_BETWEEN" | grep -Eq ^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$)
-     horaini=$(expr match "$AUTOMATIC_SHUTDOWN_BETWEEN" '\(..:..\)' | tr -d ':')
-     horafin=$(expr "$AUTOMATIC_SHUTDOWN_BETWEEN" : '.*\(..:..\)' | tr -d ':')
+  if [[ "$AUTOMATIC_SHUTDOWN_BETWEEN" =~ ^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$ ]]; then
+     horaini="${AUTOMATIC_SHUTDOWN_BETWEEN:0:2}${AUTOMATIC_SHUTDOWN_BETWEEN:3:2}"
+     horafin="${AUTOMATIC_SHUTDOWN_BETWEEN:6:2}${AUTOMATIC_SHUTDOWN_BETWEEN:9:2}"
 
-     if [ "$horaini" -lt "$horafin" ]; then
-        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOSHUTDOWN=true || AUTOSHUTDOWN=false
-     else
-        if [ "$horaini" -gt "$horafin" ]; then
-           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOSHUTDOWN=true || AUTOSHUTDOWN=false
+     if (( 10#$horaini < 10#$horafin )); then
+        if (( 10#$time >= 10#$horaini && 10#$time <= 10#$horafin )); then
+           AUTOSHUTDOWN=true
+        else
+           AUTOSHUTDOWN=false
+        fi
+     elif (( 10#$horaini > 10#$horafin )); then
+        if (( 10#$time >= 10#$horaini || 10#$time <= 10#$horafin )); then
+           AUTOSHUTDOWN=true
+        else
+           AUTOSHUTDOWN=false
         fi
      fi
   fi
 }
 
 check_auto_reboot() {
+  local time horaini horafin
   time=$(date +%H%M)
 
-  if [ -n "$AUTOMATIC_REBOOT_BETWEEN" ]; then
-     (echo "$AUTOMATIC_REBOOT_BETWEEN" | grep -Eq ^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$)
-     horaini=$(expr match "$AUTOMATIC_REBOOT_BETWEEN" '\(..:..\)' | tr -d ':')
-     horafin=$(expr "$AUTOMATIC_REBOOT_BETWEEN" : '.*\(..:..\)' | tr -d ':')
+  if [[ "$AUTOMATIC_REBOOT_BETWEEN" =~ ^[0-9]{2}:[0-9]{2}-[0-9]{2}:[0-9]{2}$ ]]; then
+     horaini="${AUTOMATIC_REBOOT_BETWEEN:0:2}${AUTOMATIC_REBOOT_BETWEEN:3:2}"
+     horafin="${AUTOMATIC_REBOOT_BETWEEN:6:2}${AUTOMATIC_REBOOT_BETWEEN:9:2}"
 
-     if [ "$horaini" -lt "$horafin" ]; then
-        [ "$time" -ge "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOREBOOT=true || AUTOREBOOT=false
-     else
-        if [ "$horaini" -gt "$horafin" ]; then
-           [ "$time" -le "$horaini" ] && [ "$time" -le "$horafin" ] && AUTOREBOOT=true || AUTOREBOOT=false
+     if (( 10#$horaini < 10#$horafin )); then
+        if (( 10#$time >= 10#$horaini && 10#$time <= 10#$horafin )); then
+           AUTOREBOOT=true
+        else
+           AUTOREBOOT=false
+        fi
+     elif (( 10#$horaini > 10#$horafin )); then
+        if (( 10#$time >= 10#$horaini || 10#$time <= 10#$horafin )); then
+           AUTOREBOOT=true
+        else
+           AUTOREBOOT=false
         fi
      fi
   fi
 
-  if [ $REBOOT ] && [ "$AUTOMATIC_REBOOT_INTO_WINDOWS" = "yes" ] && [ -x /bin/efibootmgr ]; then
+  if [ "$REBOOT" = true ] && [ "$AUTOMATIC_REBOOT_INTO_WINDOWS" = "yes" ] && command -v efibootmgr >/dev/null 2>&1; then
+     local bootorder w10_bootnum
      # Obtenemos el orden de arranque actual
-     bootorder=$(/bin/efibootmgr | sed -n 's|^BootOrder: \(.*\)|\1|p')
+     bootorder=$(efibootmgr | sed -n 's|^BootOrder: \(.*\)|\1|p')
 
-     for DISK in $(lsblk --nodeps |grep disk | awk '{print $1}'); do
-        EFI_DISK="/dev/$DISK"
-        EFIPART=$(gdisk -l $EFI_DISK | grep -w "EFI system partition" | awk '{print $1}')
+     if command -v gdisk >/dev/null 2>&1; then
+        local DISK EFI_DISK EFIPART
+        for DISK in $(lsblk --nodeps -ndo NAME,TYPE | awk '$2 == "disk" {print $1}'); do
+           EFI_DISK="/dev/$DISK"
+           EFIPART=$(gdisk -l "$EFI_DISK" 2>/dev/null | grep -w "EFI system partition" | awk '{print $1}' | head -n 1)
 
-        # Creamos una entrada específica para Windows 10, si no está creada
-        if [ "$EFIPART" ]; then
-           /bin/efibootmgr | grep "W10IES" 2>&1 > /dev/null || /bin/efibootmgr -c -d $EFI_DISK -p $EFIPART -L "W10IES" -l "\EFI\Microsoft\Boot\bootmgfw.efi"
-        fi
-     done
+           # Creamos una entrada específica para Windows 10, si no está creada
+           if [ -n "$EFIPART" ]; then
+              EFIPART="${EFIPART%+}" # gdisk informa "1+" cuando lleva el sufijo
+              efibootmgr | grep -q "W10IES" || efibootmgr -c -d "$EFI_DISK" -p "$EFIPART" -L "W10IES" -l "\EFI\Microsoft\Boot\bootmgfw.efi" >/dev/null 2>&1 || true
+           fi
+        done
+     fi
 
      # Restauramos el bootorder
-     /bin/efibootmgr -o $bootorder
+     [ -n "$bootorder" ] && efibootmgr -o "$bootorder" >/dev/null 2>&1 || true
 
      # Establecemos un arranque temporal de Windows
-     /bin/efibootmgr -n $(/bin/efibootmgr | grep "W10IES" | cut -f1 -d" " | sed -e "s/^Boot//" -e "s/*$//") 2>&1>/dev/null
+     w10_bootnum=$(efibootmgr | grep "W10IES" | cut -f1 -d" " | sed -e "s/^Boot//" -e "s/\*$//" | head -n 1)
+     # shellcheck disable=SC2086
+     [ -n "$w10_bootnum" ] && efibootmgr -n $w10_bootnum >/dev/null 2>&1 || true
   fi
 }
 
 upgrade_packages() {
   # Comprobar si hay paquetes para actualizar
-  local UPGRADABLE=$(aptitude search '~U')
+  local UPGRADABLE
+  UPGRADABLE=$(aptitude search '~U' || true)
 
   if [ -n "$UPGRADABLE" ]; then
     log_output_pkgsync echo -e "${GREEN}Se encontraron paquetes para actualizar:${NC}"
-    log_output_pkgsync echo -e "${GREEN}$UPGRADABLE"
+    log_output_pkgsync echo -e "${GREEN}$UPGRADABLE${NC}"
     log_output_pkgsync echo -e "${GREEN}Ejecutando 'aptitude upgrade'...${NC}"
     run_aptitude upgrade
   else
@@ -1066,26 +1207,29 @@ if (( $EUID != 0 )); then
    exit 1
 fi
 
+mkdir -p /var/log/pkgsync
 :>/var/log/pkgsync.log
 
-# Matamos procesos detenidos
-stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
-if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
-
-# Evitar múltiples ejecuciones simultáneas 
+# Evitar múltiples ejecuciones simultáneas
 LOCKFILE="/var/lock/$(basename "$0").lock"
 SCRIPTNAME="$(basename "$0")"
 
-exec 200>"$LOCKFILE"1
+exec 200>"$LOCKFILE"
 flock -n 200 || {
     echo -e "${RED}[ERROR] '$SCRIPTNAME' ya está en ejecución (lock: $LOCKFILE)${NC}" >&2
     exit 2
 }
 
-# For testing purposes only
-# echo "[INFO] Lock obtenido por '$SCRIPTNAME' (PID $$)"
+cleanup() {
+    if [ "${DISABLED_FAILED_REPOS:-false}" = true ]; then
+        enable_repositories || true
+        DISABLED_FAILED_REPOS=false
+    fi
+    flock -u 200 2>/dev/null || true
+    rm -f "$LOCKFILE"
+}
 
-trap 'flock -u 200; rm -f "$LOCKFILE"' EXIT
+trap cleanup EXIT
 ############################################
 
 # Establecemos valores por defecto
@@ -1109,15 +1253,18 @@ LAUNCHPAD_GETKEYS_REMOVE_EXPIRED_KEYS=no
 TIMEOUT_FOR_SINC_PUPPET="5"
 TIMEOUT_FOR_DPKG_OR_APT="3m"
 TIMEOUT_FOR_MUSTHAVE_BUILD="2m"
-THRESHOLD_FOR_APT_UPDATE=$((30 * 60)) # Definir el umbral de tiempo en segundos (por defecto 30 minutos = 1800 segundos)
-EFI_DISK=$(mount | grep '/boot/efi' | awk '{print $1}' | sed 's/[0-9]*//g') # Disco que contiene EFI
+THRESHOLD_FOR_APT_UPDATE=$((30 * 60)) # Umbral en segundos (30 minutos por defecto)
 ABORT_ON_FAILED_REPOS="yes"
 DISABLED_FAILED_REPOS=false
 AUTO_TEST_FILES="no"
 ALERT_EMAIL_RECEIVER=""
 ALERT_EMAIL_ON_ERROR="no"
 ENSURE_ESSENTIAL="no"
+IGNORE_MUSTHAVE="no"
+IGNORE_MAYNOTHAVE="no"
+IGNORE_MAYHAVE="no"
 SIMULATE="no"
+rest_markauto=""
 runned_sinc_puppet=false
 
 LAUNCH_SINC_PUPPET=yes
@@ -1126,9 +1273,22 @@ LAUNCH_SINC_PUPPET=yes
 
 [ -x /usr/sbin/sinc_puppet ] || LAUNCH_SINC_PUPPET="no"
 
+# Calculamos AFTER_TIMEOUT en segundos a partir de TIMEOUT_FOR_DPKG_OR_APT,
+# que wait_while_locked necesita (timeout solo admite segundos)
+[ -n "$TIMEOUT_FOR_DPKG_OR_APT" ] || TIMEOUT_FOR_DPKG_OR_APT="3m"
+TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
+TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
+case "$TIMEOUT_UNITS" in
+   "s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER ;;
+   "m")  AFTER_TIMEOUT=$((TIMEOUT_NUMBER * 60)) ;;
+   "h")  AFTER_TIMEOUT=$((TIMEOUT_NUMBER * 3600)) ;;
+   "d")  AFTER_TIMEOUT=$((TIMEOUT_NUMBER * 86400)) ;;
+   *)    AFTER_TIMEOUT=180 ;;
+esac
+
 parse_options "$@"
 
-$FORCE && ENABLE=yes
+if [ "$FORCE" = true ]; then ENABLE=yes; fi
 if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
   echo " * [info]: La aplicación 'pkgsync' está desactivada en /etc/default/pkgsync."
   echo "           Para activarla poner el valor ENABLE=yes."
@@ -1136,11 +1296,6 @@ if [ "$ENABLE" == "no" ] || [ ! "$ENABLE" ]; then
 fi
 
 # Crear el directorio /etc/pkgsync y sus subdirectorios si no existen
-if [ ! -d /etc/pkgsync ]; then
-   echo -e "${GREEN}Creando el directorio /etc/pkgsync ...${NC}"
-   mkdir /etc/pkgsync
-fi
-
 if [ ! -d /etc/pkgsync/mayhave.d ]; then
    echo -e "${GREEN}Creando el directorio /etc/pkgsync/mayhave.d/ ...${NC}"
    mkdir -p /etc/pkgsync/mayhave.d
@@ -1156,46 +1311,20 @@ if [ ! -d /etc/pkgsync/musthave.d ]; then
    mkdir -p /etc/pkgsync/musthave.d
 fi
 
-# Crear un fichero /etc/pkgsync/mayhave.ies vacío si no existe
-if [ ! -r /etc/pkgsync/mayhave.ies ]; then
-   echo -e "${GREEN}Creando el fichero /etc/pkgsync/mayhave.ies ...${NC}"
-   touch /etc/pkgsync/mayhave.ies
-fi
-
-# Crear un fichero /etc/pkgsync/maynothave.ies vacío si no existe
-if [ ! -r /etc/pkgsync/maynothave.ies ]; then
-   echo -e "${GREEN}Creando el fichero /etc/pkgsync/maynothave.ies ...${NC}"
-   touch /etc/pkgsync/maynothave.ies
-fi
-
-# Crear un fichero /etc/pkgsync/musthave.ies vacío si no existe
-if [ ! -r /etc/pkgsync/musthave.ies ]; then
-   echo -e "${GREEN}Creando el fichero /etc/pkgsync/musthave.ies ...${NC}"
-   touch /etc/pkgsync/musthave.ies
-fi
-
-
-# Crear un fichero /etc/pkgsync/musthave.orphan vacío si no existe
-if [ ! -r /etc/pkgsync/musthave.orphan ]; then
-   echo -e "${GREEN}Creando el fichero /etc/pkgsync/musthave.orphan ...${NC}"
-   touch /etc/pkgsync/musthave.orphan
-fi
-
-# Crear un fichero /etc/pkgsync/mayhave vacío si no existe
-if [ ! -r /etc/pkgsync/mayhave ]; then
-   echo -e "${GREEN}Creando el fichero /etc/pkgsync/mayhave ...${NC}"
-   touch /etc/pkgsync/mayhave
-fi
-
-# Crear un fichero /etc/pkgsync/maynothave vacío si no existe
-if [ ! -r /etc/pkgsync/maynothave ]; then
-   echo -e "${GREEN}Creando el fichero /etc/pkgsync/maynothave ...${NC}"
-   touch /etc/pkgsync/maynothave
-fi
+# Crear ficheros auxiliares vacíos si no existen
+for _f in /etc/pkgsync/mayhave /etc/pkgsync/mayhave.ies \
+          /etc/pkgsync/maynothave /etc/pkgsync/maynothave.ies \
+          /etc/pkgsync/musthave.ies /etc/pkgsync/musthave.orphan; do
+   if [ ! -r "$_f" ]; then
+      echo -e "${GREEN}Creando el fichero $_f ...${NC}"
+      touch "$_f"
+   fi
+done
+unset _f
 
 # Generar /etc/pkgsync/musthave si no existe el fichero con la lista de paquetes instalados en el sistema o está vacío
 if [ ! -r /etc/pkgsync/musthave -o ! -s /etc/pkgsync/musthave ]; then
-   timeout $TIMEOUT_FOR_MUSTHAVE_BUILD /usr/local/sbin/musthave-build
+   timeout "$TIMEOUT_FOR_MUSTHAVE_BUILD" /usr/local/sbin/musthave-build
 
    # Si no se ha creado un fichero musthave, mostramos un error
    if [ ! -r /etc/pkgsync/musthave ]; then
@@ -1210,84 +1339,6 @@ fi
 
 # Check if we've got debtags installed
 [ -x /usr/bin/debtags ] && USE_DEBTAGS=yes
-
-
-if [ $SIMULATE = "yes" ]; then
-   simulate
-   exit 0
-fi
-
-
-# Determinar si se debe apagar el equipo al terminar
-check_auto_shutdown
-
-# Determinar si se debe reiniciar el equipo al terminar
-check_auto_reboot
-
-# Descargar claves de repositorios
-log_output_pkgsync launchpad_getkeys
-
-# Actualizamos los paquetes instalados
-solveapterrors; echo -e "${CYAN}Comprobando si existen actualizaciones de paquetes instalados...${NC}"; wait_while_locked; LC_ALL=C check_apt_update | tee /tmp/apterrors
-
-# Abort if repository downloads fail (possible mirror failure).
-grep -w '^W: Failed to fetch' /tmp/apterrors 2>&1 >/dev/null
-if [ $? -eq 0 ]; then
-   log_output_pkgsync echo -e "${RED}\n[ERR] aptitude update error. Mirror sync in progress?${NC}"
-   exit 1
-fi
-
-# Upgrade software
-disable_failed_repositories; upgrade_packages; enable_repositories
-
-if [ -x /usr/sbin/sinc_puppet ]; then
-
-   wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET"
-
-   # Si el servidor puppet responde, se encuentra el ejecutable de sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
-   [ -n "$PUPPET_SERVER" ] && ping -c1 $PUPPET_SERVER > /dev/null 2>&1
-
-   if [ $? -eq 0 ]; then
-      if [ $runned_sinc_puppet = false ]; then
-         installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" ")
-         if version_ge $installed_version "2.7"; then
-            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f now; fi
-         else
-            if [ $LAUNCH_SINC_PUPPET = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f; fi
-         fi
-      fi
-   fi
-fi
-
-echo -e "${GREEN}Realizando pkgsync...${NC}"
-
-# Update the package lists
-wait_while_locked; check_apt_update
-
-# Get failed repositories
-cat /tmp/apterrors | grep '^Err' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%-]*" > /tmp/failedrepositories
-
-if [ $ABORT_ON_FAILED_REPOS = "yes" ]; then
-   # Abortamos pkgsync si algún repositorio no se encuentra accesible
-   if [ -s /tmp/failedrepositories ]; then
-      log_output_pkgsync echo -e "${RED}\n[ERR] aptitude update error${NC}" 
-      log_output_pkgsync echo "The following repositories fail:"
-      log_output_pkgsync cat /tmp/failedrepositories
-      echo -e "${RED}      Aborting${NC}"
-      exit 1
-   fi
-elif [ $ABORT_ON_FAILED_REPOS = "no" ]; then
-   disable_failed_repositories
-   DISABLED_FAILED_REPOS=true
-fi
-
-run_debtags update
-
-# Create ies files if don't exists
-test -f /etc/pkgsync/musthave.ies || touch /etc/pkgsync/musthave.ies
-test -f /etc/pkgsync/maynothave.ies || touch /etc/pkgsync/maynothave.ies
-test -f /etc/pkgsync/mayhave.ies || touch /etc/pkgsync/mayhave.ies
-test -f /etc/pkgsync/musthave.orphan || touch /etc/pkgsync/musthave.orphan
 
 if [ "$IGNORE_MUSTHAVE" = "yes" ]; then
    MUSTHAVE=""
@@ -1307,9 +1358,91 @@ else
    MAYHAVE="/etc/pkgsync/mayhave"
 fi
 
+if [ "$SIMULATE" = "yes" ]; then
+   simulate
+   exit 0
+fi
+
+# Determinar si se debe apagar el equipo al terminar
+check_auto_shutdown
+
+# Determinar si se debe reiniciar el equipo al terminar
+check_auto_reboot
+
+# Descargar claves de repositorios
+log_output_pkgsync launchpad_getkeys
+
+# Reparamos posibles errores previos de apt/dpkg
+solveapterrors
+
+echo -e "${CYAN}Comprobando si existen actualizaciones de paquetes instalados...${NC}"
+:> /tmp/failedrepositories
+:> /tmp/apt_update.log
+wait_while_locked; check_apt_update
+
+if [ -s /tmp/failedrepositories ] || grep -qw '^W: Failed to fetch' /tmp/apt_update.log 2>/dev/null; then
+   if [ "$ABORT_ON_FAILED_REPOS" = "yes" ]; then
+      log_output_pkgsync echo -e "${RED}\n[ERR] aptitude update error. Mirror sync in progress?${NC}"
+      if [ -s /tmp/failedrepositories ]; then
+         log_output_pkgsync echo "The following repositories fail:"
+         log_output_pkgsync cat /tmp/failedrepositories
+      fi
+      echo -e "${RED}      Aborting${NC}"
+      exit 1
+   elif [ "$ABORT_ON_FAILED_REPOS" = "no" ]; then
+      disable_failed_repositories
+      DISABLED_FAILED_REPOS=true
+   fi
+fi
+
+# Upgrade software
+upgrade_packages
+
+if [ -x /usr/sbin/sinc_puppet ]; then
+
+   wait_for_sinc_puppet "$TIMEOUT_FOR_SINC_PUPPET" || true
+
+   # Si el servidor puppet responde, se encuentra el ejecutable de sinc_puppet, y no ha sido iniciado previamente, lo iniciamos
+   if [ -n "$PUPPET_SERVER" ] && ping -c1 "$PUPPET_SERVER" > /dev/null 2>&1; then
+      if [ "$runned_sinc_puppet" = false ]; then
+         installed_version=$(dpkg -s linex-ubuntu-puppet 2>/dev/null | grep 'Version:' | cut -f2 -d" " || true)
+         if [ -n "$installed_version" ] && version_ge "$installed_version" "2.7"; then
+            if [ "$LAUNCH_SINC_PUPPET" = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f now; fi
+         else
+            if [ "$LAUNCH_SINC_PUPPET" = "yes" ] && [ -x /usr/sbin/sinc_puppet ]; then log_output_pkgsync /usr/sbin/sinc_puppet -f; fi
+         fi
+      fi
+   fi
+fi
+
+echo -e "${GREEN}Realizando pkgsync...${NC}"
+
+# Update the package lists if cache expired (e.g. after sinc_puppet modified sources)
+wait_while_locked; check_apt_update
+
+if [ -s /tmp/failedrepositories ]; then
+   if [ "$ABORT_ON_FAILED_REPOS" = "yes" ]; then
+      # Abortamos pkgsync si algún repositorio no se encuentra accesible
+      log_output_pkgsync echo -e "${RED}\n[ERR] aptitude update error${NC}"
+      log_output_pkgsync echo "The following repositories fail:"
+      log_output_pkgsync cat /tmp/failedrepositories
+      echo -e "${RED}      Aborting${NC}"
+      exit 1
+   elif [ "$ABORT_ON_FAILED_REPOS" = "no" ]; then
+      disable_failed_repositories
+      DISABLED_FAILED_REPOS=true
+   fi
+fi
+
+run_debtags update
+
 # Si el valor de ENABLE es onlyupgrade, entonces tratamos de resolver errores de apt, actualizamos paquetes y finalizamos
 if [ "$ENABLE" = "onlyupgrade" ]; then
    exit 0
+fi
+
+if [ "$AUTO_TEST_FILES" = "yes" ]; then
+   test_files; remove_packages_from_lists
 fi
 
 # Merge files
@@ -1323,45 +1456,40 @@ mayhave_marknonauto=$( getpkgs /etc/pkgsync/mayhave.all | sort -u | sed "s/$/\&m
 mustormayhave=$( ( getpkgs /etc/pkgsync/musthave.all ; getpkgs /etc/pkgsync/mayhave.all ) | sort -u )
 
 if [ "$IGNORE_MUSTHAVE" = "no" ]; then
+ # shellcheck disable=SC2086
  rest_markauto=$( filter $installed $installed $mustormayhave | sed "s/$/\&M/" )
 fi
 
-if [ $AUTO_TEST_FILES = "yes" ]; then
-   test_files; remove_packages_from_lists; merge_files
-fi
-
+# shellcheck disable=SC2086
 log_output_pkgsync run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 
-pkgs=$(find /etc/pkgsync/musthave /etc/pkgsync/musthave.ies /etc/pkgsync/musthave.d -type f -exec grep -h -w -F -f <(dpkg -l | awk '/^rc/ {print $2}') {} + 2>/dev/null | grep -v -w -F -f <(find /etc/pkgsync/maynothave /etc/pkgsync/maynothave.ies /etc/pkgsync/maynothave.d -type f -exec cat {} + 2>/dev/null | grep -E -v '^\s*($|#)') | sort -u)
+pkgs=$(find /etc/pkgsync/musthave /etc/pkgsync/musthave.ies /etc/pkgsync/musthave.d -type f -exec grep -h -w -F -f <(dpkg -l | awk '/^rc/ {print $2}') {} + 2>/dev/null | grep -v -w -F -f <(find /etc/pkgsync/maynothave /etc/pkgsync/maynothave.ies /etc/pkgsync/maynothave.d -type f -exec cat {} + 2>/dev/null | grep -E -v '^\s*($|#)') | sort -u || true)
 
 if [ -n "$pkgs" ]; then
     echo "Se han encontrado paquetes en estado rc que deberían estar instalados:"
     echo "$pkgs"
     echo "Ejecutando nuevamente pkgsync"
+    # shellcheck disable=SC2086
     log_output_pkgsync run_aptitude full-upgrade '?upgradable' $musthave_install $maynothave_remove $mayhave_marknonauto $rest_markauto
 fi
 
 log_output_pkgsync run_aptitude autoclean
-log_output_pkgsync ensure_kernels; log_output_pkgsync eliminar_dependencias
+log_output_pkgsync ensure_kernels
+log_output_pkgsync eliminar_dependencias
 log_output_pkgsync echo -e "${GREEN}Proceso concluido.${NC}"
 
-if [ $ABORT_ON_FAILED_REPOS = "no" ] && [ $DISABLED_FAILED_REPOS = true ]; then enable_repositories; fi
+if [ "$ABORT_ON_FAILED_REPOS" = "no" ] && [ "$DISABLED_FAILED_REPOS" = true ]; then
+   enable_repositories
+   DISABLED_FAILED_REPOS=false
+fi
 
-if [ $ALERT_EMAIL_ON_ERROR = "yes" ] && [ -n "$ALERT_EMAIL_RECEIVER" ]; then
-   grep -e ERR -e Err /var/log/pkgsync.log > /dev/null 2>&1
-
-   if [ $? -eq 0 ]; then
-      mail -s "Error al ejecutar pkgsync en el equipo $(hostname)" "$ALERT_EMAIL_RECEIVER" < /var/log/pkgsync.log
+if [ "$ALERT_EMAIL_ON_ERROR" = "yes" ] && [ -n "$ALERT_EMAIL_RECEIVER" ]; then
+   if grep -Eq '(\[ERR\]|^Err:|E: )' /var/log/pkgsync.log 2>/dev/null; then
+      mail -s "Error al ejecutar pkgsync en el equipo $(hostname)" "$ALERT_EMAIL_RECEIVER" < /var/log/pkgsync.log || true
    fi
 fi
 
-# El lock se libera automáticamente al salir, pero añadimos un trap por limpieza explícita
-cleanup() {
-	# For testing purposes only
-    # echo "[INFO] Liberando lock $LOCKFILE"
-    flock -u 200
-    rm -f "$LOCKFILE"
-}
-trap cleanup EXIT
+# El lock se libera automáticamente al salir mediante el trap cleanup EXIT
 
-apagar_equipo;reiniciar_equipo
+apagar_equipo
+reiniciar_equipo

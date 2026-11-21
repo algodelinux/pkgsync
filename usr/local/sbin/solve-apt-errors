@@ -1,451 +1,554 @@
 #!/bin/bash
 # solve-apt-errors - Trata de resolver posibles errores de apt
 # 2013-2026 Esteban M. Navas Martín <algodelinux@gmail.com>.
-# Last update: 02/02/2026
+# Last update: 21/11/2026
 
-idioma=$LC_ALL
+idioma=${LC_ALL:-}
 export LC_ALL=C
 export DEBIAN_FRONTEND=noninteractive
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
-YELLOW="\033[33m"
-CYAN="\033[36m"
-NC='\033[0m' # No Color
+YELLOW='\033[36m'
+CYAN='\033[36m'
+NC='\033[0m'
 
 INFO="${CYAN}[INFO]${NC}"
 OK="${GREEN}[✔]${NC}"
 WARN="${YELLOW}[!]${NC}"
 FAIL="${RED}[✖]${NC}"
-DIR="${CYAN}[DIR]${NC}"
 LOG="${CYAN}[LOG]${NC}"
 
 LOG_FILE="/var/log/solve-apt-errors.log"
 
-killprocess() {
-   updatehour=$(ps aux|grep $1 | grep -v grep | head -1 | awk '{print $9}')
-   if [ -n $updatehour ]; then
-      timestampupdate=$(date -d "$updatehour" +'%s')
-      timestampnow=$(date +'%s')
-      diference=$(($timestampnow - $timestampupdate))
-      minutesfromupdate=$(($diference / 60))
+# Release del kernel en ejecución: nunca se purga
+RUNNING_RELEASE=$(uname -r)
 
-      if [ "$minutesfromupdate" -gt "$2" ]; then
-         # Matamos proceso
-         pkill -9 $1 2>/dev/null
-      fi
-   fi
-}
-
-wait_while_locked() {
-   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout $TIMEOUT_FOR_DPKG_OR_APT /usr/local/sbin/wait_for_apt_or_dpkg
-}
-
-install_packages() {
-    local packages="$1"
-    local problem_pkgs
-    local tmp_dir="/tmp/install_packages_debs"
-    local LOG_FILE="/var/log/install_packages.log"
-
-    # Comprobar si se han pasado paquetes
-    if [ -z "$packages" ]; then
-        echo "No se han especificado paquetes para instalar." | tee -a "$LOG_FILE"
-        return 1
-    fi
-
-    echo "Instalando los siguientes paquetes: $packages" | tee -a "$LOG_FILE"
-
-    # Separar paquetes por si se pasan rutas a .deb y nombres
-    local apt_packages=()
-    local deb_files=()
-    for pkg in $packages; do
-        if [[ "$pkg" == *.deb ]]; then
-            deb_files+=("$pkg")
-        else
-            apt_packages+=("$pkg")
-        fi
-    done
-
-    # Instalar paquetes con apt-get (solo nombres de paquetes)
-    if [ "${#apt_packages[@]}" -gt 0 ]; then
-        if apt-get -y install -o Dpkg::Options::="--force-confold" "${apt_packages[@]}" 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Instalación inicial de paquetes apt completada correctamente." | tee -a "$LOG_FILE"
-        else
-            echo "Error durante la instalación de paquetes apt." | tee -a "$LOG_FILE"
-            return 2
-        fi
-    fi
-
-    # Instalar paquetes locales .deb
-    if [ "${#deb_files[@]}" -gt 0 ]; then
-        echo "Instalando paquetes locales .deb con dpkg: ${deb_files[*]}" | tee -a "$LOG_FILE"
-        if dpkg -i "${deb_files[@]}" 2>&1 | tee -a "$LOG_FILE"; then
-            echo "Instalación de paquetes .deb completada correctamente." | tee -a "$LOG_FILE"
-        else
-            echo "Error durante la instalación de paquetes .deb." | tee -a "$LOG_FILE"
-            return 3
-        fi
-    fi
-
-    # Buscar paquetes en estados problemáticos después de la instalación
-    problem_pkgs=$(dpkg -l | awk '/^(ic|iU|iF|ri|.HR)/ {print $2}')
-
-    if [ -z "$problem_pkgs" ]; then
-        echo "No se detectaron paquetes problemáticos después de la instalación." | tee -a "$LOG_FILE"
-        return 0
-    fi
-
-    echo "Se han detectado paquetes problemáticos: $problem_pkgs" | tee -a "$LOG_FILE"
-
-    # Crear directorio temporal para descargar los .deb de los problemáticos
-    mkdir -p "$tmp_dir"
-    trap 'rm -rf "$tmp_dir"' EXIT
-
-    local downloaded_any=0
-
-    # Descargar los paquetes problemáticos
-    set -o pipefail
-
-    for pkg in $problem_pkgs; do
-        echo "Procesando paquete problemático: $pkg" | tee -a "$LOG_FILE"
-
-        # Intentar descargar el paquete
-        if apt-get download -o=dir::cache="$tmp_dir" "$pkg" >>"$LOG_FILE" 2>&1; then
-            downloaded_any=1
-            echo "Paquete $pkg descargado correctamente." | tee -a "$LOG_FILE"
-        else
-            echo "No se pudo descargar $pkg, se eliminará con dpkg." | tee -a "$LOG_FILE"
-            if dpkg --remove --force-remove-reinstreq "$pkg" >>"$LOG_FILE" 2>&1; then
-                echo "Paquete $pkg eliminado correctamente." | tee -a "$LOG_FILE"
-            else
-                echo "Error al eliminar el paquete $pkg con dpkg." | tee -a "$LOG_FILE"
-            fi
-        fi
-    done
-
-    set +o pipefail
-
-    # Instalar los paquetes descargados con dpkg
-    echo "Instalando paquetes problemáticos con dpkg..." | tee -a "$LOG_FILE"
-    if dpkg -i "$tmp_dir"/*.deb 2>&1 | tee -a "$LOG_FILE"; then
-        echo "Instalación de paquetes problemáticos completada correctamente." | tee -a "$LOG_FILE"
-    else
-        echo "Error durante la instalación de paquetes problemáticos con dpkg." | tee -a "$LOG_FILE"
-        return 5
-    fi
-}
-
-unlock_dpkg() {
-    local TIME_MINUTES="${1:-5}"
-
-    # For testing purposes only
-    # echo -e "${CYAN}Buscando procesos dpkg/apt bloqueados o configurando paquetes desde más de $TIME_MINUTES minutos...${NC}" | tee -a "$LOG_FILE"
-
-    ps -eo pid,etime,comm,args --sort=etime | while read -r PID ETIME COMM ARGS; do
-        # Solo dpkg o apt
-        if [[ "$COMM" != "dpkg" && "$COMM" != "apt" ]]; then
-            continue
-        fi
-
-        # Convertir ETIME a minutos aproximados
-        minutes=0
-        if [[ $ETIME =~ - ]]; then
-            # D-HH:MM o D-HH:MM:SS
-            IFS=- read -r DAYS TIME_PART <<< "$ETIME"
-            IFS=: read -r H M S <<< "$TIME_PART:0:0"
-            minutes=$((DAYS*24*60 + H*60 + M))
-        else
-            # HH:MM:SS o MM:SS
-            IFS=: read -r H M S <<< "$ETIME:0:0"
-            H=${H:-0}
-            M=${M:-0}
-            minutes=$((H*60 + M))
-        fi
-
-        if [ "$minutes" -ge "$TIME_MINUTES" ]; then
-            # Identificar si está configurando un paquete
-            ACTION_DESC="bloqueado"
-            [[ "$ARGS" == *"--configure"* ]] && ACTION_DESC="configurando paquetes"
-
-            echo -e "${RED}Proceso $PID ($COMM) $ACTION_DESC lleva $minutes minutos. Terminando...${NC}" | tee -a "$LOG_FILE"
-
-            kill -TERM "$PID" 2>/dev/null
-            sleep 2
-            if ps -p "$PID" > /dev/null; then
-                echo -e "${RED}Proceso $PID no terminó, forzando KILL...${NC}" | tee -a "$LOG_FILE"
-                kill -KILL "$PID" 2>/dev/null
-            fi
-        fi
-    done
-
-}
-
-
-reinstall_broken_dpkg() {
-    local INFO_DIR="/var/lib/dpkg/info"
-    local BROKEN_PACKAGES=()
-
-    # Obtener todos los paquetes instalados con su arquitectura
-    mapfile -t BROKEN_PACKAGES < <(
-        dpkg -l | awk '/^ii/ {print $2}' | while IFS= read -r pkg; do
-            # Solo corregir wine32:i386 a wine32
-            [[ "$pkg" == "wine32:i386" ]] && pkg="wine32"
-            # Comprobar si falta el archivo .list
-            [ ! -f "$INFO_DIR/$pkg.list" ] && printf '%s\n' "$pkg"
-        done
-    )
-
-    # Si no hay paquetes rotos, salir silenciosamente
-    if [ ${#BROKEN_PACKAGES[@]} -eq 0 ]; then
-        return 0
-    fi
-
-    # Mostrar paquetes con archivos .list faltantes
-    echo "Paquetes con archivos .list faltantes:"
-    printf '%s\n' "${BROKEN_PACKAGES[@]}"
-
-    # Reinstalar paquetes automáticamente
-    echo "Reinstalando paquetes..."
-    check_apt_update
-    sudo apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}"
-    echo "Reinstalación completada."
-}
-
-restore_ldconfig() {
-    TMPDIR="/tmp/libc-bin-restore"
-    mkdir -p "$TMPDIR"
-
-    # Comprobación inicial
-    if command -v ldconfig >/dev/null 2>&1; then
-        return 0
-    fi
-
-    echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
-
-    # Detectar distribución y versión
-    if [ -f /etc/os-release ]; then
-        . /etc/os-release
-        DISTRO=${ID,,}
-        VERSION_ID=${VERSION_ID:-unknown}
-    else
-        echo -e "$FAIL No se puede determinar la distribución (falta /etc/os-release)."
-        return 1
-    fi
-
-    ARCH=$(dpkg --print-architecture)
-    echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
-
-    # Obtener URL del paquete libc-bin
-    echo -e "$INFO Buscando paquete libc-bin adecuado..."
-
-    case "$DISTRO" in
-        ubuntu)
-            REPO="http://archive.ubuntu.com/ubuntu"
-            ;;
-        debian)
-            REPO="http://deb.debian.org/debian"
-            ;;
-        *)
-            echo -e "$FAIL Distribución no soportada: $DISTRO"
-            return 1
-            ;;
-    esac
-
-    PKG_VER=$(LC_ALL=C apt-cache policy libc-bin 2>/dev/null | grep "Candidate:" | awk '{print $2}' || true)
-
-    if [ -z "$PKG_VER" ]; then
-        echo -e "$WARN No se pudo determinar versión de libc-bin con apt-cache, usando fallback..."
-        PKG_URL=$(
-            curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
-            | gunzip -c 2>/dev/null \
-            | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}'
-        )
-    else
-        PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${PKG_VER}_${ARCH}.deb"
-    fi
-
-    PKG_NAME=$(basename "$PKG_URL")
-    PKG_PATH="$TMPDIR/$PKG_NAME"
-
-    echo -e "$LOG Descargando $PKG_NAME ..."
-    wget -q -O "$PKG_PATH" "$PKG_URL"
-
-    # Extraer ldconfig
-    echo -e "$INFO Extrayendo paquete..."
-    dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
-
-    if [ ! -f "$TMPDIR/extracted/sbin/ldconfig" ]; then
-        echo -e "$FAIL No se encontró ldconfig dentro del paquete descargado."
-        return 1
-    fi
-
-    echo -e "$INFO Copiando ldconfig a /sbin ..."
-    cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/
-    chmod 755 /sbin/ldconfig
-
-    # Verificación y reparación
-    echo -e "$INFO Verificando funcionamiento..."
-    if /sbin/ldconfig -p >/dev/null 2>&1; then
-        echo -e "$OK ldconfig restaurado correctamente."
-    else
-        echo -e "$WARN ldconfig copiado pero no parece funcional."
-    fi
-
-    echo -e "$INFO Reinstalando libc-bin y reparando dependencias..."
-    apt-get install --reinstall -y libc-bin || true
-    apt-get -f install -y || true
-
-    # Limpieza
-    echo -e "$INFO Limpiando archivos temporales..."
-    rm -rf "$TMPDIR"
-
-    echo -e "$OK Proceso completado. ldconfig debería estar operativo."
-}
-
-install_shim_if_uefi() {
-    # Comprobar si el sistema usa UEFI
-    if [ ! -d /sys/firmware/efi ]; then
-        echo "Sistema no UEFI, no se requiere 'shim-signed'."
-        return 0
-    fi
-
-    # Detectar estado de shim-signed (ii = instalado, rc = eliminado con configs)
-    PKG_STATUS=$(dpkg -l shim-signed 2>/dev/null | awk '/^(ii|rc)/ {print $1}')
-
-    # Comprobar si hay ESP real
-    EFI_DISK=$(findmnt -n -o SOURCE /boot/efi 2>/dev/null | sed 's/[0-9]*$//')
-
-    if [ -z "$EFI_DISK" ]; then
-        # For testing purposes only
-        # echo "⚠ No se detectó disco EFI."
-
-        # Si shim-signed está instalado, desinstalarlo junto con dependencias esenciales
-        if [[ "$PKG_STATUS" == "ii" ]]; then
-            echo "'shim-signed' está instalado pero no hay ESP. Procediendo a desinstalar..."
-            export DEBIAN_FRONTEND=noninteractive
-            apt-get remove --purge -y --allow-remove-essential shim-signed grub-efi-amd64-signed mokutil || true
-            apt-get autoremove -y
-            unset DEBIAN_FRONTEND
-            echo "✔ 'shim-signed' desinstalado correctamente."
-        #else
-        #    echo "✔ 'shim-signed' no está instalado. No se realiza ninguna acción."
-        fi
-
-        return 0
-    fi
-
-    # Si shim-signed ya está instalado, no hacer nada
-    if [[ "$PKG_STATUS" == "ii" ]]; then
-        # For testing purpose only
-        # echo "'shim-signed' ya está instalado. No se realizará ninguna acción."
-        return 0
-    fi
-
-    # Si shim-signed no está instalado, proceder con instalación/reinstalación
-    echo "Disco EFI detectado: $EFI_DISK"
-    echo "'shim-signed' no está instalado. Preparando instalación manual con dependencias..."
-
-    # Preparar directorio temporal
-    TMPDIR=$(mktemp -d)
-    cd "$TMPDIR" || return 1
-
-    # Actualizar lista de paquetes
-    apt-get update -qq
-
-    # Obtener shim-signed y todas sus dependencias automáticamente
-    PACKAGES=$(apt-cache depends shim-signed  | awk '/Depends:/ {print $2}'  | grep -v '^<.*>$')
-    PACKAGES="shim-signed $PACKAGES"
-
-    echo "Descargando paquetes: $PACKAGES"
-    for pkg in $PACKAGES; do
-        if ! apt-get download "$pkg" >/dev/null 2>&1; then
-            echo "✖ Error descargando $pkg"
-            rm -rf "$TMPDIR"
-            return 1
-        fi
-    done
-
-    # Crear tmpfs temporal para evitar error 32 en post-install de GRUB
-    mkdir -p /var/lib/grub/esp
-    mount -t tmpfs tmpfs /var/lib/grub/esp || { echo "⚠ No se pudo montar tmpfs en /var/lib/grub/esp"; rm -rf "$TMPDIR"; return 1; }
-    ESP_TMPFS=1
-
-    echo "Ejecutando grub-install en modo no interactivo..."
-    grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck --no-floppy "$EFI_DISK" || {
-        echo "⚠ No se pudo ejecutar grub-install correctamente."
-    }
-
-    # Instalar paquetes descargados en modo no interactivo
-    export DEBIAN_FRONTEND=noninteractive
-    DEB_FILES=$(find "$TMPDIR" -maxdepth 1 -type f -name "*.deb")
-    dpkg -i $DEB_FILES || true
-
-    # Resolver dependencias automáticamente
-    apt-get install -f -y
-    unset DEBIAN_FRONTEND
-
-    # Verificar instalación
-    if dpkg -s shim-signed >/dev/null 2>&1; then
-        echo "✔ 'shim-signed' y sus dependencias instaladas correctamente."
-    else
-        echo "✖ Falló la instalación de 'shim-signed'."
-        umount /var/lib/grub/esp
-        rm -rf "$TMPDIR"
-        return 1
-    fi
-
-    # Limpiar temporales
-    rm -rf "$TMPDIR"
-    [ "$ESP_TMPFS" -eq 1 ] && umount /var/lib/grub/esp && echo "⚠ Desmontado tmpfs temporal en /var/lib/grub/esp"
-}
-
-if (( $EUID != 0 )); then
+if [ "$(id -u)" -ne 0 ]; then
    echo -e "${RED}Please run with SUDO or root user account${NC}"
    exit 1
 fi
 
+# Determina si un nombre de paquete es un kernel de nube/GPU (o un
+# componente suyo: imagen, módulos, módulos-extra, headers, meta).
+# Se usa para que los mecanismos de reparación nunca los reinstalen.
+is_cloud_kernel() {
+   local pkg="$1"
+   [[ "$pkg" =~ ^linux-(aws|azure|gcp|oracle|nvidia|iotg|intel-iotg|lowlatency)([-a-z0-9.]*)?(:.*)?$ ]] && return 0
+   [[ "$pkg" =~ ^linux-(image|image-unsigned|modules|modules-extra|headers|buildinfo|unsigned)[-a-z0-9.]*-(aws|azure|gcp|oracle|nvidia|iotg|intel-iotg|lowlatency)($|-[0-9][a-z0-9.+-]*)(:.*)?$ ]] && return 0
+   return 1
+}
+
+# Determina si un paquete corresponde al kernel EN EJECUCIÓN
+is_running_kernel_pkg() {
+   [[ "$1" = *-"$RUNNING_RELEASE" ]]
+}
+
+# Purga una lista de paquetes (array), con fallback a dpkg si falla apt.
+# Loga en el fichero indicado.
+purge_pkgs() {
+   local logfile="$1"; shift
+   [ $# -eq 0 ] && return 0
+   wait_while_locked
+   # shellcheck disable=SC2086
+   if ! apt-get purge -y "$@" 2>&1 | tee -a "$logfile"; then
+      # shellcheck disable=SC2086
+      dpkg --purge --force-all "$@" 2>&1 | tee -a "$logfile" || true
+   fi
+}
+
+#_AUTOREMOVE_PROTEGIDO: no deja que apt elimine paquetes base del sistema
+# (firmware, metapaquetes generic, imágenes/headers/módulos no-nube).
+# Si algo protegido apareciese como candidato, se omite el autoremove
+# completo y se avisa (mejor sobrar kernels que quedarse sin ellos).
+safe_autoremove() {
+   local logfile="$1" candidates p protected
+   candidates=$(apt-get autoremove --purge --simulate 2>/dev/null | awk '/^Purg/ {print $2}')
+   protected=""
+   for p in $candidates; do
+      if [[ "$p" =~ ^linux-(signed|firmware|generic|image|headers|modules|tools|buildinfo) ]] \
+         && ! is_cloud_kernel "$p" && ! is_running_kernel_pkg "$p"; then
+         protected="$protected $p"
+      fi
+   done
+   if [ -n "$protected" ]; then
+      echo "Aviso: autoremove omitido, protegería estos paquetes base:$protected" | tee -a "$logfile"
+      return 0
+   fi
+   apt-get autoremove --purge -y 2>&1 | tee -a "$logfile" || true
+}
+
+# Elimina de una lista de paquetes (separados por espacios o líneas)
+# los que son kernels de nube/GPU o el kernel en ejecución. Devuelve el resto.
+filter_out_cloud_kernels() {
+   local pkg
+   for pkg in $1; do
+      is_cloud_kernel "$pkg" || printf '%s\n' "$pkg"
+   done
+}
+
+killprocess() {
+   # $1 = proceso, $2 = segundos máximos de vida antes de matarlo
+   local pid etime
+   pid=$(pgrep -o "$1" 2>/dev/null)
+   [ -n "$pid" ] || return 0
+   etime=$(ps -o etimes= -p "$pid" 2>/dev/null)
+   [ -n "$etime" ] && [ "$etime" -gt "$2" ] && pkill -9 "$1" 2>/dev/null
+}
+
+wait_while_locked() {
+   [ -x /usr/local/sbin/wait_for_apt_or_dpkg ] && timeout "$AFTER_TIMEOUT" /usr/local/sbin/wait_for_apt_or_dpkg
+}
+
+purge_cloud_kernels() {
+   # Purgamos los kernels de nube/GPU usando is_cloud_kernel como UNICO
+   # criterio (antes había un awk con un patrón distinto y más permisivo
+   # que также atrapaba paquetes como linux-firmware-nvidia-graphics).
+   # Se excluye el kernel EN EJECUCIÓN para no dejar el sistema sin arrancar.
+   # Modo "quiet" (2ª pasada, red de seguridad): si no encuentra nada, el
+   # aviso va solo al log, no a pantalla.
+   local quiet=""; [ "${1:-}" = "quiet" ] && quiet=1
+   local pkg candidates=()
+   while IFS= read -r pkg; do
+      [ -n "$pkg" ] || continue
+      is_cloud_kernel "$pkg" && ! is_running_kernel_pkg "$pkg" && candidates+=("$pkg")
+   done < <(dpkg-query -W -f='${binary:Package}\t${db:Status-Abbrev}\n' 2>/dev/null \
+           | awk -F'\t' '$2 !~ /^un/ && $1 ~ /^linux-/ {print $1}')
+
+   if [ "${#candidates[@]}" -gt 0 ]; then
+      echo -e "${INFO}Purgando kernels de nube/GPU:" | tee -a "$LOG_FILE"
+      printf '  %s\n' "${candidates[@]}" | tee -a "$LOG_FILE"
+      purge_pkgs "$LOG_FILE" "${candidates[@]}"
+      safe_autoremove "$LOG_FILE"
+   elif [ -n "$quiet" ]; then
+      echo -e "${INFO}No hay kernels de nube/GPU instalados (2ª pasada)." | tee -a "$LOG_FILE" >&2
+   else
+      echo -e "${INFO}No hay kernels de nube/GPU instalados." | tee -a "$LOG_FILE"
+   fi
+}
+
+install_packages() {
+   local packages="$1"
+   local pkg problem_pkgs
+   local tmp_dir
+   tmp_dir=$(mktemp -d /tmp/install_packages_debs.XXXXXX)
+   local LOG_FILE="/var/log/install_packages.log"
+   local downloaded_any=0
+
+   if [ -z "$packages" ]; then
+      echo "No se han especificado paquetes para instalar." | tee -a "$LOG_FILE"
+      rm -rf "$tmp_dir"
+      return 1
+   fi
+
+   # ---------------------------------------------------------------
+   # kernels de nube/GPU: nunca se instalan. Si alguno aparece en la
+   # lista se purga en su lugar y se continúa solo con el resto.
+   # El kernel en ejecución nunca se purga.
+   # ---------------------------------------------------------------
+   local cloud_pkgs=() normal_pkgs=()
+   for pkg in $packages; do
+      if is_cloud_kernel "$pkg" && ! is_running_kernel_pkg "$pkg"; then
+         cloud_pkgs+=("$pkg")
+      else
+         normal_pkgs+=("$pkg")
+      fi
+   done
+
+   if [ ${#cloud_pkgs[@]} -gt 0 ]; then
+      echo "Se han encontrado kernels de nube/GPU en la lista de reparación:" | tee -a "$LOG_FILE"
+      printf '  %s\n' "${cloud_pkgs[@]}" | tee -a "$LOG_FILE"
+      echo "Se purgan en lugar de reinstalarse:" | tee -a "$LOG_FILE"
+      purge_pkgs "$LOG_FILE" "${cloud_pkgs[@]}"
+   fi
+
+   packages="${normal_pkgs[*]}"
+   unset normal_pkgs
+
+   if [ -z "$packages" ]; then
+      echo "Solo quedaban kernels de nube/GPU en la lista; purgados. Nada más que instalar." | tee -a "$LOG_FILE"
+      rm -rf "$tmp_dir"
+      return 0
+   fi
+   # ---------------------------------------------------------------
+
+   echo "Instalando los siguientes paquetes: $packages" | tee -a "$LOG_FILE"
+
+   local apt_packages=() deb_files=()
+   for pkg in $packages; do
+      case "$pkg" in
+         *.deb) deb_files+=("$pkg") ;;
+         *)     apt_packages+=("$pkg") ;;
+      esac
+   done
+
+   if [ "${#apt_packages[@]}" -gt 0 ]; then
+      wait_while_locked
+      if apt-get -y install -o Dpkg::Options::="--force-confold" "${apt_packages[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+         echo "Instalación inicial de paquetes apt completada correctamente." | tee -a "$LOG_FILE"
+      else
+         echo "Error durante la instalación de paquetes apt." | tee -a "$LOG_FILE"
+         rm -rf "$tmp_dir"
+         return 2
+      fi
+   fi
+
+   if [ "${#deb_files[@]}" -gt 0 ]; then
+      echo "Instalando paquetes locales .deb con dpkg: ${deb_files[*]}" | tee -a "$LOG_FILE"
+      if dpkg -i "${deb_files[@]}" 2>&1 | tee -a "$LOG_FILE"; then
+         echo "Instalación de paquetes .deb completada correctamente." | tee -a "$LOG_FILE"
+      else
+         echo "Error durante la instalación de paquetes .deb." | tee -a "$LOG_FILE"
+         rm -rf "$tmp_dir"
+         return 3
+      fi
+   fi
+
+   # Además de los estados problemáticos, tratamos también los
+   # paquetes desempaquetados o a medio configurar que sean kernels
+   # de nube: se purgan, no se reparan (salvo el kernel en ejecución).
+   local remain_cloud=()
+   while IFS= read -r pkg; do
+      [ -n "$pkg" ] || continue
+      is_cloud_kernel "$pkg" && ! is_running_kernel_pkg "$pkg" && remain_cloud+=("$pkg")
+   done < <(dpkg -l | awk '/^(ic|iU|iF|ri|pi)/ {print $2}')
+
+   if [ "${#remain_cloud[@]}" -gt 0 ]; then
+      echo "Purgando kernels de nube/GPU en estado problemático:" | tee -a "$LOG_FILE"
+      printf '  %s\n' "${remain_cloud[@]}" | tee -a "$LOG_FILE"
+      purge_pkgs "$LOG_FILE" "${remain_cloud[@]}"
+   fi
+
+   problem_pkgs=$(dpkg -l | awk '/^(ic|iU|iF|ri|pi)/ {print $2}')
+   problem_pkgs=$(filter_out_cloud_kernels "$problem_pkgs")
+
+   if [ -z "$problem_pkgs" ]; then
+      echo "No se detectaron paquetes problemáticos después de la instalación." | tee -a "$LOG_FILE"
+      rm -rf "$tmp_dir"
+      return 0
+   fi
+
+   echo "Se han detectado paquetes problemáticos: $problem_pkgs" | tee -a "$LOG_FILE"
+
+   # apt-get download SIEMPRE descarga en el directorio actual
+   # (dir::cache no le afecta), por eso entramos en $tmp_dir.
+   for pkg in $problem_pkgs; do
+      echo "Procesando paquete problemático: $pkg" | tee -a "$LOG_FILE"
+      if (cd "$tmp_dir" && apt-get download "$pkg" >>"$LOG_FILE" 2>&1); then
+         downloaded_any=1
+      else
+         echo "No se pudo descargar $pkg, se eliminará con dpkg." | tee -a "$LOG_FILE"
+         wait_while_locked
+         if dpkg --remove --force-remove-reinstreq "$pkg" >>"$LOG_FILE" 2>&1; then
+            echo "Paquete $pkg eliminado correctamente." | tee -a "$LOG_FILE"
+         else
+            echo "Error al eliminar el paquete $pkg con dpkg." | tee -a "$LOG_FILE"
+         fi
+      fi
+   done
+
+   if [ "$downloaded_any" -eq 1 ]; then
+      echo "Instalando paquetes problemáticos con dpkg..." | tee -a "$LOG_FILE"
+      # shellcheck disable=SC2086
+      if (cd "$tmp_dir" && ls *.deb >/dev/null 2>&1) && dpkg -i "$tmp_dir"/*.deb 2>&1 | tee -a "$LOG_FILE"; then
+         echo "Instalación de paquetes problemáticos completada correctamente." | tee -a "$LOG_FILE"
+      else
+         echo "Error durante la instalación de paquetes problemáticos con dpkg." | tee -a "$LOG_FILE"
+         rm -rf "$tmp_dir"
+         return 5
+      fi
+   fi
+
+   rm -rf "$tmp_dir"
+   return 0
+}
+
+unlock_dpkg() {
+   local TIME_MINUTES="${1:-5}"
+   local pid etime comm args days h m minutes action_desc
+
+   ps -eo pid,etimes,comm,args --sort=etimes | while read -r pid etime comm args; do
+      case "$comm" in
+         dpkg|apt|apt-get|unattended-upgrade|sinc_puppet) ;;
+         *) continue ;;
+      esac
+
+      minutes=$((etime / 60))
+
+      if [ "$minutes" -ge "$TIME_MINUTES" ]; then
+         action_desc="bloqueado"
+         [[ "$args" == *"--configure"* ]] && action_desc="configurando paquetes"
+         echo -e "${RED}Proceso $pid ($comm) $action_desc lleva $minutes minutos. Terminando...${NC}" | tee -a "$LOG_FILE"
+         kill -TERM "$pid" 2>/dev/null
+         sleep 2
+         if ps -p "$pid" > /dev/null; then
+            echo -e "${RED}Proceso $pid no terminó, forzando KILL...${NC}" | tee -a "$LOG_FILE"
+            kill -KILL "$pid" 2>/dev/null
+         fi
+      fi
+   done
+}
+
+reinstall_broken_dpkg() {
+   local INFO_DIR="/var/lib/dpkg/info"
+   local BROKEN_PACKAGES=() pkg
+
+   mapfile -t BROKEN_PACKAGES < <(
+      dpkg -l | awk '/^ii/ {print $2}' | while IFS= read -r pkg; do
+         [ "$pkg" = "wine32:i386" ] && pkg="wine32"
+         [ ! -f "$INFO_DIR/$pkg.list" ] && printf '%s\n' "$pkg"
+      done
+   )
+
+   # Los kernels de nube/GPU con .list faltante se purgan, no se reinstalan
+   local cloud=() normal=()
+   for pkg in "${BROKEN_PACKAGES[@]}"; do
+      if is_cloud_kernel "$pkg" && ! is_running_kernel_pkg "$pkg"; then
+         cloud+=("$pkg")
+      else
+         normal+=("$pkg")
+      fi
+   done
+   if [ ${#cloud[@]} -gt 0 ]; then
+      echo "Purgando kernels de nube/GPU con ficheros .list faltantes:" | tee -a "$LOG_FILE"
+      printf '  %s\n' "${cloud[@]}" | tee -a "$LOG_FILE"
+      purge_pkgs "$LOG_FILE" "${cloud[@]}"
+   fi
+   BROKEN_PACKAGES=("${normal[@]}")
+
+   [ ${#BROKEN_PACKAGES[@]} -eq 0 ] && return 0
+
+   echo "Paquetes con archivos .list faltantes:"
+   printf '%s\n' "${BROKEN_PACKAGES[@]}"
+
+   echo "Reinstalando paquetes..."
+   wait_while_locked
+   apt-get update -qq
+   wait_while_locked
+   apt-get install --reinstall -y "${BROKEN_PACKAGES[@]}" 2>&1 | tee -a "$LOG_FILE"
+   echo "Reinstalación completada."
+}
+
+restore_ldconfig() {
+   local TMPDIR="/tmp/libc-bin-restore"
+   mkdir -p "$TMPDIR"
+
+   if command -v ldconfig >/dev/null 2>&1; then
+      rm -rf "$TMPDIR"
+      return 0
+   fi
+
+   echo -e "$WARN ldconfig no encontrado. Procediendo a restaurarlo..."
+
+   local DISTRO VERSION_ID ARCH REPO PKG_VER PKG_URL PKG_NAME PKG_PATH
+
+   if [ -f /etc/os-release ]; then
+      . /etc/os-release
+      DISTRO=${ID,,}
+      VERSION_ID=${VERSION_ID:-unknown}
+   else
+      echo -e "$FAIL No se puede determinar la distribución (falta /etc/os-release)."
+      return 1
+   fi
+
+   ARCH=$(dpkg --print-architecture)
+   echo -e "$INFO Sistema detectado: $DISTRO $VERSION_ID ($ARCH)"
+
+   case "$DISTRO" in
+      ubuntu) REPO="http://archive.ubuntu.com/ubuntu" ;;
+      debian) REPO="http://deb.debian.org/debian" ;;
+      *) echo -e "$FAIL Distribución no soportada: $DISTRO"; return 1 ;;
+   esac
+
+   PKG_VER=$(apt-cache policy libc-bin 2>/dev/null | awk '/Candidate:/ {print $2}')
+
+   if [ -z "$PKG_VER" ]; then
+      echo -e "$WARN No se pudo determinar versión de libc-bin con apt-cache, usando fallback..."
+      local RELPATH
+      RELPATH=$(curl -s "${REPO}/dists/${VERSION_CODENAME:-stable}/main/binary-${ARCH}/Packages.gz" \
+                | gunzip -c 2>/dev/null \
+                | awk '/^Package: libc-bin/{found=1} found && /^Filename:/{print $2; exit}')
+      [ -n "$RELPATH" ] && PKG_URL="${REPO}/${RELPATH}"
+   else
+      # apt-cache devuelve la versión con época (1:2.39...) pero el nombre de
+      # fichero no la incluye; también escondemos '+ubuntu' mal codificado.
+      local VER_FOR_FILE="${PKG_VER#*:}"
+      PKG_URL="${REPO}/pool/main/g/glibc/libc-bin_${VER_FOR_FILE}_${ARCH}.deb"
+   fi
+
+   if [ -z "$PKG_URL" ]; then
+      echo -e "$FAIL No se pudo obtener la URL de libc-bin."
+      rm -rf "$TMPDIR"
+      return 1
+   fi
+
+   PKG_NAME=$(basename "$PKG_URL")
+   PKG_PATH="$TMPDIR/$PKG_NAME"
+
+   echo -e "$LOG Descargando $PKG_NAME ..."
+   if ! curl -fsSL -o "$PKG_PATH" "$PKG_URL"; then
+      echo -e "$FAIL No se pudo descargar $PKG_NAME."
+      rm -rf "$TMPDIR"
+      return 1
+   fi
+
+   echo -e "${INFO}Extrayendo paquete..."
+   dpkg-deb -x "$PKG_PATH" "$TMPDIR/extracted"
+
+   if [ ! -f "$TMPDIR/extracted/sbin/ldconfig" ]; then
+      echo -e "${FAIL}No se encontró ldconfig dentro del paquete descargado."
+      rm -rf "$TMPDIR"
+      return 1
+   fi
+
+   echo -e "${INFO}Copiando ldconfig a /sbin ..."
+   cp "$TMPDIR/extracted/sbin/ldconfig" /sbin/ldconfig
+   chmod 755 /sbin/ldconfig
+
+   echo -e "${INFO}Verificando funcionamiento..."
+   if /sbin/ldconfig -p >/dev/null 2>&1; then
+      echo -e "$OK ldconfig restaurado correctamente."
+   else
+      echo -e "$WARN ldconfig copiado pero no parece funcional."
+   fi
+
+   echo -e "${INFO}Reinstalando libc-bin y reparando dependencias..."
+   wait_while_locked
+   apt-get install --reinstall -y libc-bin 2>&1 | tee -a "$LOG_FILE" || true
+   wait_while_locked
+   apt-get -f install -y 2>&1 | tee -a "$LOG_FILE" || true
+
+   rm -rf "$TMPDIR"
+   echo -e "$OK Proceso completado. ldconfig debería estar operativo."
+}
+
+install_shim_if_uefi() {
+   if [ ! -d /sys/firmware/efi ]; then
+      return 0
+   fi
+
+   local PKG_STATUS EFI_DISK
+   PKG_STATUS=$(dpkg -l shim-signed 2>/dev/null | awk '/^(ii|rc)/ {print $1}')
+   EFI_DISK=$(findmnt -n -o SOURCE /boot/efi 2>/dev/null | sed 's/[0-9]*$//')
+
+   if [ -z "$EFI_DISK" ]; then
+      if [ "$PKG_STATUS" = "ii" ]; then
+         echo "'shim-signed' está instalado pero no hay ESP. Procediendo a desinstalar..."
+         wait_while_locked
+         apt-get remove --purge -y --allow-remove-essential shim-signed grub-efi-amd64-signed mokutil 2>&1 | tee -a "$LOG_FILE" || true
+         wait_while_locked
+         safe_autoremove "$LOG_FILE"
+         echo "✔ 'shim-signed' desinstalado correctamente."
+      fi
+      return 0
+   fi
+
+   if [ "$PKG_STATUS" = "ii" ]; then
+      return 0
+   fi
+
+   echo "Disco EFI detectado: $EFI_DISK"
+   echo "'shim-signed' no está instalado. Preparando instalación manual con dependencias..."
+
+   # Todo el trabajo con $TMPDIR se hace en una subshell para no cambiar
+   # el directorio de trabajo del script y poder borrarlo sin peligro.
+   (
+      local TMPDIR PACKAGES pkg DEB_FILES
+      TMPDIR=$(mktemp -d) || exit 1
+      cd "$TMPDIR" || exit 1
+      trap 'rm -rf "$TMPDIR"' EXIT
+
+      apt-get update -qq
+
+      PACKAGES="shim-signed $(apt-cache depends shim-signed | awk '/Depends:/ {print $2}' | grep -v '^<.*>$')"
+
+      echo "Descargando paquetes: $PACKAGES"
+      for pkg in $PACKAGES; do
+         if ! apt-get download "$pkg" >/dev/null 2>&1; then
+            echo "✖ Error descargando $pkg"
+            exit 1
+         fi
+      done
+
+      mkdir -p /var/lib/grub/esp
+      local ESP_TMPFS=0
+      if mount -t tmpfs tmpfs /var/lib/grub/esp; then ESP_TMPFS=1; fi
+
+      echo "Ejecutando grub-install en modo no interactivo..."
+      grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=GRUB --recheck --no-floppy "$EFI_DISK" 2>&1 | tee -a "$LOG_FILE" \
+         || echo "⚠ No se pudo ejecutar grub-install correctamente."
+
+      # shellcheck disable=SC2086
+      DEB_FILES=$(ls "$TMPDIR"/*.deb 2>/dev/null)
+      if [ -n "$DEB_FILES" ]; then
+         # shellcheck disable=SC2086
+         dpkg -i $DEB_FILES 2>&1 | tee -a "$LOG_FILE" || true
+      fi
+      apt-get install -f -y 2>&1 | tee -a "$LOG_FILE"
+
+      if ! dpkg -s shim-signed >/dev/null 2>&1; then
+         echo "✖ Falló la instalación de 'shim-signed'."
+         [ "$ESP_TMPFS" -eq 1 ] && umount /var/lib/grub/esp
+         exit 1
+      fi
+
+      echo "✔ 'shim-signed' y sus dependencias instaladas correctamente."
+      [ "$ESP_TMPFS" -eq 1 ] && { umount /var/lib/grub/esp && echo "⚠ Desmontado tmpfs temporal en /var/lib/grub/esp"; }
+      exit 0
+   )
+   return $?
+}
+
+# ============================================================================
+# Sección principal
+# ============================================================================
+
 # Tiempo máximo en minutos que puede estar corriendo sinc_puppet antes de matarlo
 TIMEOUT_FOR_SINC_PUPPET="5"
-# Tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync 
-# Este ajuste puede definirse en segundos (30 o 30s), minutos (10m), horas (6h) o días (2d).
+# Tiempo máximo de espera a que dpkg o apt hayan terminado antes de realizar pkgsync
 TIMEOUT_FOR_DPKG_OR_APT="3m"
+AFTER_TIMEOUT=180
 
 if [ -f /etc/default/pkgsync ]; then
-   TIMEOUT_FOR_DPKG_OR_APT=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
-   TIMEOUT_FOR_SINC_PUPPET=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
+   _value=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_DPKG_OR_APT="\(.*\)"|\1|p')
+   [ -n "$_value" ] && TIMEOUT_FOR_DPKG_OR_APT="$_value"
+   _value=$(grep -v "^#" /etc/default/pkgsync | sed -n 's|TIMEOUT_FOR_SINC_PUPPET="\(.*\)"|\1|p')
+   [ -n "$_value" ] && TIMEOUT_FOR_SINC_PUPPET="$_value"
 fi
+unset _value 2>/dev/null || true
 
-if [ -s "$TIMEOUT_FOR_DPKG_OR_APT" ]; then
-   TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT: -1}
-   TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT:: -1}
-fi
+TIMEOUT_NUMBER=${TIMEOUT_FOR_DPKG_OR_APT%?}
+TIMEOUT_UNITS=${TIMEOUT_FOR_DPKG_OR_APT#$TIMEOUT_NUMBER}
 
 case "$TIMEOUT_UNITS" in
-
-"s")  AFTER_TIMEOUT=$TIMEOUT_NUMBER
-    ;;
-"m")  AFTER_TIMEOUT=$(($TIMEOUT_NUMBER * 60))
-    ;;
-"h")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 3600))
-    ;;
-"d")  AFTER_TIMEOUT=$((expr $TIMEOUT_NUMBER * 86400))
-   ;;
+   s) AFTER_TIMEOUT=$TIMEOUT_NUMBER ;;
+   m) AFTER_TIMEOUT=$((TIMEOUT_NUMBER * 60)) ;;
+   h) AFTER_TIMEOUT=$((TIMEOUT_NUMBER * 3600)) ;;
+   d) AFTER_TIMEOUT=$((TIMEOUT_NUMBER * 86400)) ;;
+   *) AFTER_TIMEOUT=180 ;;
 esac
 
-if [ "$1" == "-f" ]; then
-   $TIMEOUT_FOR_SINC_PUPPET=0
-   $AFTER_TIMEOUT=0
+if [ "${1:-}" = "-f" ]; then
+   TIMEOUT_FOR_SINC_PUPPET=0
+   AFTER_TIMEOUT=0
 fi
 
 # Matamos procesos detenidos
-stopped_processes=$(ps auwx | awk 'NR>1 && $8 ~ "T" {print $2}')
-if [ "$stopped_processes" ]; then kill -9 $stopped_processes; fi
+stopped_processes=$(ps -eo pid,stat,comm | awk '$2 ~ /^T/ && $3 !~ /^(ps|awk)$/ {print $1}')
+if [ -n "$stopped_processes" ]; then
+   echo "Terminando procesos detenidos: $stopped_processes" | tee -a "$LOG_FILE"
+   # shellcheck disable=SC2086
+   kill -9 $stopped_processes 2>/dev/null || true
+fi
 
 # Matamos sinc_puppet si está corriendo desde hace más de xx minutos
-if [ $(pgrep -c sinc_puppet) -gt 0 ]; then killprocess sinc_puppet $TIMEOUT_FOR_SINC_PUPPET; fi
+if pgrep sinc_puppet >/dev/null; then killprocess sinc_puppet "$((TIMEOUT_FOR_SINC_PUPPET * 60))"; fi
 
 # Buscamos procesos dpkg/apt detenidos más de 5 minutos (valor por defecto)
 unlock_dpkg
+
+# Purgamos kernels de nube/GPU al principio...
+purge_cloud_kernels
 
 # Restauramos ldconfig si no se encuentra
 restore_ldconfig
@@ -453,65 +556,105 @@ restore_ldconfig
 # Instalamos shim en sistemas uefi, si se encuentra en estado ^rc
 install_shim_if_uefi
 
-# Tratamos de instalar paquetes en estado ic
-wait_while_locked; incomplete_packages=$(dpkg -l|grep ^ic | awk '{print $2}')
-if [ "$incomplete_packages" ]; then
-   wait_while_locked; install_packages $incomplete_packages
+# Tratamos de instalar paquetes en estado ic (los kernels de nube, si están
+# en la lista, se purgan dentro de install_packages en lugar de reinstalarse)
+wait_while_locked; incomplete_packages=$(dpkg -l | awk '/^ic/ {print $2}')
+if [ -n "$incomplete_packages" ]; then
+   echo -e "${INFO}Tratando de reparar paquetes en estado ^ic.${NC}" | tee -a "$LOG_FILE"
+   wait_while_locked; install_packages "$incomplete_packages"
 fi
 
 # Reinstalamos paquetes en muy mal estado o los desinstalamos si no se pueden reinstalar
-wait_while_locked; very_bad_state_packages=$(dpkg -l|grep "^.HR" | awk '{print $2}')
-if [ "$very_bad_state_packages" ]; then
+wait_while_locked; very_bad_state_packages=$(dpkg -l | awk '/^.HR/ {print $2}')
+if [ -n "$very_bad_state_packages" ]; then
+   echo -e "${INFO}Tratando de reparar paquetes en muy mal estado.${NC}" | tee -a "$LOG_FILE"
    for packagename in $very_bad_state_packages; do
-       mv /var/lib/dpkg/info/$packagename.* /tmp/
-       wait_while_locked; dpkg --purge --force-all $packagename
-       wait_while_locked; install_packages $packagename
-       if [ $? -ne 0 ]; then
-          wait_while_locked; dpkg --purge --force-all $packagename
-       fi
+      mv /var/lib/dpkg/info/"$packagename".* /tmp/ 2>/dev/null
+      wait_while_locked; dpkg --purge --force-all "$packagename"
+      wait_while_locked
+      if ! is_cloud_kernel "$packagename"; then
+         if ! install_packages "$packagename"; then
+            wait_while_locked; dpkg --purge --force-all "$packagename"
+         fi
+      else
+         echo "Paquete $packagename es un kernel de nube/GPU: no se reinstala." | tee -a "$LOG_FILE"
+      fi
    done
 fi
 
 # Desinstalamos paquetes en estado de inconsistencia
-wait_while_locked; inconsistent_packages=$(dpkg -l|grep ^iU | awk '{print $2}')
-if [ "$inconsistent_packages" ]; then
+wait_while_locked; inconsistent_packages=$(dpkg -l | awk '/^iU/ {print $2}')
+if [ -n "$inconsistent_packages" ]; then
+   echo -e "${INFO}Tratando de reparar paquetes en estado ^iU.${NC}" | tee -a "$LOG_FILE"
    for packagename in $inconsistent_packages; do
-       mv /var/lib/dpkg/info/$packagename.* /tmp/
-       wait_while_locked; dpkg --remove --force-remove-reinstreq $packagename
+      mv /var/lib/dpkg/info/"$packagename".* /tmp/ 2>/dev/null
+      wait_while_locked; dpkg --remove --force-remove-reinstreq "$packagename"
    done
 fi
 
 # Reinstalamos paquetes a medio instalar o los desinstalamos si no se pueden reinstalar
-wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-if [ "$bad_packages" ]; then
-   wait_while_locked; install_packages $bad_packages
-   wait_while_locked; bad_packages=$(dpkg -l | grep -e ^iF -e ^ri | awk '{print $2}')
-   if [ "$bad_packages" ]; then
-      wait_while_locked; apt-get remove -y $bad_packages
-      if [ $? -ne 0 ]; then
-         wait_while_locked; dpkg --purge --force-all $bad_packages
+wait_while_locked; bad_packages=$(dpkg -l | awk '/^(iF|ri)/ {print $2}')
+if [ -n "$bad_packages" ]; then
+   echo -e "${INFO}Tratando de reinstalar paquetes en estado ^iF o ^ri.${NC}" | tee -a "$LOG_FILE"
+   wait_while_locked; install_packages "$bad_packages"
+   wait_while_locked; bad_packages=$(dpkg -l | awk '/^(iF|ri)/ {print $2}')
+   bad_packages=$(filter_out_cloud_kernels "$bad_packages")
+   if [ -n "$bad_packages" ]; then
+      wait_while_locked
+      # shellcheck disable=SC2086
+      if ! apt-get remove -y $bad_packages 2>&1 | tee -a "$LOG_FILE"; then
+         wait_while_locked
+         # shellcheck disable=SC2086
+         dpkg --purge --force-all $bad_packages
       fi
    fi
 fi
 
-wait_while_locked; apt-get check 1>/dev/null 2>/tmp/apterrors
+wait_while_locked
+apt-get check 1>/dev/null 2>/tmp/apterrors
 
 if [ -s /tmp/apterrors ]; then
-   if [ -n "$(grep 'Unable to acquire the dpkg frontend lock' /tmp/apterrors)" ]; then
-      if [ $(pgrep -c aptitude) -gt 0 ]; then killprocess aptitude $AFTER_TIMEOUT; fi
-      if [ $(pgrep -c apt-get) -gt 0 ]; then killprocess apt-get $AFTER_TIMEOUT; fi
-      if [ $(pgrep -c dpkg) -gt 0 ]; then killprocess dpkg $AFTER_TIMEOUT; fi
+   if grep -q 'Unable to acquire the dpkg frontend lock' /tmp/apterrors; then
+      pgrep aptitude >/dev/null && killprocess aptitude "$AFTER_TIMEOUT"
+      pgrep apt-get  >/dev/null && killprocess apt-get  "$AFTER_TIMEOUT"
+      pgrep dpkg     >/dev/null && killprocess dpkg     "$AFTER_TIMEOUT"
    fi
 
-   grep "Unmet dependencies." /tmp/apterrors 2>/dev/null && wait_while_locked; aptitude -yf install; wait_while_locked; dpkg --configure -a
-   grep "dpkg was interrupted, you must manually run 'dpkg --configure -a' to correct the problem." /tmp/apterrors 2>/dev/null && wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
-   grep -E 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors 2>/dev/null && rm -r /var/lib/apt/lists/*; wait_while_locked; apt-get update -y; wait_while_locked; dpkg --configure -a; wait_while_locked; aptitude -yf install
+   if grep -q "Unmet dependencies." /tmp/apterrors; then
+      wait_while_locked; dpkg --configure -a 2>&1 | tee -a "$LOG_FILE"
+      wait_while_locked; apt-get -f install -y 2>&1 | tee -a "$LOG_FILE"
+   fi
+
+   if grep -q "dpkg was interrupted" /tmp/apterrors; then
+      wait_while_locked; dpkg --configure -a 2>&1 | tee -a "$LOG_FILE"
+      wait_while_locked; apt-get -f install -y 2>&1 | tee -a "$LOG_FILE"
+   fi
+
+   if grep -qE 'Encountered a section with no Package: header|Problem with MergeList ' /tmp/apterrors; then
+      rm -r /var/lib/apt/lists/* 2>/dev/null
+      wait_while_locked; apt-get update
+      wait_while_locked; dpkg --configure -a 2>&1 | tee -a "$LOG_FILE"
+      wait_while_locked; apt-get -f install -y 2>&1 | tee -a "$LOG_FILE"
+   fi
 fi
 
-# Reinstalamos paquetes con archivos .list faltantes
+# Reinstalamos paquetes con ficheros .list faltantes (los kernels de nube,
+# si están en la lista, se purgan dentro de reinstall_broken_dpkg)
 reinstall_broken_dpkg
 
 # Aseguramos la actualización de pkgsync
-wait_while_locked; apt-cache search '~U' | grep -oE pkgsync >/dev/null 2>&1 && install_packages pkgsync
+wait_while_locked
+if apt list --upgradable 2>/dev/null | grep -q '^pkgsync/'; then
+   wait_while_locked; install_packages pkgsync
+fi
 
-export LC_ALL=$idioma
+# Red de seguridad final: si algún mecanismo de reparación anterior hubiera
+# vuelto a traer un kernel de nube/GPU, lo purgamos antes de terminar
+purge_cloud_kernels quiet
+
+# Restauramos el idioma original (sin exportar un valor vacío si no existía)
+if [ -n "$idioma" ]; then
+   export LC_ALL="$idioma"
+else
+   unset LC_ALL
+fi
